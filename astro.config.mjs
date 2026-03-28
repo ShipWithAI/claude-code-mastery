@@ -24,9 +24,9 @@ export default defineConfig({
           label: 'Start Here',
           translations: { vi: 'Bắt đầu' },
           items: [
-            { label: 'About Us', link: '/en/author/', translations: { vi: 'Về chúng tôi' } },
-            { label: 'Cheat Sheet', link: '/en/cheat-sheet/', translations: { vi: 'Bảng Tham Chiếu' } },
-            { label: 'Tips & Tricks', link: '/en/tips-tricks/', translations: { vi: 'Mẹo & Thủ Thuật' } },
+            { slug: 'author' },
+            { slug: 'cheat-sheet' },
+            { slug: 'tips-tricks' },
           ],
         },
         {
