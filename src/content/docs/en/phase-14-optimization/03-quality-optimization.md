@@ -1,0 +1,349 @@
+---
+title: 'Quality Optimization'
+description: 'Improve Claude Code output quality with configuration techniques and quality/speed tradeoff strategies.'
+---
+
+# Module 14.3: Quality Optimization
+
+> **Estimated time**: ~35 minutes
+>
+> **Prerequisite**: Module 14.2 (Speed Optimization)
+>
+> **Outcome**: After this module, you will know techniques to improve Claude Code output quality, understand quality/speed tradeoffs, and configure Claude for high-quality results.
+
+---
+
+## 1. WHY — Why This Matters
+
+Claude produces code quickly, but it's not quite right. Variable names don't match your conventions. Error handling is missing. It works but doesn't fit your architecture. You spend 30 minutes fixing what Claude generated — defeating the purpose.
+
+Quality optimization ensures Claude's output is production-ready from the start. Less fixing, more shipping. The time invested in setup pays off on every task.
+
+---
+
+## 2. CONCEPT — Core Ideas
+
+### Quality Dimensions
+
+| Dimension | Low Quality | High Quality |
+|-----------|-------------|--------------|
+| **Correctness** | Has bugs | Works correctly |
+| **Standards** | Generic patterns | Matches your style |
+| **Architecture** | Tightly coupled | Clean separation |
+| **Robustness** | Happy path only | Error handling |
+| **Maintainability** | Hard to change | Easy to extend |
+
+### Quality Levers
+
+```text
+CLAUDE.md Setup      → Establishes standards upfront
+Examples             → Show, don't just tell
+Think Mode           → Better reasoning for complex tasks
+Iterative Refinement → Review and improve
+Explicit Constraints → State what you want and don't want
+```
+
+### The Examples Principle
+
+```text
+Without example:
+"Use proper error handling"
+→ Claude guesses what you mean
+
+With example:
+"Use this error handling pattern:
+try {
+  await operation();
+} catch (error) {
+  logger.error('Operation failed', { error, context });
+  throw new AppError('OPERATION_FAILED', error);
+}"
+→ Claude follows exactly
+```
+
+### Think Mode for Quality
+
+Complex tasks benefit from reasoning. Ask Claude to "think step by step" about architecture. Trade speed for better decisions. Use for: design, debugging, refactoring.
+
+### Explicit Constraints
+
+```text
+DO:
+- Use TypeScript strict mode
+- Add JSDoc for public functions
+- Handle null/undefined explicitly
+
+DON'T:
+- Use any type
+- Ignore error cases
+- Use deprecated APIs
+```
+
+---
+
+## 3. DEMO — Step by Step
+
+**Scenario**: Implement a user service with CRUD operations.
+
+### Without Quality Setup
+
+```text
+You: Create a user service with CRUD operations.
+
+Claude: [Generates code]
+```
+
+```javascript
+// user-service.js
+const users = [];
+
+function createUser(data) {
+  const user = { id: Date.now(), ...data };
+  users.push(user);
+  return user;
+}
+
+function getUser(id) {
+  return users.find(u => u.id === id);
+}
+```
+
+**Issues**: No TypeScript, no error handling, in-memory storage, no validation, doesn't match team standards.
+
+### With Quality Setup
+
+**CLAUDE.md includes**:
+- TypeScript strict mode
+- Repository pattern
+- Error handling with custom AppError
+- Zod for validation
+- Example code from existing services
+
+```text
+You: Create a user service following our repository pattern
+with proper validation and error handling.
+
+Think through the design first:
+- What validation rules do we need?
+- What errors could occur?
+- How does this fit our existing services?
+
+Claude: [Thinks through design, then generates]
+```
+
+```typescript
+// src/services/UserService.ts
+import { UserRepository } from '../repositories/UserRepository';
+import { CreateUserSchema } from '../schemas/user';
+import { AppError } from '../errors/AppError';
+import { logger } from '../utils/logger';
+
+export class UserService {
+  constructor(private readonly repository: UserRepository) {}
+
+  async create(data: unknown): Promise<User> {
+    const validated = CreateUserSchema.parse(data);
+
+    const existing = await this.repository.findByEmail(validated.email);
+    if (existing) {
+      throw new AppError('DUPLICATE_EMAIL', 'Email already registered');
+    }
+
+    try {
+      const user = await this.repository.create(validated);
+      logger.info('User created', { userId: user.id });
+      return user;
+    } catch (error) {
+      logger.error('Failed to create user', { error });
+      throw new AppError('CREATE_FAILED', 'Could not create user', error);
+    }
+  }
+}
+```
+
+### Quality Comparison
+
+| Without Setup | With Quality Setup |
+|---------------|-------------------|
+| JavaScript | TypeScript strict |
+| No validation | Zod schemas |
+| No error handling | Custom errors + logging |
+| Doesn't fit project | Matches existing patterns |
+| Needs rewriting | Production-ready |
+
+---
+
+## 4. PRACTICE — Try It Yourself
+
+### Exercise 1: Quality CLAUDE.md
+
+**Goal**: Enhance your CLAUDE.md for quality.
+
+**Instructions**:
+1. Audit your current CLAUDE.md for quality guidance
+2. Add: coding standards, error handling pattern, example code
+3. Test: Generate same feature before/after
+4. Compare quality differences
+
+<details>
+<summary>💡 Hint</summary>
+
+Include at least one code example for your most important pattern (e.g., error handling, API endpoint structure).
+
+</details>
+
+<details>
+<summary>✅ Solution</summary>
+
+Add to CLAUDE.md:
+```markdown
+## Code Quality Standards
+- TypeScript strict mode
+- No `any` type
+- All errors must be handled with AppError
+- Public functions need JSDoc
+
+## Error Handling Example
+```typescript
+try {
+  const result = await operation();
+  return result;
+} catch (error) {
+  logger.error('Operation failed', { error });
+  throw new AppError('OPERATION_FAILED', error);
+}
+```
+```
+
+</details>
+
+### Exercise 2: Example-Driven Quality
+
+**Goal**: Use examples to enforce patterns.
+
+**Instructions**:
+1. Pick a pattern you want Claude to follow
+2. Write one clear example
+3. Add to CLAUDE.md
+4. Test if Claude replicates the pattern
+
+<details>
+<summary>💡 Hint</summary>
+
+Examples work best when they're real code from your project, not generic samples.
+
+</details>
+
+<details>
+<summary>✅ Solution</summary>
+
+Pick your most repeated pattern. Extract a clean example. Reference it: "Follow the pattern in the Error Handling Example section."
+
+Claude will match the style, naming, and structure of your example.
+
+</details>
+
+### Exercise 3: Think Mode for Design
+
+**Goal**: Compare direct implementation vs. think-first approach.
+
+**Instructions**:
+1. Pick a complex feature
+2. First: ask Claude to implement directly
+3. Second: ask Claude to think through design, then implement
+4. Compare architectural quality
+
+<details>
+<summary>💡 Hint</summary>
+
+Ask: "Think step by step about what could go wrong, what edge cases exist, and how this fits our architecture."
+
+</details>
+
+<details>
+<summary>✅ Solution</summary>
+
+Think-first typically produces:
+- Better error handling (considers edge cases)
+- Cleaner architecture (considers fit with existing code)
+- More complete implementations (considers full requirements)
+
+Use for features that touch multiple parts of the system.
+
+</details>
+
+---
+
+## 5. CHEAT SHEET
+
+### Quality Levers
+
+| Lever | Effect |
+|-------|--------|
+| CLAUDE.md | Standards and patterns |
+| Examples | Show what you want |
+| Think Mode | Better reasoning |
+| Constraints | DO/DON'T lists |
+| Review Loop | Iterate to improve |
+
+### Quality Prompts
+
+```text
+"Follow our existing patterns in [file]"
+"Think through the design before implementing"
+"Use the same error handling as [example]"
+"Don't use [pattern], use [better pattern] instead"
+```
+
+### CLAUDE.md Quality Template
+
+```markdown
+## Code Quality Standards
+- TypeScript strict mode
+- No `any` type
+- All errors must be handled
+
+## Example Pattern
+[Include actual code example from your project]
+```
+
+---
+
+## 6. PITFALLS — Common Mistakes
+
+| ❌ Mistake | ✅ Correct Approach |
+|---|---|
+| No CLAUDE.md quality guidance | Define standards explicitly |
+| Telling without showing | Include code examples |
+| Accepting first output | Review and iterate |
+| Vague quality requirements | Specific: "use Zod validation" |
+| Ignoring existing patterns | "Follow pattern in [file]" |
+| Never using think mode | Think mode for complex decisions |
+| Speed over quality always | Know when quality matters most |
+
+---
+
+## 7. REAL CASE — Production Story
+
+**Scenario**: Vietnamese fintech found Claude-generated code had consistent issues: missing error handling, inconsistent naming, no logging. Code reviews caught it, but wasted time.
+
+**Quality Improvement Initiative**:
+
+| Week | Focus | Action |
+|------|-------|--------|
+| 1 | Audit | Reviewed 20 PRs: errors (80%), naming (60%), logging (70%) |
+| 2 | CLAUDE.md | Added patterns with examples for each issue |
+| 3 | Examples | Created /examples folder, one per pattern |
+| 4 | Policy | Think mode required for complex features |
+
+**Results (4 weeks later)**:
+- Error handling issues: 80% → 10%
+- Naming consistency: 60% → 5%
+- Code review rejections: 40% → 8%
+- Time to production: -30% (less rework)
+
+**Quote**: "We stopped blaming Claude for bad code and started teaching Claude our standards. Quality isn't magic — it's setup."
+
+---
+
+> **Next**: [Module 14.4: Cost Optimization](../04-cost-optimization/) →

@@ -1,0 +1,492 @@
+---
+title: 'Think Mode (Extended Thinking)'
+description: 'Activate Claude Code extended thinking for deeper reasoning on complex debugging and architecture tasks.'
+---
+
+# Module 6.1: Think Mode (Extended Thinking)
+
+> **Estimated time**: ~30 minutes
+>
+> **Prerequisite**: Module 5.3 (Image & Visual Context)
+>
+> **Outcome**: After this module, you will know how to activate Claude Code's extended thinking mode, when to use it vs. quick mode, and how to get dramatically better results on complex problems.
+
+---
+
+## 1. WHY — Why This Matters
+
+You ask Claude Code to "refactor the auth module for OAuth2 support." It immediately starts writing code — but the solution is shallow. It misses edge cases, doesn't account for your existing session management, and ignores token refresh complexity. You spend the next hour fixing what Claude generated.
+
+The problem? Claude was sprinting when it should have been thinking. It's like a senior developer who starts coding before fully understanding the problem — you get fast output, but poor quality. Think mode is telling Claude: "Don't write code yet. Think through the problem first, map out edge cases, consider alternatives, THEN implement." The quality difference on complex, multi-step problems is dramatic.
+
+---
+
+## 2. CONCEPT — Core Ideas
+
+### What is Think Mode?
+
+**Think mode** tells Claude Code to spend more time reasoning before taking action. Instead of immediately generating code, Claude first reasons through the problem — analyzing constraints, exploring edge cases, considering alternatives, mapping dependencies — and then produces a more thoughtful, complete solution.
+
+It's the difference between a junior dev who codes first and debugs later, versus a senior dev who thinks first and gets it right the first time.
+
+### How to Activate Think Mode
+
+Think mode is activated through **prompt-based triggers**. The key is to explicitly instruct Claude to think before acting:
+
+| Level | Trigger Phrase | Reasoning Depth |
+|-------|----------------|-----------------|
+| **Level 1** | "think about this first" | Basic extended reasoning |
+| **Level 2** | "think step by step" | Structured breakdown of problem |
+| **Level 3** | "think carefully" | Deep analysis with edge cases & trade-offs |
+| **Level 4** | "ultrathink" ⚠️ | Maximum reasoning depth (verify if official) |
+
+⚠️ **Note**: A dedicated `/think` command may exist in some versions — needs verification. Currently, prompt-based triggers are the reliable method.
+
+### When to Think vs. Act
+
+Not all tasks need deep thinking. Match the reasoning depth to problem complexity:
+
+**USE THINK MODE** for:
+- Architecture decisions
+- Complex refactoring
+- Debugging unclear issues
+- Security analysis
+- Database migrations
+- API design
+- Multi-system integration
+
+**SKIP THINK MODE** for:
+- Simple code generation
+- Formatting/linting
+- Adding a field to a model
+- Writing straightforward tests
+- Basic file operations
+- Renaming variables
+
+### The Think-Act Spectrum
+
+Think mode isn't binary — it's a gradient. The key is matching thinking depth to problem complexity:
+
+```mermaid
+graph LR
+    A[Trivial Task] -->|Act Immediately| B[Simple Task]
+    B -->|Think Basic| C[Moderate Task]
+    C -->|Think Step-by-Step| D[Complex Task]
+    D -->|Think Carefully| E[Critical Task]
+
+    style A fill:#90EE90
+    style B fill:#FFD700
+    style C fill:#FFA500
+    style D fill:#FF6347
+    style E fill:#DC143C
+```
+
+### Cost Consideration
+
+Extended thinking uses more tokens. It's an investment — use it when the problem justifies the cost. Think mode might use 2-3x more tokens upfront, but saves 5-10x tokens in rework and debugging.
+
+---
+
+## 3. DEMO — Step by Step
+
+**Scenario**: You need to refactor the payment module to support multiple providers (Stripe, PayPal, VNPay) instead of the current hardcoded Stripe integration.
+
+### Step 1: WITHOUT Think Mode — Immediate Action
+
+```bash
+$ claude
+```
+
+**Prompt**:
+```
+Refactor src/payment/payment-service.ts to support multiple payment providers
+(Stripe, PayPal, VNPay)
+```
+
+**Claude's response**:
+```
+I'll refactor the payment service to use the strategy pattern...
+
+[Generates code immediately]
+
+interface PaymentProvider {
+  charge(amount: number): Promise<PaymentResult>
+}
+
+class StripeProvider implements PaymentProvider { ... }
+class PayPalProvider implements PaymentProvider { ... }
+class VNPayProvider implements PaymentProvider { ... }
+```
+
+**What's missing**:
+- No analysis of existing session handling
+- Doesn't address webhook integration differences
+- Ignores VNPay's HMAC signature requirements
+- Misses refund flow differences
+- No consideration of currency handling (VND has no decimals)
+
+The code compiles, but it's shallow.
+
+---
+
+### Step 2: WITH Think Mode — Level 2 (Step-by-Step)
+
+**Prompt**:
+```
+Think step by step about how to refactor src/payment/payment-service.ts
+to support multiple payment providers (Stripe, PayPal, VNPay).
+
+Consider:
+- Existing integration points
+- Provider-specific requirements
+- Error handling differences
+- Currency handling (VND has no decimals)
+```
+
+**Claude's response**:
+```
+Let me think through this refactoring systematically:
+
+1. CURRENT STATE ANALYSIS
+   - Current service directly calls Stripe SDK
+   - Webhooks handled in separate route
+   - Session stored in Redis
+   - Currency assumed to be USD
+
+2. PROVIDER DIFFERENCES
+   - Stripe: REST API, webhook events, automatic retries
+   - PayPal: OAuth flow required, IPN callbacks
+   - VNPay: HMAC signature, VND only (no decimals), bank redirect flow
+
+3. INTEGRATION POINTS TO ABSTRACT
+   - Payment initiation (charge/redirect)
+   - Webhook/callback verification
+   - Refund processing
+   - Status polling
+   - Error mapping
+
+4. DESIGN CONSIDERATIONS
+   - Strategy pattern for provider selection
+   - Adapter pattern for webhook normalization
+   - Factory for provider instantiation
+   - Currency formatter per provider
+
+Now I'll implement this architecture...
+```
+
+**Result**: The analysis identifies real constraints BEFORE generating code. The final implementation handles VND decimals correctly, includes webhook adapters, and properly maps provider-specific errors.
+
+---
+
+### Step 3: WITH Think Mode — Level 3 (Carefully)
+
+For the architectural decision, go deeper:
+
+**Prompt**:
+```
+Think carefully about the payment provider abstraction design.
+
+What are the trade-offs between:
+1. Pure strategy pattern (interface + implementations)
+2. Plugin architecture (dynamic loading)
+3. Monorepo with separate provider packages
+
+Consider: maintainability, testing, provider-specific quirks, team structure.
+```
+
+**Claude's response**:
+```
+Let me analyze these architectural approaches:
+
+OPTION 1: Pure Strategy Pattern
+✅ Pros: Simple, type-safe, all code in one place
+❌ Cons: Tight coupling, hard to version providers independently
+
+OPTION 2: Plugin Architecture
+✅ Pros: Dynamic loading, can update providers without rebuild
+❌ Cons: Loses type safety, complex initialization, harder debugging
+
+OPTION 3: Monorepo Packages
+✅ Pros: Independent versioning, clear boundaries, reusable
+❌ Cons: Setup overhead, requires build orchestration
+
+RECOMMENDATION: Monorepo packages
+Why:
+- Your team has 3 developers per provider
+- VNPay API changes frequently (monthly compliance updates)
+- Stripe/PayPal are stable, VNPay needs fast iteration
+- Separate versioning critical for compliance audit
+
+Structure:
+packages/
+  payment-core/        # Interfaces, shared types
+  payment-stripe/      # Stripe implementation
+  payment-paypal/      # PayPal implementation
+  payment-vnpay/       # VNPay implementation (independent release cycle)
+
+This allows VNPay team to iterate without touching core/Stripe/PayPal.
+```
+
+**Result**: You get not just code, but architectural reasoning with trade-offs analyzed. You can make an informed decision rather than accepting the first solution.
+
+---
+
+### Step 4: Combining Think + Act
+
+**Prompt**:
+```
+Good analysis. Now implement the PaymentProvider interface and the VNPayProvider
+class with proper HMAC signature verification.
+```
+
+**Result**: Claude now generates code informed by the previous analysis. The implementation includes HMAC verification, VND handling, and bank redirect flow — all identified during the thinking phase.
+
+---
+
+### Step 5: Compare Cost
+
+Check token usage:
+
+```bash
+/cost
+```
+
+**Without think mode**:
+```
+Input tokens:  1,200
+Output tokens: 2,500
+Total cost:    $0.04
+```
+
+**With think mode**:
+```
+Input tokens:  1,200
+Output tokens: 4,800 (thinking) + 2,200 (code) = 7,000
+Total cost:    $0.09
+```
+
+**Analysis**: 2.25x more expensive upfront, but avoided 3 rounds of corrections (which would have cost $0.12+ and 2 hours of your time). The ROI on complex tasks is clear.
+
+---
+
+## 4. PRACTICE — Try It Yourself
+
+### Exercise 1: Think vs Rush
+
+**Goal**: Experience the quality difference between immediate action and thinking first.
+
+**Instructions**:
+1. Start a Claude session: `claude`
+2. WITHOUT think mode, prompt:
+   ```
+   Add caching to src/api/user-service.ts
+   ```
+   Note the output quality. Does it consider cache invalidation? Cache key strategy? TTL?
+
+3. Start a NEW session (to clear context): `/clear`
+
+4. WITH think mode, prompt:
+   ```
+   Think carefully about adding caching to src/api/user-service.ts.
+
+   Consider:
+   - Cache invalidation strategy
+   - Cache key design
+   - TTL for different data types
+   - Cache provider (Redis vs in-memory)
+   - Impact on existing code
+   ```
+
+5. Compare outputs. Check:
+   - Did it handle cache invalidation?
+   - Did it consider cache stampede?
+   - Did it address multi-instance deployment?
+   - Did it suggest monitoring/observability?
+
+6. Check token cost for both: `/cost`
+
+**Expected result**: Think mode output should identify edge cases and trade-offs that immediate mode missed.
+
+<details>
+<summary>💡 Hint</summary>
+
+Think mode should identify:
+- Cache stampede risk (many requests hitting empty cache)
+- Invalidation strategy (write-through vs invalidate-on-write)
+- Distributed cache considerations (Redis pub/sub for invalidation)
+- Monitoring (cache hit rate, eviction rate)
+
+Immediate mode likely gives you basic caching without addressing these concerns.
+</details>
+
+<details>
+<summary>✅ Solution</summary>
+
+**Without think mode** typically produces:
+```typescript
+// Simple but incomplete
+private cache = new Map<string, User>();
+
+async getUser(id: string): Promise<User> {
+  if (this.cache.has(id)) return this.cache.get(id)!;
+  const user = await this.db.findUser(id);
+  this.cache.set(id, user);
+  return user;
+}
+```
+
+**With think mode** produces:
+```typescript
+// Complete with invalidation strategy
+import { Redis } from 'ioredis';
+
+private redis: Redis;
+private readonly USER_TTL = 300; // 5 minutes
+
+async getUser(id: string): Promise<User> {
+  const cacheKey = `user:${id}`;
+
+  // Check cache
+  const cached = await this.redis.get(cacheKey);
+  if (cached) return JSON.parse(cached);
+
+  // Cache miss - fetch and set
+  const user = await this.db.findUser(id);
+  await this.redis.setex(cacheKey, this.USER_TTL, JSON.stringify(user));
+  return user;
+}
+
+async updateUser(id: string, data: Partial<User>): Promise<User> {
+  const user = await this.db.updateUser(id, data);
+
+  // Invalidate cache on write
+  await this.redis.del(`user:${id}`);
+
+  return user;
+}
+```
+
+Plus analysis of cache stampede mitigation, monitoring, and distributed invalidation.
+</details>
+
+---
+
+### Exercise 2: Think Level Calibration
+
+**Goal**: Learn to match thinking depth to problem complexity.
+
+**Instructions**: For each task below, decide the appropriate think level (0-3), execute it, and evaluate the result.
+
+| Task | Your Think Level | Execute | Evaluate Result |
+|------|------------------|---------|-----------------|
+| Add `phoneNumber` field to User model | ? | Run it | Was thinking needed? |
+| Write unit test for `calculateTax()` | ? | Run it | Did it cover edge cases? |
+| Refactor `processOrder()` to async | ? | Run it | Did it handle all async points? |
+| Design caching strategy for product catalog | ? | Run it | Did it consider invalidation? |
+| Plan database migration from MySQL to PostgreSQL | ? | Run it | Did it identify all compatibility issues? |
+
+**Expected result**: You should find:
+- Tasks 1-2: Level 0 (act immediately) is fine
+- Task 3: Level 1 ("think about this") catches async edge cases
+- Task 4: Level 2 ("think step by step") needed for strategy
+- Task 5: Level 3 ("think carefully") essential for migration risks
+
+<details>
+<summary>💡 Hint</summary>
+
+Rule of thumb:
+- **Trivial** (add field, rename) → Level 0 (act)
+- **Simple** (write test, format) → Level 0-1
+- **Moderate** (refactor function, add feature) → Level 1-2
+- **Complex** (design system, debug obscure issue) → Level 2-3
+- **Critical** (architecture, migration, security) → Level 3
+
+When in doubt, go one level UP. Better to overthink than underthink.
+</details>
+
+<details>
+<summary>✅ Solution</summary>
+
+| Task | Recommended Level | Why |
+|------|-------------------|-----|
+| Add `phoneNumber` field | Level 0 (act) | Trivial, no complexity |
+| Write unit test | Level 1 (think) | Need to identify edge cases |
+| Refactor to async | Level 2 (step-by-step) | Many integration points, error handling |
+| Design caching | Level 2-3 (step-by-step or carefully) | Architectural decision, trade-offs |
+| DB migration | Level 3 (carefully) | Critical, many gotchas, data loss risk |
+
+</details>
+
+---
+
+## 5. CHEAT SHEET
+
+| Think Level | Trigger Phrase | Best For | Token Cost | Example Use |
+|-------------|----------------|----------|------------|-------------|
+| **Level 0<br>(Act)** | No trigger | Simple, well-defined tasks | Low | "Add field to model", "Format code", "Write test" |
+| **Level 1<br>(Think)** | "think about this first" | Moderate complexity, some edge cases | Medium | "Add caching", "Refactor function", "Debug error" |
+| **Level 2<br>(Step-by-Step)** | "think step by step" | Complex, multi-part problems | Medium-High | "Design API", "Refactor module", "Plan integration" |
+| **Level 3<br>(Carefully)** | "think carefully" | Architecture, critical decisions | High | "Migration strategy", "Security analysis", "System design" |
+| **Level 4<br>(Ultra)** ⚠️ | "ultrathink" | Mission-critical, regulatory | Very High | "Financial system design", "Compliance architecture" |
+
+⚠️ Level 4 "ultrathink" is a community term — verify if your Claude Code version supports it explicitly.
+
+**Golden Rule**: When in doubt, go one level UP. It's better to overthink a simple problem (minor token cost) than underthink a complex one (expensive rework).
+
+---
+
+## 6. PITFALLS — Common Mistakes
+
+| ❌ Mistake | ✅ Correct Approach |
+|-----------|---------------------|
+| **Using think mode for trivial tasks**<br>"Think carefully about adding this console.log" | Reserve think mode for complexity. Trivial tasks waste tokens and time. |
+| **Never using think mode for complex tasks**<br>"Refactor auth system" with no thinking → shallow output | Complex architecture/refactoring ALWAYS needs Level 2-3 thinking. Default to "think step by step" for any multi-file change. |
+| **Ignoring the thinking analysis**<br>Claude writes detailed analysis, you skip to code | Read the thinking output! It often identifies edge cases you missed in your prompt. Use it to refine requirements. |
+| **Using maximum think level for everything**<br>"Think carefully about this one-liner fix" | Match think level to complexity. Overthinking simple tasks slows you down and burns tokens unnecessarily. |
+| **Expecting think mode to fix a bad prompt**<br>Vague prompt + "think carefully" → still vague | Think mode amplifies a good prompt. Garbage in, garbage out. Give Claude clear context and constraints first. |
+| **Not combining think with act**<br>Get great analysis, then prompt "do it" without referencing the analysis | After thinking phase, explicitly tell Claude: "Now implement based on your analysis above." Connect the phases. |
+
+---
+
+## 7. REAL CASE — Production Story
+
+**Scenario**: A Vietnam-based fintech team was building a payment reconciliation system for their banking app. The system needed to handle VND currency (no decimal places), reconcile transactions across multiple banks (VietcomBank, Techcombank, MBBank), and comply with State Bank of Vietnam (SBV) reporting requirements.
+
+**Problem**: The team asked Claude Code to "implement payment reconciliation logic." Without think mode, Claude generated a generic reconciliation system based on USD assumptions. The output:
+- Used `amount * 100` logic (cents) — wrong for VND
+- Assumed uniform bank API formats — each bank has different field names
+- Missed SBV compliance requirements (transaction state machine, audit trail)
+- No handling for bank-specific settlement windows
+
+The team spent 3 days fixing edge cases, doing 5 rounds of corrections. Each round introduced new bugs.
+
+**Solution**: The team lead stopped, cleared context, and started over with think mode:
+
+```
+Think carefully about implementing a payment reconciliation system for
+a Vietnamese banking app.
+
+Requirements:
+- VND currency (no decimals, amounts are whole numbers)
+- Multiple banks: VietcomBank, Techcombank, MBBank
+- Each bank has different API response formats
+- Must comply with SBV audit requirements (state machine + audit trail)
+- Settlement windows vary by bank
+
+Consider edge cases, currency handling, compliance, and maintainability.
+```
+
+**Result**: Claude's thinking phase identified:
+1. VND handling: amounts are integers, no decimal conversion
+2. Bank API differences: need adapter pattern per bank
+3. SBV compliance: proposed state machine (pending → processing → settled → reconciled) with full audit log
+4. Settlement window handling: configuration per bank
+5. Suggested using saga pattern for distributed reconciliation
+
+The resulting architecture passed code review on first submission. The team saved 2 days of rework and eliminated a whole class of currency bugs.
+
+**Team Rule**: Now any task touching money or compliance must use "think carefully." They estimate think mode adds 5 minutes upfront, saves 1-2 days of debugging.
+
+---
+
+> **Next**: [Module 6.2: Plan Mode](../02-plan-mode/) →

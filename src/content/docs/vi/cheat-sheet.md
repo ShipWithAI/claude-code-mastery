@@ -1,0 +1,333 @@
+---
+title: Bảng Tham Chiếu Claude Code
+description: Tham chiếu nhanh tất cả lệnh, cấu hình và best practice của Claude Code
+---
+
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+## Tham Chiếu Nhanh — Tất Cả Lệnh
+
+### Lệnh CLI (Terminal)
+
+| Lệnh | Mục đích | Ví dụ |
+|------|----------|-------|
+| `claude` | Bắt đầu phiên REPL tương tác | `claude` |
+| `claude -p "prompt"` | Chế độ one-shot | `claude -p "giải thích lỗi này"` |
+| `claude --model sonnet` | Chọn model cụ thể | `claude --model opus` |
+| `claude --version` | Kiểm tra phiên bản | `claude --version` |
+| `cat file \| claude -p "..."` | Chế độ pipe — đưa nội dung file | `cat log.txt \| claude -p "tóm tắt"` |
+| `claude config` | Quản lý cấu hình | `claude config` |
+| `claude -c` / `claude --continue` | Tiếp tục cuộc hội thoại gần nhất | `claude -c` |
+| `claude -r` / `claude --resume` | Resume session cụ thể theo ID/tên | `claude -r "auth-refactor"` |
+| `claude update` | Cập nhật lên phiên bản mới nhất | `claude update` |
+| `claude mcp` | Cấu hình MCP server | `claude mcp add my-server` |
+| `claude doctor` | Chẩn đoán lỗi cài đặt | `claude doctor` |
+| `claude -p --output-format json` | Output JSON cho automation | `claude -p --output-format json "list files"` |
+| `claude -p --max-turns 3` | Giới hạn số lượt agentic | `claude -p --max-turns 3 "fix lint"` |
+| `claude -p --max-budget-usd 5` | Giới hạn chi phí (USD) | `claude -p --max-budget-usd 5 "refactor"` |
+| `claude --allowedTools "Read" "Bash(git *)"` | Giới hạn tool được dùng | `claude --allowedTools "Read"` |
+| `claude --system-prompt "..."` | System prompt tuỳ chỉnh | `claude --system-prompt "You are a reviewer"` |
+
+<Aside type="tip">
+Dùng **one-shot mode** (`-p`) cho câu hỏi nhanh. Dùng **REPL mode** cho hội thoại nhiều lượt và task phức tạp.
+</Aside>
+
+### Slash Commands (Trong REPL)
+
+| Lệnh | Chức năng | Khi nào dùng |
+|------|-----------|-------------|
+| `/help` | Liệt kê tất cả lệnh | Quên cú pháp? Bắt đầu từ đây |
+| `/init` | Tạo CLAUDE.md cho project | Lần đầu vào project mới |
+| `/compact` | Nén lịch sử hội thoại | Context ở 50-70% — giải phóng 30-70% token |
+| `/compact [focus]` | Compact với hướng dẫn giữ lại | `/compact Giữ lại quyết định auth` |
+| `/clear` | Xóa TOÀN BỘ context | Chuyển sang project khác |
+| `/cost` | Hiện token đã dùng và chi phí | Kiểm tra mỗi 20-30 phút |
+| `/model` | Đổi model giữa phiên | Chuyển giữa Haiku/Sonnet/Opus |
+| `/status` | Hiện version, model, thông tin tài khoản | Xem tổng quan phiên nhanh |
+| `/context` | Lưới hiển thị context đã dùng | Xem context window còn bao nhiêu |
+| `/memory` | Sửa file CLAUDE.md | Cập nhật project memory mà không cần thoát |
+| `/resume` | Resume session hoặc hiện danh sách | Quay lại cuộc hội thoại trước |
+| `/doctor` | Kiểm tra sức khoẻ cài đặt | Chẩn đoán sự cố |
+| `/terminal-setup` | Cài đặt keybinding cho terminal | Bật Shift+Enter cho input nhiều dòng |
+| `/vim` | Bật chế độ vim | Dành cho người dùng vim |
+| `/bug` | Báo lỗi | Gửi bug report cho Anthropic |
+| `/export` | Xuất cuộc hội thoại ra file | Lưu session để xem lại |
+| `/exit` hoặc `Ctrl+C` | Thoát phiên | Xong việc |
+
+<Aside type="caution">
+`/compact` giữ lại context task đang làm. `/clear` xóa tất cả. Ưu tiên `/compact` khi đang làm việc.
+</Aside>
+
+### Phím Tắt
+
+| Phím tắt | Chức năng |
+|----------|-----------|
+| `Escape` | Huỷ generation đang chạy |
+| `Escape` × 2 | Rewind — hiện danh sách message để undo |
+| `Ctrl+C` | Ngắt / thoát |
+| `Ctrl+V` | Dán ảnh từ clipboard (macOS: `Ctrl+V`, KHÔNG PHẢI `Cmd+V`) |
+| `Ctrl+G` | Mở prompt trong editor ngoài (`$EDITOR`) |
+| `Ctrl+L` | Xoá màn hình terminal |
+| `Ctrl+O` | Bật/tắt verbose output |
+| `Shift+Tab` | Chuyển chế độ permission (Normal → Auto-Accept → Plan) |
+| `Option+T` / `Alt+T` | Bật/tắt extended thinking |
+| `Option+P` / `Alt+P` | Đổi model |
+| `Tab` | Chấp nhận gợi ý prompt |
+| `Up` / `Down` | Duyệt lịch sử prompt |
+
+<Aside type="tip">
+Chạy `/terminal-setup` trước để bật `Shift+Enter` cho input nhiều dòng trên terminal hỗ trợ (iTerm2, Ghostty, Kitty, WezTerm).
+</Aside>
+
+### Phím Tắt Nhập Liệu
+
+| Phương thức | Cách dùng |
+|-------------|-----------|
+| Input nhiều dòng | `\` + Enter, hoặc `Shift+Enter` (sau khi chạy `/terminal-setup`) |
+| Chế độ Bash | `! npm test` — chạy lệnh shell không qua AI |
+| Tham chiếu file | `@src/utils/auth.js` — tự động hoàn thành với `Tab` |
+| Dán ảnh | `Ctrl+V` (ảnh chụp màn hình từ clipboard) |
+
+### Chọn Chế Độ Phù Hợp
+
+| Tình huống | Chế độ | Lệnh |
+|-----------|--------|------|
+| Debug nhiều lượt | REPL | `claude` |
+| Câu hỏi nhanh | One-shot | `claude -p "..."` |
+| Review diff | Pipe | `git diff \| claude -p "review"` |
+| Phân tích log | Pipe | `cat errors.log \| claude -p "phân tích"` |
+| CI/CD | One-shot | Script dùng `-p` |
+| Học / khám phá | REPL | `claude` |
+
+### Chọn Model
+
+| Model | Chi phí | Dùng cho |
+|-------|---------|----------|
+| **Haiku** | $ | Format, sửa typo, edit đơn giản, trả lời nhanh |
+| **Sonnet** | $$ | Feature, debug, code review, documentation |
+| **Opus** | $$$ | Architecture, debug phức tạp, security, bài toán mới |
+
+<Aside type="tip">
+Mặc định dùng **Sonnet** cho hầu hết task. Dùng **Haiku** cho edit đơn giản. Chỉ dùng **Opus** cho architecture và reasoning phức tạp.
+</Aside>
+
+---
+
+## Best Practice cho CLAUDE.md
+
+### 6 Phần Thiết Yếu
+
+Mỗi CLAUDE.md trong project nên có 6 phần sau:
+
+```markdown
+# Project: [Tên]
+
+## 1. Tổng Quan Project
+Tech stack: Node.js 20, Express, PostgreSQL, Redis
+Architecture: Monorepo với thư mục packages/
+
+## 2. Quy Tắc Kiến Trúc
+- Routes → Services → Repositories → Database
+- Business logic chỉ ở services, không bao giờ ở routes
+- Types dùng chung trong packages/shared/
+
+## 3. Quy Ước Code
+- Files: kebab-case (user-service.ts)
+- Classes: PascalCase (UserService)
+- Functions: camelCase (getUserById)
+- Error handling: Promise<Result<T, AppError>>
+- Imports: Tuyệt đối qua @/ prefix
+
+## 4. Lệnh Thường Dùng
+npm run dev          # Start dev server (port 3000)
+npm test             # Chạy tất cả test
+npm run lint         # ESLint + Prettier
+npm run db:migrate   # Chạy database migration
+
+## 5. Ràng Buộc (KHÔNG ĐƯỢC)
+- KHÔNG dùng `any` type — luôn định nghĩa type cụ thể
+- KHÔNG cài dependencies mà không hỏi trước
+- KHÔNG đặt business logic trong route handler
+- KHÔNG commit file .env
+- KHÔNG sửa database schema mà không có migration
+
+## 6. Context (Kiến Thức Ngầm)
+- Redis key PHẢI có version prefix: v1:user:123
+- JWT hết hạn sau 15 phút, refresh token sau 7 ngày
+- Legacy /api/v1 routes giữ lại cho mobile app
+- Payment gateway sandbox dùng key có prefix TEST_
+```
+
+### Kích Thước CLAUDE.md
+
+| Kích thước | Token | Chất lượng |
+|-----------|-------|------------|
+| 300-500 từ | ~400-650 | Tối thiểu — thiếu edge case |
+| **500-800 từ** | **~650-1000** | **Vừa đủ cho hầu hết project** |
+| 800-1200 từ | ~1000-1500 | Toàn diện — project lớn |
+| 1200+ từ | 1500+ | Quá dài — giảm hiệu quả |
+
+<Aside type="caution">
+Giữ CLAUDE.md dưới 1000 từ. Mỗi token dùng cho project memory là một token KHÔNG có sẵn cho công việc thực tế.
+</Aside>
+
+### Thứ Tự Ưu Tiên File
+
+| Vị trí | Phạm vi | Ưu tiên |
+|--------|---------|---------|
+| `~/.claude/CLAUDE.md` | Toàn cục (mọi project) | Thấp nhất |
+| `./CLAUDE.md` | Gốc project | **Chính — dùng cái này** |
+| `./src/CLAUDE.md` | Cấp thư mục | Cao nhất (ghi đè gốc) |
+
+---
+
+## Hướng Dẫn File Pattern
+
+### .gitignore — Bảo Vệ Secret
+
+```bash
+# Secret — KHÔNG BAO GIỜ commit
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+vendor/
+.venv/
+
+# Build output
+dist/
+build/
+.next/
+
+# File hệ điều hành
+.DS_Store
+Thumbs.db
+```
+
+### Pattern .env.example — An Toàn Cho Claude
+
+```bash
+# .env.example — commit vào git, an toàn cho Claude đọc
+DATABASE_URL=postgresql://user:password@localhost:5432/dbname
+REDIS_URL=redis://:password@localhost:6379
+API_KEY=your_api_key_here
+STRIPE_KEY=sk_test_placeholder
+
+# .env — secret thật, gitignored, KHÔNG BAO GIỜ cho Claude đọc
+# DATABASE_URL=postgresql://realuser:s3cr3t@prod.db:5432/prod
+```
+
+<Aside type="danger">
+**Không bao giờ** cho Claude đọc file `.env` trực tiếp. Luôn dùng `.env.example` với giá trị placeholder. Nếu secret bị lộ, rotate ngay lập tức.
+</Aside>
+
+### Tham Chiếu Nhanh Quyền Hạn
+
+| Loại Lệnh | Hành động |
+|-----------|-----------|
+| `ls`, `pwd`, `cat`, `head`, `tail` | Cho phép — chỉ đọc |
+| `grep`, `find` | Cho phép — chỉ tìm kiếm |
+| `git status`, `git log`, `git diff` | Cho phép — git chỉ đọc |
+| `git commit -m "..."` | Kiểm tra message trước |
+| `npm install <package>` | Xác nhận tên package |
+| Ghi file trong `src/` | Kiểm tra đường dẫn và nội dung |
+| `rm`, `git push --force` | **Luôn từ chối** trừ khi cố ý |
+| `curl`, `wget` | **Luôn từ chối** — rủi ro lộ dữ liệu |
+| Thao tác trên `~/.ssh/`, `~/.aws/` | **Luôn từ chối** — thư mục nhạy cảm |
+
+### Cài Đặt Secret Scanner (Gitleaks)
+
+```bash
+# Cài đặt
+brew install gitleaks
+
+# Thêm pre-commit hook
+cat > .git/hooks/pre-commit << 'HOOK'
+#!/bin/bash
+gitleaks protect --staged --verbose
+if [ $? -ne 0 ]; then
+    echo "PHÁT HIỆN SECRET! Commit bị chặn."
+    exit 1
+fi
+echo "Không phát hiện secret."
+exit 0
+HOOK
+chmod +x .git/hooks/pre-commit
+```
+
+---
+
+## Quản Lý Context
+
+### Ước Tính Token
+
+| Loại nội dung | Token / 1000 ký tự |
+|--------------|---------------------|
+| Văn bản tiếng Anh | ~250 |
+| Source code | ~400 |
+| JSON data | ~400 |
+| File nhỏ (<5KB) | 1,000-2,000 tổng |
+| File vừa (5-20KB) | 2,000-5,000 tổng |
+| File lớn (>50KB) | 10,000+ tổng |
+
+### Theo Dõi Sức Khỏe Context
+
+| Mức | Chất lượng | Hành động |
+|-----|-----------|-----------|
+| 0-50% | Tuyệt vời | Tiếp tục làm việc |
+| 50-70% | Tốt | Chuẩn bị `/compact` |
+| 70-85% | Giảm sút | Chạy `/compact` ngay |
+| 85-95% | Kém | Phải compact hoặc clear |
+| 95%+ | Không đáng tin | `/clear` và bắt đầu lại |
+
+### Combo Hiệu Quả
+
+| Combo | Quy trình | Khi nào |
+|-------|-----------|---------|
+| `/cost` → `/compact` | Kiểm tra → nén | Bảo trì định kỳ (mỗi 30 phút) |
+| `/clear` → `/init` | Reset → cấu hình | Bắt đầu project mới |
+| `/compact` → làm việc → `/cost` | Nén → tiếp tục → kiểm tra | Phiên làm việc dài |
+
+---
+
+## Quy Trình Nhanh
+
+### Khởi Tạo Project Mới
+```bash
+cd my-project
+claude               # Bắt đầu phiên
+/init                # Tạo CLAUDE.md
+# Sửa CLAUDE.md theo 6 phần ở trên
+/cost                # Kiểm tra mức dùng cơ bản
+```
+
+### Protocol Phiên Làm Việc Dài
+```bash
+# Mỗi 20-30 phút:
+/cost                # Kiểm tra mức context
+
+# Khi context ở 50-70%:
+/compact             # Giải phóng, giữ context task
+
+# Chuyển sang task không liên quan:
+/clear               # Reset hoàn toàn
+```
+
+### Review Code An Toàn
+```bash
+git diff main | claude -p "Review diff này về bugs, security, và style"
+```
+
+### Khám Phá Codebase Tiết Kiệm Context
+```bash
+# Bước 1: Tổng quan trước
+"Cho tôi xem cấu trúc thư mục của src/"
+
+# Bước 2: Đọc có chọn lọc
+"Cho tôi xem function signatures trong src/auth/"
+
+# Bước 3: Đào sâu chỉ khi cần
+"Đọc src/auth/login.ts — tôi cần hiểu luồng token"
+```

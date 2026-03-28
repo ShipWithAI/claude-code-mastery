@@ -1,0 +1,349 @@
+---
+title: 'Tối ưu Chất lượng'
+description: 'Nâng cao chất lượng output của Claude Code: prompt engineering nâng cao, verification và iteration.'
+---
+
+# Module 14.3: Tối ưu Chất lượng
+
+> **Thời gian ước tính**: ~35 phút
+>
+> **Yêu cầu trước**: Module 14.2 (Tối ưu Tốc độ)
+>
+> **Kết quả**: Sau module này, bạn sẽ biết kỹ thuật improve output quality, hiểu quality/speed tradeoff, và configure Claude cho high-quality result.
+
+---
+
+## 1. WHY — Tại sao cần học
+
+Claude produce code nhanh, nhưng không quite right. Variable name không match convention. Missing error handling. Works nhưng không fit architecture. Bạn mất 30 phút fix cái Claude generate — defeating purpose.
+
+Quality optimization ensure output production-ready từ đầu. Less fixing, more shipping. Thời gian đầu tư vào setup trả về ở mọi task.
+
+---
+
+## 2. CONCEPT — Khái niệm cốt lõi
+
+### Quality Dimension
+
+| Dimension | Low Quality | High Quality |
+|-----------|-------------|--------------|
+| **Correctness** | Có bug | Works correctly |
+| **Standards** | Generic pattern | Match your style |
+| **Architecture** | Tightly coupled | Clean separation |
+| **Robustness** | Happy path only | Error handling |
+| **Maintainability** | Khó thay đổi | Dễ mở rộng |
+
+### Quality Lever
+
+```text
+CLAUDE.md Setup      → Thiết lập standard upfront
+Examples             → Show, không chỉ tell
+Think Mode           → Better reasoning cho complex task
+Iterative Refinement → Review và improve
+Explicit Constraints → State DO và DON'T
+```
+
+### Examples Principle
+
+```text
+Không có example:
+"Dùng proper error handling"
+→ Claude đoán ý bạn
+
+Có example:
+"Dùng pattern này:
+try {
+  await operation();
+} catch (error) {
+  logger.error('Operation failed', { error, context });
+  throw new AppError('OPERATION_FAILED', error);
+}"
+→ Claude follow chính xác
+```
+
+### Think Mode cho Quality
+
+Complex task cần reasoning. Yêu cầu Claude "think step by step" về architecture. Trade speed cho better decision. Dùng cho: design, debugging, refactoring.
+
+### Explicit Constraint
+
+```text
+DO:
+- Dùng TypeScript strict mode
+- Thêm JSDoc cho public function
+- Handle null/undefined explicitly
+
+DON'T:
+- Dùng any type
+- Ignore error case
+- Dùng deprecated API
+```
+
+---
+
+## 3. DEMO — Từng bước cụ thể
+
+**Scenario**: Implement user service với CRUD operation.
+
+### Không có Quality Setup
+
+```text
+Bạn: Tạo user service với CRUD operation.
+
+Claude: [Generate code]
+```
+
+```javascript
+// user-service.js
+const users = [];
+
+function createUser(data) {
+  const user = { id: Date.now(), ...data };
+  users.push(user);
+  return user;
+}
+
+function getUser(id) {
+  return users.find(u => u.id === id);
+}
+```
+
+**Vấn đề**: Không TypeScript, không error handling, in-memory storage, không validation, không match team standard.
+
+### Có Quality Setup
+
+**CLAUDE.md bao gồm**:
+- TypeScript strict mode
+- Repository pattern
+- Error handling với custom AppError
+- Zod cho validation
+- Example code từ existing service
+
+```text
+Bạn: Tạo user service theo repository pattern với proper
+validation và error handling.
+
+Think through design trước:
+- Validation rule cần gì?
+- Error nào có thể xảy ra?
+- Fit với existing service thế nào?
+
+Claude: [Think through design, rồi generate]
+```
+
+```typescript
+// src/services/UserService.ts
+import { UserRepository } from '../repositories/UserRepository';
+import { CreateUserSchema } from '../schemas/user';
+import { AppError } from '../errors/AppError';
+import { logger } from '../utils/logger';
+
+export class UserService {
+  constructor(private readonly repository: UserRepository) {}
+
+  async create(data: unknown): Promise<User> {
+    const validated = CreateUserSchema.parse(data);
+
+    const existing = await this.repository.findByEmail(validated.email);
+    if (existing) {
+      throw new AppError('DUPLICATE_EMAIL', 'Email đã đăng ký');
+    }
+
+    try {
+      const user = await this.repository.create(validated);
+      logger.info('User created', { userId: user.id });
+      return user;
+    } catch (error) {
+      logger.error('Failed to create user', { error });
+      throw new AppError('CREATE_FAILED', 'Không thể tạo user', error);
+    }
+  }
+}
+```
+
+### So sánh Quality
+
+| Không Setup | Có Quality Setup |
+|-------------|------------------|
+| JavaScript | TypeScript strict |
+| Không validation | Zod schema |
+| Không error handling | Custom error + logging |
+| Không fit project | Match existing pattern |
+| Cần rewrite | Production-ready |
+
+---
+
+## 4. PRACTICE — Luyện tập
+
+### Bài 1: Quality CLAUDE.md
+
+**Mục tiêu**: Enhance CLAUDE.md cho quality.
+
+**Hướng dẫn**:
+1. Audit CLAUDE.md hiện tại cho quality guidance
+2. Thêm: coding standard, error handling pattern, example code
+3. Test: Generate cùng feature trước/sau
+4. So sánh quality difference
+
+<details>
+<summary>💡 Gợi ý</summary>
+
+Include ít nhất một code example cho pattern quan trọng nhất (ví dụ: error handling, API endpoint structure).
+
+</details>
+
+<details>
+<summary>✅ Giải pháp</summary>
+
+Thêm vào CLAUDE.md:
+```markdown
+## Code Quality Standard
+- TypeScript strict mode
+- Không dùng `any` type
+- Mọi error phải handle với AppError
+- Public function cần JSDoc
+
+## Error Handling Example
+```typescript
+try {
+  const result = await operation();
+  return result;
+} catch (error) {
+  logger.error('Operation failed', { error });
+  throw new AppError('OPERATION_FAILED', error);
+}
+```
+```
+
+</details>
+
+### Bài 2: Example-Driven Quality
+
+**Mục tiêu**: Dùng example để enforce pattern.
+
+**Hướng dẫn**:
+1. Pick một pattern bạn muốn Claude follow
+2. Viết một example rõ ràng
+3. Thêm vào CLAUDE.md
+4. Test xem Claude có replicate pattern không
+
+<details>
+<summary>💡 Gợi ý</summary>
+
+Example hiệu quả nhất khi là real code từ project, không phải generic sample.
+
+</details>
+
+<details>
+<summary>✅ Giải pháp</summary>
+
+Pick pattern lặp nhiều nhất. Extract clean example. Reference: "Follow pattern trong Error Handling Example section."
+
+Claude sẽ match style, naming, và structure của example.
+
+</details>
+
+### Bài 3: Think Mode cho Design
+
+**Mục tiêu**: So sánh direct implementation vs think-first.
+
+**Hướng dẫn**:
+1. Pick complex feature
+2. Đầu tiên: yêu cầu Claude implement trực tiếp
+3. Sau đó: yêu cầu Claude think through design, rồi implement
+4. So sánh architectural quality
+
+<details>
+<summary>💡 Gợi ý</summary>
+
+Hỏi: "Think step by step về cái gì có thể sai, edge case nào tồn tại, và fit architecture thế nào."
+
+</details>
+
+<details>
+<summary>✅ Giải pháp</summary>
+
+Think-first thường produce:
+- Better error handling (consider edge case)
+- Cleaner architecture (consider fit với existing code)
+- More complete implementation (consider full requirement)
+
+Dùng cho feature touch nhiều phần của system.
+
+</details>
+
+---
+
+## 5. CHEAT SHEET
+
+### Quality Lever
+
+| Lever | Effect |
+|-------|--------|
+| CLAUDE.md | Standard và pattern |
+| Examples | Show cái bạn muốn |
+| Think Mode | Better reasoning |
+| Constraints | DO/DON'T list |
+| Review Loop | Iterate để improve |
+
+### Quality Prompt
+
+```text
+"Follow existing pattern trong [file]"
+"Think through design trước khi implement"
+"Dùng error handling giống [example]"
+"Đừng dùng [pattern], dùng [better pattern]"
+```
+
+### CLAUDE.md Quality Template
+
+```markdown
+## Code Quality Standard
+- TypeScript strict mode
+- Không dùng `any` type
+- Mọi error phải handle
+
+## Example Pattern
+[Include actual code example từ project]
+```
+
+---
+
+## 6. PITFALLS — Sai lầm thường gặp
+
+| ❌ Sai | ✅ Đúng |
+|--------|---------|
+| Không có quality guidance trong CLAUDE.md | Define standard explicit |
+| Tell mà không show | Include code example |
+| Accept output đầu tiên | Review và iterate |
+| Yêu cầu quality vague | Specific: "dùng Zod validation" |
+| Ignore existing pattern | "Follow pattern trong [file]" |
+| Không bao giờ dùng think mode | Think mode cho complex decision |
+| Luôn ưu tiên speed hơn quality | Biết khi nào quality matter nhất |
+
+---
+
+## 7. REAL CASE — Câu chuyện thực tế
+
+**Scenario**: Fintech Việt Nam thấy Claude-generated code có consistent issue: missing error handling, inconsistent naming, không logging. Code review catch nhưng waste time.
+
+**Quality Improvement Initiative**:
+
+| Tuần | Focus | Action |
+|------|-------|--------|
+| 1 | Audit | Review 20 PR: error (80%), naming (60%), logging (70%) |
+| 2 | CLAUDE.md | Thêm pattern với example cho mỗi issue |
+| 3 | Examples | Tạo /examples folder, one per pattern |
+| 4 | Policy | Think mode required cho complex feature |
+
+**Kết quả (4 tuần sau)**:
+- Error handling issue: 80% → 10%
+- Naming consistency: 60% → 5%
+- Code review rejection: 40% → 8%
+- Time to production: -30% (less rework)
+
+**Quote**: "Dừng blame Claude cho bad code. Bắt đầu teach Claude standard. Quality không phải magic — là setup."
+
+---
+
+> **Tiếp theo**: [Module 14.4: Tối ưu Chi phí](../04-cost-optimization/) →
