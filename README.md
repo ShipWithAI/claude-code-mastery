@@ -9,6 +9,8 @@ Not another Getting Started guide — this is a structured, senior-level curricu
 [![Stars](https://img.shields.io/github/stars/ShipWithAI/claude-code-mastery?style=social)](https://github.com/ShipWithAI/claude-code-mastery/stargazers)
 [![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/ShipWithAI/claude-code-mastery/pulls)
+![Version](https://img.shields.io/badge/version-1.0-blue)
+![Claude Code](https://img.shields.io/badge/Claude%20Code-2.1%2B-green)
 
 **16 Phases · 55 Modules · 136 Lessons · English + Tiếng Việt**
 
@@ -17,6 +19,15 @@ Not another Getting Started guide — this is a structured, senior-level curricu
 </div>
 
 ---
+
+## The Problem
+
+Most Claude Code tutorials teach individual features in isolation. But real productivity comes from combining features into workflows — and knowing which patterns to use (and avoid) in production. That's what this course teaches.
+
+---
+
+<details>
+<summary>📋 Full Course Roadmap (16 Phases)</summary>
 
 ## Course Roadmap
 
@@ -38,6 +49,21 @@ Not another Getting Started guide — this is a structured, senior-level curricu
 | 🚀 14 | **Optimization & Performance** | 4 | Task, speed, quality, and cost optimization |
 | 📦 15 | **Templates, Skills & Ecosystem** | 5 | CLAUDE.md templates, prompt recipes, skills, community |
 | 🏆 16 | **Real-World Mastery** | 3 | Case studies, role-specific workflows, workshop design |
+
+</details>
+
+---
+
+## What You'll Be Able to Do
+
+| Scenario | What You'll Learn | Phase |
+|----------|-------------------|-------|
+| Set up Claude Code for a new project | CLAUDE.md architecture, context optimization | 04, 05 |
+| Automate code review with AI | Hooks, multi-agent patterns, team governance | 06, 07, 10 |
+| Refactor a legacy codebase safely | Code archeology, incremental refactoring, testing | 09 |
+| Run Claude Code in CI/CD | Headless mode, GitHub Actions, SDK | 11 |
+| Optimize Claude Code costs | Token management, caching, model selection | 14 |
+| Onboard your team to Claude Code | Team CLAUDE.md, conventions, review workflows | 10, 15 |
 
 ---
 
@@ -135,6 +161,20 @@ Join fellow developers learning Claude Code:
    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=ShipWithAI/claude-code-mastery&type=Date" />
  </picture>
 </a>
+
+---
+
+## FAQ
+
+**Is this free?** Yes, completely free and open source.
+
+**How is this different from official docs?** Official docs explain features. This course teaches production workflows, patterns, and pitfalls through structured lessons.
+
+**How long does it take?** Self-paced. Each phase takes 1-3 hours. Do one phase per day or binge the whole thing.
+
+**Is it up to date?** Yes, actively maintained and compatible with Claude Code 2.1+.
+
+**I found an error.** Please open an issue or PR! See [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ---
 
