@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1280">
+  <title>Claude Code Mastery — Social Preview</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      width: 1280px;
+      height: 640px;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    /* Subtle grid pattern */
+    body::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(148, 163, 184, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148, 163, 184, 0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    /* Glow accent */
+    body::after {
+      content: '';
+      position: absolute;
+      top: -120px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 400px;
+      background: radial-gradient(ellipse, rgba(96, 165, 250, 0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .content {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 6px 16px;
+      border: 1px solid rgba(96, 165, 250, 0.3);
+      border-radius: 20px;
+      color: #60a5fa;
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    h1 {
+      font-size: 72px;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: -1.5px;
+      line-height: 1.1;
+    }
+
+    .subtitle {
+      font-size: 26px;
+      color: #60a5fa;
+      font-weight: 400;
+      max-width: 700px;
+      line-height: 1.4;
+    }
+
+    .stats {
+      font-size: 20px;
+      color: #94a3b8;
+      font-weight: 500;
+      letter-spacing: 1px;
+      margin-top: 4px;
+    }
+
+    .stats span {
+      margin: 0 6px;
+      color: #475569;
+    }
+
+    .footer {
+      position: absolute;
+      bottom: 36px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      font-size: 16px;
+      color: #475569;
+      z-index: 1;
+    }
+
+    .footer .dot {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: #334155;
+    }
+  </style>
+</head>
+<body>
+  <div class="content">
+    <div class="badge">Free &amp; Open Source</div>
+    <h1>Claude Code Mastery</h1>
+    <div class="subtitle">The most comprehensive free course on Claude Code</div>
+    <div class="stats">
+      16 Phases <span>&middot;</span> 55 Modules <span>&middot;</span> 136 Lessons
+    </div>
+  </div>
+  <div class="footer">
+    <span>shipwithai.io</span>
+    <div class="dot"></div>
+    <span>by MangalaHQ</span>
+  </div>
+</body>
+</html>
