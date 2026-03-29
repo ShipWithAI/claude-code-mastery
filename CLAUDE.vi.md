@@ -448,10 +448,6 @@ Khi làm việc trên dự án này, dùng các quy ước sau:
 
 ---
 
-## CONTENT STRATEGY
-See [CONTENT-STRATEGY.md](./CONTENT-STRATEGY.md) for content taxonomy, agent team, and classification rules. Always follow this when creating content.
-
-
 ## LƯU Ý QUAN TRỌNG
 
 1. **Không bao giờ bịa tính năng Claude Code**. Nếu không chắc flag/lệnh có tồn tại, nói rõ. Đánh dấu tính năng chưa chắc bằng `⚠️ Cần xác minh`.

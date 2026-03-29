@@ -447,10 +447,6 @@ When working on this project, use these conventions:
 
 ---
 
-## CONTENT STRATEGY
-See [CONTENT-STRATEGY.md](./CONTENT-STRATEGY.md) for content taxonomy, agent team, and classification rules. Always follow this when creating content.
-
-
 ## IMPORTANT NOTES
 
 1. **Never invent Claude Code features**. If unsure whether a flag/command exists, say so. Mark uncertain features with `⚠️ Verify`.
