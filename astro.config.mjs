@@ -11,6 +11,7 @@ export default defineConfig({
       description: 'The most comprehensive course on mastering Claude Code — from foundation to production. By ShipWithAI.',
       customCss: [
         './src/styles/starlight-overrides.css',
+        './src/styles/custom.css',
       ],
       components: {
         Footer: './src/components/Footer.astro',
