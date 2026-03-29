@@ -1,11 +1,11 @@
 ---
 title: About Us
-description: Meet MangalaHQ — the team behind ShipWithAI, the plugin ecosystem for Claude Code
+description: Meet ShipWithAI — the community behind the Claude Code course and plugin ecosystem
 ---
 
-## MangalaHQ
+## ShipWithAI
 
-We are a small team of developers building tools that make software development faster and more reliable.
+We are a community of developers building tools that make software development faster and more reliable.
 
 **ShipWithAI** is our plugin ecosystem for Claude Code. We build plugins we use ourselves — Auth, Payment, Deploy CI/CD — to ship real products, then share them with the developer community.
 
@@ -24,5 +24,4 @@ We are a small team of developers building tools that make software development 
 ## Connect
 
 - [X: @shipwithaiio](https://x.com/shipwithaiio)
-- [X: @MangalaHQ](https://x.com/MangalaHQ)
 - [Community (Telegram)](https://t.me/ShipWithAI)

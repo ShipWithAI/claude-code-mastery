@@ -8,7 +8,7 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'Claude Code Mastery',
-      description: 'The most comprehensive course on mastering Claude Code — from foundation to production. By MangalaHQ.',
+      description: 'The most comprehensive course on mastering Claude Code — from foundation to production. By ShipWithAI.',
       defaultLocale: 'en',
       locales: {
         en: { label: 'English', lang: 'en' },

@@ -149,6 +149,6 @@ Join fellow developers learning Claude Code:
 
 If this course helped you, consider giving it a ⭐ — it helps others find it too.
 
-Built by [MangalaHQ](https://x.com/MangalaHQ) · Part of the [ShipWithAI](https://shipwithai.io) ecosystem
+Built by the [ShipWithAI](https://shipwithai.io) community
 
 </div>
