@@ -9,6 +9,16 @@ export default defineConfig({
     starlight({
       title: 'Claude Code Mastery',
       description: 'The most comprehensive course on mastering Claude Code — from foundation to production. By ShipWithAI.',
+      customCss: [
+        './src/styles/starlight-overrides.css',
+      ],
+      components: {
+        Footer: './src/components/Footer.astro',
+      },
+      logo: {
+        src: './src/assets/shipwithailogo.png',
+        replacesTitle: false,
+      },
       defaultLocale: 'en',
       locales: {
         en: { label: 'English', lang: 'en' },

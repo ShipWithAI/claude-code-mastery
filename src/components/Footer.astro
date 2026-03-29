@@ -1,0 +1,196 @@
+---
+import EditLink from 'virtual:starlight/components/EditLink';
+import LastUpdated from 'virtual:starlight/components/LastUpdated';
+import Pagination from 'virtual:starlight/components/Pagination';
+import config from 'virtual:starlight/user-config';
+import { Icon } from '@astrojs/starlight/components';
+
+const route = Astro.locals.starlightRoute;
+const locale = route?.lang?.startsWith('vi') ? 'vi' : 'en';
+const year = new Date().getFullYear();
+
+const i18n = {
+  tagline: locale === 'vi'
+    ? 'Giúp developer ship nhanh hơn với AI.'
+    : 'Helping developers ship faster with AI.',
+  builtBy: locale === 'vi'
+    ? 'Được xây dựng bởi cộng đồng'
+    : 'Built by the',
+  community: locale === 'vi' ? '' : 'community',
+};
+---
+
+<footer class="sl-flex starlight-meta">
+  <div class="meta sl-flex">
+    <EditLink />
+    <LastUpdated />
+  </div>
+  <Pagination />
+
+  {
+    config.credits && (
+      <a class="kudos sl-flex" href="https://starlight.astro.build">
+        <Icon name={'starlight'} /> {Astro.locals.t('builtWithStarlight.label')}
+      </a>
+    )
+  }
+</footer>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-content">
+      <div class="footer-brand">
+        <a class="footer-logo" href="https://shipwithai.io">
+          <img src="/favicon.svg" alt="" width="20" height="20" />
+          <span>ShipWithAI</span>
+        </a>
+        <p class="footer-tagline">{i18n.tagline}</p>
+      </div>
+
+      <div class="footer-links">
+        <a href="https://shipwithai.io">ShipWithAI.io</a>
+        <span class="sep" aria-hidden="true">&middot;</span>
+        <a href="https://github.com/ShipWithAI/claude-code-mastery" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <span class="sep" aria-hidden="true">&middot;</span>
+        <a href="https://t.me/ShipWithAI" target="_blank" rel="noopener noreferrer">Telegram</a>
+        <span class="sep" aria-hidden="true">&middot;</span>
+        <a href="https://x.com/shipwithaiio" target="_blank" rel="noopener noreferrer">Twitter</a>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <p>&copy; {year} {i18n.builtBy} <a href="https://shipwithai.io">ShipWithAI</a> {i18n.community}</p>
+    </div>
+  </div>
+</footer>
+
+<style>
+  @layer starlight.core {
+    .starlight-meta {
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+    .meta {
+      gap: 0.75rem 3rem;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      margin-top: 3rem;
+      font-size: var(--sl-text-sm);
+      color: var(--sl-color-gray-3);
+    }
+    .meta > :global(p:only-child) {
+      margin-inline-start: auto;
+    }
+    .kudos {
+      align-items: center;
+      gap: 0.5em;
+      margin: 1.5rem auto;
+      font-size: var(--sl-text-xs);
+      text-decoration: none;
+      color: var(--sl-color-gray-3);
+    }
+    .kudos:hover {
+      color: var(--sl-color-white);
+    }
+  }
+
+  @layer starlight.components {
+    .kudos :global(svg) {
+      color: var(--sl-color-orange);
+    }
+  }
+
+  .site-footer {
+    border-top: 1px solid var(--color-border, rgba(255, 255, 255, 0.08));
+    background: var(--color-bg-base, #111827);
+    margin-top: 3rem;
+  }
+
+  .footer-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 1.5rem;
+  }
+
+  .footer-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+  }
+
+  .footer-logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    text-decoration: none;
+    color: var(--color-text-primary, #F9FAFB);
+    font-family: var(--font-heading, 'JetBrains Mono', monospace);
+    font-weight: 700;
+    font-size: 0.95rem;
+  }
+
+  .footer-tagline {
+    margin: 0.35rem 0 0;
+    font-size: 0.85rem;
+    color: var(--color-text-muted, #9CA3AF);
+    line-height: 1.5;
+  }
+
+  .footer-links {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .footer-links a {
+    font-size: 0.85rem;
+    color: var(--color-text-secondary, #D1D5DB);
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+
+  .footer-links a:hover {
+    color: var(--color-text-primary, #F9FAFB);
+  }
+
+  .sep {
+    color: var(--color-text-faint, #6B7280);
+    font-size: 0.75rem;
+  }
+
+  .footer-bottom {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-accent-subtle, rgba(129, 140, 248, 0.1));
+    text-align: center;
+  }
+
+  .footer-bottom p {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--color-text-muted, #9CA3AF);
+  }
+
+  .footer-bottom a {
+    color: var(--color-accent, #818CF8);
+    text-decoration: none;
+  }
+
+  .footer-bottom a:hover {
+    color: var(--color-accent-hover, #6366F1);
+  }
+
+  @media (max-width: 480px) {
+    .footer-content {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .footer-inner {
+      padding: 2rem 1rem 1.25rem;
+    }
+  }
+</style>

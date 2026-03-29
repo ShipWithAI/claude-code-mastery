@@ -1,0 +1,347 @@
+/* ============================================================
+   starlight-overrides.css
+   Injects the ShipWithAI design system into course.shipwithai.io
+   Ported from shipwithai.io to maintain brand consistency.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+/* ── Starlight font overrides ── */
+:root {
+  --sl-font: 'IBM Plex Sans', 'Inter', system-ui, sans-serif;
+  --sl-font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* ============================================================
+   Design tokens — dark mode (default)
+   ============================================================ */
+:root {
+  /* ── Typography ── */
+  --font-heading: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-body: 'IBM Plex Sans', 'Inter', system-ui, sans-serif;
+  --font-code: 'JetBrains Mono', 'Fira Code', monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 2rem;
+  --text-4xl: 2.5rem;
+  --text-5xl: 3rem;
+
+  --leading-tight: 1.2;
+  --leading-normal: 1.6;
+  --leading-relaxed: 1.75;
+  --line-length: 75ch;
+
+  /* ── Background layers (dark) ── */
+  --color-bg-deepest: #0B0F19;
+  --color-bg-base: #111827;
+  --color-bg-surface: #1F2937;
+  --color-bg-surface-hover: #283548;
+  --color-bg-overlay: #374151;
+
+  /* ── Text ── */
+  --color-text-primary: #F9FAFB;
+  --color-text-secondary: #D1D5DB;
+  --color-text-muted: #9CA3AF;
+  --color-text-faint: #6B7280;
+
+  /* ── Brand / Accent ── */
+  --color-accent: #818CF8;
+  --color-accent-hover: #6366F1;
+  --color-accent-subtle: rgba(129, 140, 248, 0.1);
+  --color-accent-border: rgba(129, 140, 248, 0.25);
+
+  /* ── CTA / Success ── */
+  --color-cta: #34D399;
+  --color-cta-hover: #10B981;
+  --color-cta-bg: rgba(52, 211, 153, 0.1);
+
+  /* ── Semantic ── */
+  --color-warning: #FBBF24;
+  --color-error: #F87171;
+  --color-info: #60A5FA;
+
+  /* ── Borders & Dividers ── */
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-hover: rgba(255, 255, 255, 0.15);
+  --color-border-accent: rgba(129, 140, 248, 0.3);
+
+  /* ── Shadows ── */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 20px rgba(129, 140, 248, 0.15);
+
+  /* ── Spacing ── */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+  --space-3xl: 4rem;
+  --space-4xl: 6rem;
+
+  /* ── Border radius ── */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  /* ── Transitions ── */
+  --transition-fast: 150ms ease-out;
+  --transition-normal: 200ms ease-out;
+  --transition-slow: 300ms ease-out;
+
+  /* ── Starlight backward compat aliases ── */
+  --sl-color-bg: var(--color-bg-deepest);
+  --sl-color-white: var(--color-text-primary);
+  --sl-color-gray-1: #e4e4e7;
+  --sl-color-gray-2: var(--color-text-secondary);
+  --sl-color-gray-3: var(--color-text-muted);
+  --sl-color-gray-4: var(--color-text-faint);
+  --sl-color-gray-6: var(--color-accent-subtle);
+  --sl-color-gray-7: var(--color-bg-base);
+  --sl-color-black: var(--color-bg-deepest);
+  --sl-color-hairline: var(--color-border);
+  --sl-color-accent: var(--color-accent);
+  --sl-color-accent-high: var(--color-accent-hover);
+  --sl-text-sm: var(--text-sm);
+  --sl-text-xs: var(--text-xs);
+  --sl-font-mono: var(--font-code);
+
+  color-scheme: dark;
+}
+
+/* ============================================================
+   Light mode overrides
+   ============================================================ */
+[data-theme="light"] {
+  --color-bg-deepest: #F8FAFC;
+  --color-bg-base: #FFFFFF;
+  --color-bg-surface: #F1F5F9;
+  --color-bg-surface-hover: #E2E8F0;
+  --color-bg-overlay: #FFFFFF;
+
+  --color-text-primary: #0F172A;
+  --color-text-secondary: #334155;
+  --color-text-muted: #64748B;
+  --color-text-faint: #94A3B8;
+
+  --color-accent: #4F46E5;
+  --color-accent-hover: #4338CA;
+  --color-accent-subtle: rgba(79, 70, 229, 0.08);
+  --color-accent-border: rgba(79, 70, 229, 0.2);
+
+  --color-cta: #059669;
+  --color-cta-hover: #047857;
+
+  --color-border: rgba(0, 0, 0, 0.08);
+  --color-border-hover: rgba(0, 0, 0, 0.15);
+  --color-border-accent: rgba(79, 70, 229, 0.25);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-glow: 0 0 20px rgba(79, 70, 229, 0.1);
+
+  /* ── Starlight compat ── */
+  --sl-color-bg: var(--color-bg-deepest);
+  --sl-color-white: var(--color-text-primary);
+  --sl-color-gray-1: #27272a;
+  --sl-color-gray-2: var(--color-text-secondary);
+  --sl-color-gray-3: var(--color-text-muted);
+  --sl-color-gray-6: rgba(0, 0, 0, 0.06);
+  --sl-color-gray-7: var(--color-bg-surface);
+  --sl-color-hairline: var(--color-border);
+  --sl-color-accent: var(--color-accent);
+  --sl-color-accent-high: var(--color-accent-hover);
+
+  color-scheme: light;
+}
+
+/* ============================================================
+   Typography overrides
+   ============================================================ */
+
+.sl-markdown-content {
+  font-family: var(--font-body);
+  line-height: 1.75;
+}
+
+.sl-markdown-content h1,
+.sl-markdown-content h2,
+.sl-markdown-content h3,
+.sl-markdown-content h4 {
+  font-family: var(--font-heading);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.sl-markdown-content h2 {
+  margin-top: 2.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.sl-markdown-content code,
+.sl-markdown-content pre {
+  font-family: var(--font-code);
+}
+
+/* Inline code styling */
+.sl-markdown-content :not(pre) > code {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.15em 0.35em;
+  font-size: 0.875em;
+}
+
+/* Code block styling */
+.sl-markdown-content pre {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Sidebar typography */
+nav.sidebar-content,
+.sidebar-content,
+starlight-menu-button + nav {
+  font-family: var(--font-body);
+}
+
+/* Global heading override */
+h1, h2, h3, h4 {
+  font-family: var(--font-heading);
+}
+
+/* ============================================================
+   Sidebar improvements
+   ============================================================ */
+
+/* Sidebar group labels (Phase headings) */
+.sidebar-content .top-level > li > details > summary,
+.sidebar-content .top-level > li > a {
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* Active sidebar item */
+[aria-current="page"],
+[aria-current="true"] {
+  background: var(--color-accent-subtle) !important;
+  border-left: 3px solid var(--color-accent) !important;
+  font-weight: 600;
+}
+
+/* Sidebar hover */
+.sidebar-content a:hover {
+  background: var(--color-bg-surface-hover);
+  transition: background var(--transition-fast);
+}
+
+/* ============================================================
+   Content area improvements
+   ============================================================ */
+
+/* Tables */
+.sl-markdown-content table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: var(--text-sm);
+}
+
+.sl-markdown-content th {
+  background: var(--color-bg-surface);
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sl-markdown-content th,
+.sl-markdown-content td {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-border);
+}
+
+.sl-markdown-content tr:hover {
+  background: var(--color-bg-surface-hover);
+}
+
+/* Blockquotes */
+.sl-markdown-content blockquote {
+  border-left: 3px solid var(--color-accent);
+  background: var(--color-accent-subtle);
+  padding: 1rem 1.25rem;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-style: normal;
+}
+
+/* Details/Summary (collapsible sections) */
+.sl-markdown-content details {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1rem;
+  margin: 1rem 0;
+  background: var(--color-bg-surface);
+}
+
+.sl-markdown-content details summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-family: var(--font-heading);
+  color: var(--color-accent);
+}
+
+.sl-markdown-content details[open] summary {
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Links */
+.sl-markdown-content a {
+  color: var(--color-accent);
+  text-decoration-color: var(--color-accent-border);
+  text-underline-offset: 0.15em;
+  transition: color var(--transition-fast);
+}
+
+.sl-markdown-content a:hover {
+  color: var(--color-accent-hover);
+}
+
+/* ============================================================
+   Global base styles
+   ============================================================ */
+
+html {
+  -webkit-font-smoothing: antialiased;
+  scroll-behavior: smooth;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--color-accent-subtle);
+  color: var(--color-text-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
