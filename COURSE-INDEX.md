@@ -2,13 +2,13 @@
 
 ## About This Course
 
-This is a comprehensive **16-phase, 55-module** course on mastering Claude Code (Anthropic's CLI coding agent). Available in **English** and **Vietnamese**.
+This is a comprehensive **16-phase, 64-module** course on mastering Claude Code (Anthropic's CLI coding agent). Available in **English** and **Vietnamese**.
 
 When using this course as an AI knowledge base, **READ THIS FILE FIRST** to understand the structure, then reference specific lessons based on the user's question.
 
 ## Giới Thiệu
 
-Đây là course toàn diện gồm **16 phases, 55 modules** về cách làm chủ Claude Code. Có cả bản **Tiếng Anh** và **Tiếng Việt**.
+Đây là course toàn diện gồm **16 phases, 64 modules** về cách làm chủ Claude Code. Có cả bản **Tiếng Anh** và **Tiếng Việt**.
 
 Khi dùng course này làm AI knowledge base, **HÃY ĐỌC FILE NÀY TRƯỚC** để hiểu cấu trúc, sau đó tham chiếu lessons cụ thể theo câu hỏi.
 
@@ -565,4 +565,4 @@ src/content/docs/
 | 14 | Optimization | Tối ưu hóa | 4 |
 | 15 | Templates & Skills | Templates & Hệ sinh thái | 5 |
 | 16 | Real-World Mastery | Thực chiến | 3 |
-| **Total** | | | **69** |
+| **Total** | | | **64** |
