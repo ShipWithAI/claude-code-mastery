@@ -35,8 +35,8 @@ src/content/docs/
     └── ...
 ```
 
-- English lessons: `src/content/docs/en/phase-XX-name/XX-module.md`
-- Vietnamese lessons: `src/content/docs/vi/phase-XX-name/XX-module.md`
+- English lessons: `src/content/docs/en/claude-code/phase-XX-name/XX-module.md`
+- Vietnamese lessons: `src/content/docs/vi/claude-code/phase-XX-name/XX-module.md`
 - Content is the same in both languages — use whichever matches the user's language
 - Some modules use `.mdx` extension for interactive components
 
@@ -46,8 +46,8 @@ src/content/docs/
 
 ### Phase 1: Foundation / Nền Tảng (`phase-01-foundation/`)
 
-**EN:** `src/content/docs/en/phase-01-foundation/`
-**VI:** `src/content/docs/vi/phase-01-foundation/`
+**EN:** `src/content/docs/en/claude-code/phase-01-foundation/`
+**VI:** `src/content/docs/vi/claude-code/phase-01-foundation/`
 
 - **Module 1.1 — Installation & Configuration** (`01-installation.md`)
   EN: Install Claude Code CLI, configure API keys, authenticate, and run your first command.
@@ -65,8 +65,8 @@ src/content/docs/
 
 ### Phase 2: Security & Sandboxing / Bảo Mật (`phase-02-security/`)
 
-**EN:** `src/content/docs/en/phase-02-security/`
-**VI:** `src/content/docs/vi/phase-02-security/`
+**EN:** `src/content/docs/en/claude-code/phase-02-security/`
+**VI:** `src/content/docs/vi/claude-code/phase-02-security/`
 
 - **Module 2.1 — Threat Model** (`01-threat-model.md`)
   EN: Understand what Claude Code can access on your system, recognize attack scenarios, and assess your risk exposure.
@@ -92,8 +92,8 @@ src/content/docs/
 
 ### Phase 3: Core Workflows / Quy trình Cốt lõi (`phase-03-core-workflows/`)
 
-**EN:** `src/content/docs/en/phase-03-core-workflows/`
-**VI:** `src/content/docs/vi/phase-03-core-workflows/`
+**EN:** `src/content/docs/en/claude-code/phase-03-core-workflows/`
+**VI:** `src/content/docs/vi/claude-code/phase-03-core-workflows/`
 
 - **Module 3.1 — Reading & Understanding Codebases** (`01-reading-codebases.md`)
   EN: Use Claude Code to rapidly understand unfamiliar codebases, map architecture, and identify key patterns.
@@ -115,8 +115,8 @@ src/content/docs/
 
 ### Phase 4: Prompt Engineering & Memory / Kỹ thuật Prompt & Bộ nhớ (`phase-04-prompt-memory/`)
 
-**EN:** `src/content/docs/en/phase-04-prompt-memory/`
-**VI:** `src/content/docs/vi/phase-04-prompt-memory/`
+**EN:** `src/content/docs/en/claude-code/phase-04-prompt-memory/`
+**VI:** `src/content/docs/vi/claude-code/phase-04-prompt-memory/`
 
 - **Module 4.1 — Prompting Techniques** (`01-prompting-techniques.md`)
   EN: Master prompt engineering for Claude Code with context, constraints, references, and iterative refinement.
@@ -138,8 +138,8 @@ src/content/docs/
 
 ### Phase 5: Context Mastery / Làm chủ Context (`phase-05-context-mastery/`)
 
-**EN:** `src/content/docs/en/phase-05-context-mastery/`
-**VI:** `src/content/docs/vi/phase-05-context-mastery/`
+**EN:** `src/content/docs/en/claude-code/phase-05-context-mastery/`
+**VI:** `src/content/docs/vi/claude-code/phase-05-context-mastery/`
 
 - **Module 5.1 — Controlling Context** (`01-controlling-context.md`)
   EN: Control what enters Claude Code context window and maintain high-quality output in long sessions.
@@ -157,8 +157,8 @@ src/content/docs/
 
 ### Phase 6: Thinking & Planning Modes / Chế độ Suy nghĩ & Lên kế hoạch (`phase-06-thinking-planning/`)
 
-**EN:** `src/content/docs/en/phase-06-thinking-planning/`
-**VI:** `src/content/docs/vi/phase-06-thinking-planning/`
+**EN:** `src/content/docs/en/claude-code/phase-06-thinking-planning/`
+**VI:** `src/content/docs/vi/claude-code/phase-06-thinking-planning/`
 
 - **Module 6.1 — Think Mode (Extended Thinking)** (`01-think-mode.mdx` / VI: `01-think-mode.md`)
   EN: Activate Claude Code extended thinking for deeper reasoning on complex debugging and architecture tasks.
@@ -176,8 +176,8 @@ src/content/docs/
 
 ### Phase 7: Multi-Agent & Full Auto / Đa tác tử & Tự động hoàn toàn (`phase-07-multi-agent-auto/`)
 
-**EN:** `src/content/docs/en/phase-07-multi-agent-auto/`
-**VI:** `src/content/docs/vi/phase-07-multi-agent-auto/`
+**EN:** `src/content/docs/en/claude-code/phase-07-multi-agent-auto/`
+**VI:** `src/content/docs/vi/claude-code/phase-07-multi-agent-auto/`
 
 - **Module 7.1 — Auto Coding Levels** (`01-auto-coding-levels.md`)
   EN: Understand Claude Code automation levels from manual to full auto and configure each for your risk tolerance.
@@ -203,8 +203,8 @@ src/content/docs/
 
 ### Phase 8: Meta-Debugging / Debug AI (`phase-08-meta-debugging/`)
 
-**EN:** `src/content/docs/en/phase-08-meta-debugging/`
-**VI:** `src/content/docs/vi/phase-08-meta-debugging/`
+**EN:** `src/content/docs/en/claude-code/phase-08-meta-debugging/`
+**VI:** `src/content/docs/vi/claude-code/phase-08-meta-debugging/`
 
 - **Module 8.1 — Hallucination Detection & Prevention** (`01-hallucination-detection.mdx`)
   EN: Detect and prevent AI hallucinations in Claude Code output to protect your projects from incorrect code.
@@ -230,8 +230,8 @@ src/content/docs/
 
 ### Phase 9: Legacy Code & Brownfield / Code cũ & Dự án Brownfield (`phase-09-legacy-brownfield/`)
 
-**EN:** `src/content/docs/en/phase-09-legacy-brownfield/`
-**VI:** `src/content/docs/vi/phase-09-legacy-brownfield/`
+**EN:** `src/content/docs/en/claude-code/phase-09-legacy-brownfield/`
+**VI:** `src/content/docs/vi/claude-code/phase-09-legacy-brownfield/`
 
 - **Module 9.1 — Archeology Mode** (`01-archeology-mode.md`)
   EN: Excavate legacy codebases with Claude Code using systematic exploration and mental model building.
@@ -253,8 +253,8 @@ src/content/docs/
 
 ### Phase 10: Team Collaboration / Cộng tác Team (`phase-10-team-collaboration/`)
 
-**EN:** `src/content/docs/en/phase-10-team-collaboration/`
-**VI:** `src/content/docs/vi/phase-10-team-collaboration/`
+**EN:** `src/content/docs/en/claude-code/phase-10-team-collaboration/`
+**VI:** `src/content/docs/vi/claude-code/phase-10-team-collaboration/`
 
 - **Module 10.1 — Team CLAUDE.md** (`01-team-claude-md.md`)
   EN: Create and maintain a shared CLAUDE.md for consistent Claude Code behavior across your entire team.
@@ -280,8 +280,8 @@ src/content/docs/
 
 ### Phase 11: Automation & Headless / Tự động hóa (`phase-11-automation-headless/`)
 
-**EN:** `src/content/docs/en/phase-11-automation-headless/`
-**VI:** `src/content/docs/vi/phase-11-automation-headless/`
+**EN:** `src/content/docs/en/claude-code/phase-11-automation-headless/`
+**VI:** `src/content/docs/vi/claude-code/phase-11-automation-headless/`
 
 - **Module 11.1 — Headless Mode** (`01-headless-mode.md`)
   EN: Run Claude Code in headless mode for scripted automation, batch processing, and CI/CD pipelines.
@@ -307,8 +307,8 @@ src/content/docs/
 
 ### Phase 12: n8n & Workflow Integration / Tích hợp n8n (`phase-12-n8n-workflows/`)
 
-**EN:** `src/content/docs/en/phase-12-n8n-workflows/`
-**VI:** `src/content/docs/vi/phase-12-n8n-workflows/`
+**EN:** `src/content/docs/en/claude-code/phase-12-n8n-workflows/`
+**VI:** `src/content/docs/vi/claude-code/phase-12-n8n-workflows/`
 
 - **Module 12.1 — Claude Code + n8n** (`01-claude-code-n8n.md`)
   EN: Trigger Claude Code from n8n workflows and build visual AI automation pipelines for development tasks.
@@ -326,8 +326,8 @@ src/content/docs/
 
 ### Phase 13: Data & Analysis / Dữ liệu & Phân tích (`phase-13-data-analysis/`)
 
-**EN:** `src/content/docs/en/phase-13-data-analysis/`
-**VI:** `src/content/docs/vi/phase-13-data-analysis/`
+**EN:** `src/content/docs/en/claude-code/phase-13-data-analysis/`
+**VI:** `src/content/docs/vi/claude-code/phase-13-data-analysis/`
 
 - **Module 13.1 — Data Analysis** (`01-data-analysis.md`)
   EN: Use Claude Code for exploratory data analysis with prompting patterns for CSV, JSON, and SQL data.
@@ -345,8 +345,8 @@ src/content/docs/
 
 ### Phase 14: Optimization & Performance / Tối ưu hóa (`phase-14-optimization/`)
 
-**EN:** `src/content/docs/en/phase-14-optimization/`
-**VI:** `src/content/docs/vi/phase-14-optimization/`
+**EN:** `src/content/docs/en/claude-code/phase-14-optimization/`
+**VI:** `src/content/docs/vi/claude-code/phase-14-optimization/`
 
 - **Module 14.1 — Task Optimization** (`01-task-optimization.md`)
   EN: Structure tasks optimally for Claude Code with the right granularity to avoid common framing mistakes.
@@ -368,8 +368,8 @@ src/content/docs/
 
 ### Phase 15: Templates, Skills & Ecosystem / Templates & Hệ sinh thái (`phase-15-templates-skills/`)
 
-**EN:** `src/content/docs/en/phase-15-templates-skills/`
-**VI:** `src/content/docs/vi/phase-15-templates-skills/`
+**EN:** `src/content/docs/en/claude-code/phase-15-templates-skills/`
+**VI:** `src/content/docs/vi/claude-code/phase-15-templates-skills/`
 
 - **Module 15.1 — CLAUDE.md Templates** (`01-claude-md-templates.md`)
   EN: Get ready-to-use CLAUDE.md templates for common project types and adapt them for your specific stack.
@@ -395,8 +395,8 @@ src/content/docs/
 
 ### Phase 16: Real-World Mastery / Thực chiến (`phase-16-real-world-mastery/`)
 
-**EN:** `src/content/docs/en/phase-16-real-world-mastery/`
-**VI:** `src/content/docs/vi/phase-16-real-world-mastery/`
+**EN:** `src/content/docs/en/claude-code/phase-16-real-world-mastery/`
+**VI:** `src/content/docs/vi/claude-code/phase-16-real-world-mastery/`
 
 - **Module 16.1 — Case Studies** (`01-case-studies.md`)
   EN: Real-world Claude Code case studies showing successful implementations across diverse project types.

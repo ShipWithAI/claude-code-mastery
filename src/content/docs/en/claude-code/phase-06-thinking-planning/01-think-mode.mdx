@@ -423,11 +423,11 @@ When in doubt, go one level UP. Better to overthink than underthink.
 
 | Think Level | Trigger Phrase | Best For | Token Cost | Example Use |
 |-------------|----------------|----------|------------|-------------|
-| **Level 0<br>(Act)** | No trigger | Simple, well-defined tasks | Low | "Add field to model", "Format code", "Write test" |
-| **Level 1<br>(Think)** | "think about this first" | Moderate complexity, some edge cases | Medium | "Add caching", "Refactor function", "Debug error" |
-| **Level 2<br>(Step-by-Step)** | "think step by step" | Complex, multi-part problems | Medium-High | "Design API", "Refactor module", "Plan integration" |
-| **Level 3<br>(Carefully)** | "think carefully" | Architecture, critical decisions | High | "Migration strategy", "Security analysis", "System design" |
-| **Level 4<br>(Ultra)** ⚠️ | "ultrathink" | Mission-critical, regulatory | Very High | "Financial system design", "Compliance architecture" |
+| **Level 0<br/>(Act)** | No trigger | Simple, well-defined tasks | Low | "Add field to model", "Format code", "Write test" |
+| **Level 1<br/>(Think)** | "think about this first" | Moderate complexity, some edge cases | Medium | "Add caching", "Refactor function", "Debug error" |
+| **Level 2<br/>(Step-by-Step)** | "think step by step" | Complex, multi-part problems | Medium-High | "Design API", "Refactor module", "Plan integration" |
+| **Level 3<br/>(Carefully)** | "think carefully" | Architecture, critical decisions | High | "Migration strategy", "Security analysis", "System design" |
+| **Level 4<br/>(Ultra)** ⚠️ | "ultrathink" | Mission-critical, regulatory | Very High | "Financial system design", "Compliance architecture" |
 
 ⚠️ Level 4 "ultrathink" is a community term — verify if your Claude Code version supports it explicitly.
 
@@ -439,12 +439,12 @@ When in doubt, go one level UP. Better to overthink than underthink.
 
 | ❌ Mistake | ✅ Correct Approach |
 |-----------|---------------------|
-| **Using think mode for trivial tasks**<br>"Think carefully about adding this console.log" | Reserve think mode for complexity. Trivial tasks waste tokens and time. |
-| **Never using think mode for complex tasks**<br>"Refactor auth system" with no thinking → shallow output | Complex architecture/refactoring ALWAYS needs Level 2-3 thinking. Default to "think step by step" for any multi-file change. |
-| **Ignoring the thinking analysis**<br>Claude writes detailed analysis, you skip to code | Read the thinking output! It often identifies edge cases you missed in your prompt. Use it to refine requirements. |
-| **Using maximum think level for everything**<br>"Think carefully about this one-liner fix" | Match think level to complexity. Overthinking simple tasks slows you down and burns tokens unnecessarily. |
-| **Expecting think mode to fix a bad prompt**<br>Vague prompt + "think carefully" → still vague | Think mode amplifies a good prompt. Garbage in, garbage out. Give Claude clear context and constraints first. |
-| **Not combining think with act**<br>Get great analysis, then prompt "do it" without referencing the analysis | After thinking phase, explicitly tell Claude: "Now implement based on your analysis above." Connect the phases. |
+| **Using think mode for trivial tasks**<br/>"Think carefully about adding this console.log" | Reserve think mode for complexity. Trivial tasks waste tokens and time. |
+| **Never using think mode for complex tasks**<br/>"Refactor auth system" with no thinking → shallow output | Complex architecture/refactoring ALWAYS needs Level 2-3 thinking. Default to "think step by step" for any multi-file change. |
+| **Ignoring the thinking analysis**<br/>Claude writes detailed analysis, you skip to code | Read the thinking output! It often identifies edge cases you missed in your prompt. Use it to refine requirements. |
+| **Using maximum think level for everything**<br/>"Think carefully about this one-liner fix" | Match think level to complexity. Overthinking simple tasks slows you down and burns tokens unnecessarily. |
+| **Expecting think mode to fix a bad prompt**<br/>Vague prompt + "think carefully" → still vague | Think mode amplifies a good prompt. Garbage in, garbage out. Give Claude clear context and constraints first. |
+| **Not combining think with act**<br/>Get great analysis, then prompt "do it" without referencing the analysis | After thinking phase, explicitly tell Claude: "Now implement based on your analysis above." Connect the phases. |
 
 ---
 
