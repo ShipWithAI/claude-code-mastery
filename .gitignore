@@ -19,6 +19,9 @@ Thumbs.db
 .env.*
 !.env.example
 
+# Claude Code agents (personal config)
+.claude/agents/
+
 # IDE
 .idea/
 .vscode/
