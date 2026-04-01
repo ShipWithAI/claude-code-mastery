@@ -4,6 +4,36 @@
       "source": "/",
       "destination": "/en/",
       "permanent": true
+    },
+    {
+      "source": "/en/phase-:path*",
+      "destination": "/en/claude-code/phase-:path*",
+      "permanent": true
+    },
+    {
+      "source": "/vi/phase-:path*",
+      "destination": "/vi/claude-code/phase-:path*",
+      "permanent": true
+    },
+    {
+      "source": "/en/cheat-sheet",
+      "destination": "/en/claude-code/cheat-sheet",
+      "permanent": true
+    },
+    {
+      "source": "/vi/cheat-sheet",
+      "destination": "/vi/claude-code/cheat-sheet",
+      "permanent": true
+    },
+    {
+      "source": "/en/tips-tricks",
+      "destination": "/en/claude-code/tips-tricks",
+      "permanent": true
+    },
+    {
+      "source": "/vi/tips-tricks",
+      "destination": "/vi/claude-code/tips-tricks",
+      "permanent": true
     }
   ]
 }
