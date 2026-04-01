@@ -6,13 +6,18 @@
       "permanent": true
     },
     {
-      "source": "/en/phase-:path*",
-      "destination": "/en/claude-code/phase-:path*",
+      "source": "/en/(phase-.*)",
+      "destination": "/en/claude-code/$1",
       "permanent": true
     },
     {
-      "source": "/vi/phase-:path*",
-      "destination": "/vi/claude-code/phase-:path*",
+      "source": "/vi/(phase-.*)",
+      "destination": "/vi/claude-code/$1",
+      "permanent": true
+    },
+    {
+      "source": "/en/cheat-sheet/(.*)",
+      "destination": "/en/claude-code/cheat-sheet/$1",
       "permanent": true
     },
     {
@@ -21,13 +26,28 @@
       "permanent": true
     },
     {
+      "source": "/vi/cheat-sheet/(.*)",
+      "destination": "/vi/claude-code/cheat-sheet/$1",
+      "permanent": true
+    },
+    {
       "source": "/vi/cheat-sheet",
       "destination": "/vi/claude-code/cheat-sheet",
       "permanent": true
     },
     {
+      "source": "/en/tips-tricks/(.*)",
+      "destination": "/en/claude-code/tips-tricks/$1",
+      "permanent": true
+    },
+    {
       "source": "/en/tips-tricks",
       "destination": "/en/claude-code/tips-tricks",
+      "permanent": true
+    },
+    {
+      "source": "/vi/tips-tricks/(.*)",
+      "destination": "/vi/claude-code/tips-tricks/$1",
       "permanent": true
     },
     {
