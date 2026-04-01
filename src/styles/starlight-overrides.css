@@ -4,7 +4,7 @@
    Ported from shipwithai.io to maintain brand consistency.
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+/* Fonts are self-hosted via @fontsource — see astro.config.mjs */
 
 /* ── Starlight font overrides ── */
 :root {
