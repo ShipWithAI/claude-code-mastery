@@ -2,7 +2,7 @@
 
 Thanks for helping make this course better! Here's how to contribute.
 
-All PRs should target the **`main`** branch.
+All PRs should target the **`develop`** branch. The `main` branch is reserved for production deployments only.
 
 ## Quick Fixes
 
@@ -23,7 +23,7 @@ Before writing a new module:
    - **REAL CASE** — Production scenario
 3. Read [`CLAUDE.md`](./CLAUDE.md) for full writing guidelines and the module template
 
-Content lives in `src/content/docs/en/` (English) and `src/content/docs/vi/` (Vietnamese).
+Content lives in `src/content/docs/en/claude-code/` (English) and `src/content/docs/vi/claude-code/` (Vietnamese).
 
 ## Vietnamese Translation
 
