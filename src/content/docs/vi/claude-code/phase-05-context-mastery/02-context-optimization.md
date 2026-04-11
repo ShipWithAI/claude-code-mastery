@@ -63,7 +63,7 @@ Giữa các phase: `/compact` để nén learnings và xóa nhiễu.
 graph TD
     A[Task Lớn] --> B[Session Architecture]
     B --> C[Phase 1: Hiểu]
-    C --> D[/compact]
+    C --> D["/compact"]
     D --> E[Phase 2: Lập kế hoạch]
     E --> F[Context Priming]
     F --> G[Task Decomposition]
@@ -71,12 +71,12 @@ graph TD
     G --> I[Sub-task 2]
     G --> J[Sub-task 3]
     H --> K[One-Shot Pattern]
-    I --> L[/compact]
+    I --> L["/compact"]
     J --> M[Context Recycling]
     L --> N[Phase 3: Thực thi]
     M --> N
     K --> N
-    N --> O[/compact]
+    N --> O["/compact"]
     O --> P[Phase 4: Xác minh]
 ```
 
