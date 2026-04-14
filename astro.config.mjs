@@ -2,9 +2,15 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import sitemap from '@astrojs/sitemap';
+import rehypeMermaid from 'rehype-mermaid';
 
 export default defineConfig({
   site: 'https://course.shipwithai.io',
+  markdown: {
+    rehypePlugins: [
+      [rehypeMermaid, { strategy: 'inline-svg' }],
+    ],
+  },
   integrations: [
     starlight({
       title: 'Claude Code Mastery',

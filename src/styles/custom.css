@@ -3,3 +3,23 @@
   background-color: rgba(129, 140, 248, 0.2) !important;
   font-weight: 600;
 }
+
+/* ── Mermaid Diagrams ── */
+/* SVGs are rendered with hardcoded light-mode colors by rehype-mermaid.
+   In dark mode (the default for this site), wrap them in a light card so
+   connectors, node backgrounds, and text all remain readable. */
+svg[id^="mermaid-"] {
+  display: block;
+  max-width: 100%;
+  margin: 1.5rem auto;
+  border-radius: 8px;
+  padding: 1.25rem 1.5rem;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+/* In light mode: transparent background (diagram colours already work) */
+[data-theme='light'] svg[id^="mermaid-"] {
+  background-color: transparent;
+  border-color: #e2e8f0;
+}

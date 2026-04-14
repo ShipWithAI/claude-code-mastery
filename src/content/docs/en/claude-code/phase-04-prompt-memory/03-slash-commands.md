@@ -52,15 +52,15 @@ graph TD
     A --> E{New project setup?}
     A --> F{Forgot what commands exist?}
 
-    B -->|Yes| G[/compact]
-    C -->|Yes, unrelated to current work| H[/clear]
-    D -->|Yes| I[/cost]
-    E -->|Yes| J[/init]
-    F -->|Yes| K[/help]
+    B -->|Yes| G["/compact"]
+    C -->|Yes, unrelated to current work| H["/clear"]
+    D -->|Yes| I["/cost"]
+    E -->|Yes| J["/init"]
+    F -->|Yes| K["/help"]
 
     G --> L[Continue working with freed context]
     H --> M[Fresh start, all context erased]
-    I --> N[Review usage, decide if need /compact]
+    I --> N["Review usage, decide if need /compact"]
     J --> O[CLAUDE.md created, configure project]
     K --> P[See all available commands]
 ```
