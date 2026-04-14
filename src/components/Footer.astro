@@ -9,9 +9,6 @@ const route = Astro.locals.starlightRoute;
 const locale = route?.lang?.startsWith('vi') ? 'vi' : 'en';
 const year = new Date().getFullYear();
 
-// Course analytics — self-initializing script for GA4 events
-import '../scripts/course-analytics';
-
 const i18n = {
   tagline: locale === 'vi'
     ? 'Giúp developer ship nhanh hơn với AI.'
@@ -201,3 +198,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     }
   }
 </style>
+
+<script>
+  import '../scripts/course-analytics';
+</script>
