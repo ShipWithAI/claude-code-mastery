@@ -8,7 +8,7 @@ export default defineConfig({
   site: 'https://course.shipwithai.io',
   markdown: {
     rehypePlugins: [
-      [rehypeMermaid, { strategy: 'inline-svg' }],
+      [rehypeMermaid, { strategy: 'pre-mermaid' }],
     ],
   },
   integrations: [
@@ -16,6 +16,11 @@ export default defineConfig({
       title: 'Claude Code Mastery',
       description: 'The most comprehensive course on mastering Claude Code — from foundation to production. By ShipWithAI.',
       head: [
+        {
+          tag: 'script',
+          attrs: { type: 'module' },
+          content: `import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';mermaid.initialize({startOnLoad:true,theme:'dark'});`,
+        },
         {
           tag: 'script',
           content: `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
