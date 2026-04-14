@@ -2,14 +2,35 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import sitemap from '@astrojs/sitemap';
-import rehypeMermaid from 'rehype-mermaid';
+import { visit } from 'unist-util-visit';
+
+/** Lightweight rehype plugin: converts ```mermaid code blocks to <pre class="mermaid"> for client-side rendering. */
+function rehypeMermaidPre() {
+  return (tree) => {
+    visit(tree, 'element', (node, index, parent) => {
+      if (
+        node.tagName === 'pre' &&
+        node.children?.length === 1 &&
+        node.children[0].tagName === 'code' &&
+        node.children[0].properties?.className?.includes('language-mermaid')
+      ) {
+        const code = node.children[0];
+        const text = code.children?.find((c) => c.type === 'text')?.value || '';
+        parent.children[index] = {
+          type: 'element',
+          tagName: 'pre',
+          properties: { className: ['mermaid'] },
+          children: [{ type: 'text', value: text }],
+        };
+      }
+    });
+  };
+}
 
 export default defineConfig({
   site: 'https://course.shipwithai.io',
   markdown: {
-    rehypePlugins: [
-      [rehypeMermaid, { strategy: 'pre-mermaid' }],
-    ],
+    rehypePlugins: [rehypeMermaidPre],
   },
   integrations: [
     starlight({
