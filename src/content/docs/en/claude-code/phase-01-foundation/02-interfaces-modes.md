@@ -80,13 +80,13 @@ When inside an interactive REPL session, these shortcuts speed up your workflow:
 
 ```mermaid
 graph TD
-    A[Need Claude Code?] --> B{Multiple<br/>back-and-forth?}
-    B -->|Yes| C[REPL Mode<br/>claude]
-    B -->|No| D{Processing<br/>file/command output?}
-    D -->|Yes| E[Pipe Mode<br/>cat file \| claude -p ...]
-    D -->|No| F{In a script<br/>or automation?}
-    F -->|Yes| G[One-shot Mode<br/>claude -p ...]
-    F -->|No| H{Quick single<br/>question?}
+    A["Need Claude Code?"] --> B{"Multiple<br/>back-and-forth?"}
+    B -->|Yes| C["REPL Mode<br/>claude"]
+    B -->|No| D{"Processing<br/>file/command output?"}
+    D -->|Yes| E["Pipe Mode<br/>cat file | claude -p ..."]
+    D -->|No| F{"In a script<br/>or automation?"}
+    F -->|Yes| G["One-shot Mode<br/>claude -p ..."]
+    F -->|No| H{"Quick single<br/>question?"}
     H -->|Yes| G
     H -->|No| C
     style C fill:#e1f5ff

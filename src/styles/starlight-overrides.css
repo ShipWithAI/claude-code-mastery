@@ -238,6 +238,17 @@ header {
   background-color: rgba(248, 250, 252, 0.85);
 }
 
+/* ── Header controls: theme & language selectors ── */
+/* Starlight's Select.astro reads --sl-color-bg-nav for <option> bg.
+   Our gray-6 override makes it near-transparent, so dropdown options
+   render as white-on-white. Fix by pointing it to a solid surface. */
+:root {
+  --sl-color-bg-nav: var(--color-bg-base);
+}
+[data-theme="light"] {
+  --sl-color-bg-nav: var(--color-bg-base);
+}
+
 /* ============================================================
    Sidebar improvements
    ============================================================ */

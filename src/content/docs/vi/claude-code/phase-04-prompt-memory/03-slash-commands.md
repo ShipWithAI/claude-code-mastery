@@ -52,15 +52,15 @@ graph TD
     A --> E{Setup dự án mới?}
     A --> F{Quên mất có lệnh gì?}
 
-    B -->|Có| G[/compact]
-    C -->|Có, không liên quan task hiện tại| H[/clear]
-    D -->|Có| I[/cost]
-    E -->|Có| J[/init]
-    F -->|Có| K[/help]
+    B -->|Có| G["/compact"]
+    C -->|Có, không liên quan task hiện tại| H["/clear"]
+    D -->|Có| I["/cost"]
+    E -->|Có| J["/init"]
+    F -->|Có| K["/help"]
 
     G --> L[Tiếp tục làm với context được giải phóng]
     H --> M[Khởi đầu mới, mọi context bị xóa]
-    I --> N[Xem usage, quyết định có cần /compact không]
+    I --> N["Xem usage, quyết định có cần /compact không"]
     J --> O[CLAUDE.md tạo xong, configure dự án]
     K --> P[Xem tất cả lệnh có sẵn]
 ```
