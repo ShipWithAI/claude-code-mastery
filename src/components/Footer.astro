@@ -9,6 +9,9 @@ const route = Astro.locals.starlightRoute;
 const locale = route?.lang?.startsWith('vi') ? 'vi' : 'en';
 const year = new Date().getFullYear();
 
+// Course analytics — self-initializing script for GA4 events
+import '../scripts/course-analytics';
+
 const i18n = {
   tagline: locale === 'vi'
     ? 'Giúp developer ship nhanh hơn với AI.'
@@ -19,6 +22,10 @@ const i18n = {
   community: locale === 'vi' ? '' : 'community',
 };
 ---
+
+<!-- GTM noscript fallback (ideally right after <body>, but Starlight doesn't expose that) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-MJJNTKQR"
+height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 
 <footer class="sl-flex starlight-meta">
   <div class="meta sl-flex">
