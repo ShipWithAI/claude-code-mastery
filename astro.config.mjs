@@ -2,20 +2,46 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import sitemap from '@astrojs/sitemap';
-import rehypeMermaid from 'rehype-mermaid';
+import { visit } from 'unist-util-visit';
+
+/** Lightweight rehype plugin: converts ```mermaid code blocks to <pre class="mermaid"> for client-side rendering. */
+function rehypeMermaidPre() {
+  return (tree) => {
+    visit(tree, 'element', (node, index, parent) => {
+      if (
+        node.tagName === 'pre' &&
+        node.children?.length === 1 &&
+        node.children[0].tagName === 'code' &&
+        node.children[0].properties?.className?.includes('language-mermaid')
+      ) {
+        const code = node.children[0];
+        const text = code.children?.find((c) => c.type === 'text')?.value || '';
+        parent.children[index] = {
+          type: 'element',
+          tagName: 'pre',
+          properties: { className: ['mermaid'] },
+          children: [{ type: 'text', value: text }],
+        };
+      }
+    });
+  };
+}
 
 export default defineConfig({
   site: 'https://course.shipwithai.io',
   markdown: {
-    rehypePlugins: [
-      [rehypeMermaid, { strategy: 'inline-svg' }],
-    ],
+    rehypePlugins: [rehypeMermaidPre],
   },
   integrations: [
     starlight({
       title: 'Claude Code Mastery',
       description: 'The most comprehensive course on mastering Claude Code — from foundation to production. By ShipWithAI.',
       head: [
+        {
+          tag: 'script',
+          attrs: { type: 'module' },
+          content: `import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';mermaid.initialize({startOnLoad:true,theme:'dark'});`,
+        },
         {
           tag: 'script',
           content: `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':

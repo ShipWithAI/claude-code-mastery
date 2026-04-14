@@ -20,6 +20,10 @@ const i18n = {
 };
 ---
 
+<!-- GTM noscript fallback (ideally right after <body>, but Starlight doesn't expose that) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-MJJNTKQR"
+height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+
 <footer class="sl-flex starlight-meta">
   <div class="meta sl-flex">
     <EditLink />
@@ -194,3 +198,7 @@ const i18n = {
     }
   }
 </style>
+
+<script>
+  import '../scripts/course-analytics';
+</script>
