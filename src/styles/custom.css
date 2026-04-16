@@ -108,3 +108,88 @@
 .mermaid-diagram.modal:focus-visible::after {
   opacity: 1;
 }
+
+/* ── Carry-over polish from Task 4 review ── */
+
+/* Touch devices have no hover — always show the expand affordance on modal thumbnails. */
+@media (hover: none) {
+  .mermaid-diagram.modal::after { opacity: 0.9; }
+}
+
+/* If mermaid never sets data-processed (CDN failure, CSP block, render error),
+   reveal the raw source after 3s so users see something rather than a blank card. */
+@keyframes mermaid-fallback-reveal { to { visibility: visible; } }
+.mermaid-diagram pre.mermaid:not([data-processed="true"]) {
+  animation: mermaid-fallback-reveal 0s 3s forwards;
+}
+
+/* ── Mermaid modal viewer ── */
+.mermaid-modal {
+  width: 95vw;
+  height: 90vh;
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  background: #f8fafc;
+  overflow: hidden;
+}
+.mermaid-modal::backdrop {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.mermaid-modal__body {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  box-sizing: border-box;
+}
+.mermaid-modal__body > svg {
+  width: calc(var(--zoom, 1) * 100%);
+  height: auto;
+  min-width: 100%;
+  max-width: none;
+}
+
+.mermaid-modal__close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+  z-index: 1;
+}
+.mermaid-modal__close:hover { background: rgba(0, 0, 0, 0.85); }
+
+.mermaid-modal__zoom {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.5rem;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 0.25rem;
+  border-radius: 8px;
+}
+.mermaid-modal__zoom > button {
+  min-width: 2.25rem;
+  padding: 0.35rem 0.75rem;
+  border: none;
+  background: transparent;
+  color: #fff;
+  font-size: 0.95rem;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.mermaid-modal__zoom > button:hover { background: rgba(255, 255, 255, 0.15); }

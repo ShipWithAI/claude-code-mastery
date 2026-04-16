@@ -42,6 +42,72 @@ function classify(figure) {
   figure.classList.add(mode);
 }
 
+// ── Modal singleton ────────────────────────────────────────────────
+const MODAL_HTML = `
+<dialog class="mermaid-modal" aria-label="Diagram viewer">
+  <button type="button" class="mermaid-modal__close" aria-label="Close">✕</button>
+  <div class="mermaid-modal__body"></div>
+  <div class="mermaid-modal__zoom">
+    <button type="button" data-zoom="-" aria-label="Zoom out">−</button>
+    <button type="button" data-zoom="0" aria-label="Reset zoom">Reset</button>
+    <button type="button" data-zoom="+" aria-label="Zoom in">+</button>
+  </div>
+</dialog>
+`.trim();
+
+function ensureModal() {
+  let dialog = document.querySelector('.mermaid-modal');
+  if (dialog) return dialog;
+
+  document.body.insertAdjacentHTML('beforeend', MODAL_HTML);
+  dialog = document.querySelector('.mermaid-modal');
+  const body = dialog.querySelector('.mermaid-modal__body');
+
+  // Close button
+  dialog.querySelector('.mermaid-modal__close').addEventListener('click', () => dialog.close());
+
+  // Backdrop click closes (click on the dialog itself, not its children)
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog) dialog.close();
+  });
+
+  // On close: clear clone, reset zoom
+  dialog.addEventListener('close', () => {
+    body.innerHTML = '';
+    body.style.setProperty('--zoom', '1');
+  });
+
+  return dialog;
+}
+
+function openModalFor(figure) {
+  const dialog = ensureModal();
+  const body = dialog.querySelector('.mermaid-modal__body');
+  const svg = figure.querySelector('svg');
+  if (!svg) return;
+
+  const clone = svg.cloneNode(true);
+  clone.removeAttribute('id');  // avoid duplicate IDs in DOM
+  body.innerHTML = '';
+  body.appendChild(clone);
+  body.style.setProperty('--zoom', '1');
+
+  // Copy aria-label from the source figure for screen readers
+  const label = figure.getAttribute('aria-label');
+  if (label) dialog.setAttribute('aria-label', label);
+
+  dialog.showModal();
+}
+
+// Event delegation: click on a .modal figure opens the dialog.
+// Listener attached once on document.body — survives SPA nav.
+document.body.addEventListener('click', (e) => {
+  // Don't trigger when clicking inside the already-open dialog.
+  if (e.target.closest('.mermaid-modal')) return;
+  const figure = e.target.closest('.mermaid-diagram.modal');
+  if (figure) openModalFor(figure);
+});
+
 // Render every mermaid <pre> inside a figure and classify each figure.
 async function renderAndClassify() {
   try {
