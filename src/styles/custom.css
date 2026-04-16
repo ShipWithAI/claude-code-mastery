@@ -101,13 +101,21 @@
   cursor: zoom-in;
   max-height: 420px;
   overflow: hidden;
-  text-align: center;
+  /* Grid centering puts the SVG in the visual center of the card both
+     horizontally and vertically — no inline-block descender space to skew it. */
+  display: grid;
+  place-items: center;
 }
 .mermaid-diagram.modal pre.mermaid {
-  display: block;
+  /* Flex-centre the SVG within the pre so it doesn't sit on the text baseline
+     (which would leave descender space under the SVG and push it visually up
+     inside the grid-centred card). */
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .mermaid-diagram.modal svg {
-  display: inline-block;
+  display: block;
   max-width: 100%;
   max-height: 380px;
   width: auto;
@@ -150,6 +158,10 @@
   border-radius: 12px;
   background: #f8fafc;
   overflow: hidden;
+  /* Centre the dialog in the viewport. Starlight resets margin to 0 on all
+     elements, which clobbers <dialog>'s user-agent `margin: auto` that is
+     responsible for default centring. Re-assert it here. */
+  margin: auto;
 }
 .mermaid-modal::backdrop {
   background: rgba(0, 0, 0, 0.7);
