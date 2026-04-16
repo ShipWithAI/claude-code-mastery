@@ -121,15 +121,16 @@ function initCourseCompletionTracking() {
 }
 
 // ── Event 4: course_code_copy ───────────────────────────────
-// Starlight renders copy buttons on code blocks with class "copy"
+// Expressive Code renders copy buttons on code blocks with data-code attribute
+// Structure: <div class="copy"><button title="Copy to clipboard" data-code="...">
 // We listen for clicks on those buttons
 function initCourseCodeCopy() {
 	if (!isCoursePage()) return;
 
-	// Starlight's copy button: <button class="copy">...</button>
+	// Expressive Code's copy button: <button data-code="...">...</button>
 	// It may be rendered with slight delay, so use delegation
 	document.addEventListener('click', (e) => {
-		const btn = (e.target as HTMLElement).closest('button.copy, button[data-copy]');
+		const btn = (e.target as HTMLElement).closest('button[data-code]');
 		if (!btn) return;
 
 		pushEvent('course_code_copy', {
