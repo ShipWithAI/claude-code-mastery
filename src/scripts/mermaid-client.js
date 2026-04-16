@@ -87,6 +87,31 @@ function ensureModal() {
     body.style.setProperty('--zoom', '1');
   });
 
+  // Zoom controls (+ / − / Reset)
+  const ZOOM_MIN = 0.5;
+  const ZOOM_MAX = 3;
+  const ZOOM_STEP = 0.25;
+
+  function getZoom() {
+    return parseFloat(body.style.getPropertyValue('--zoom')) || 1;
+  }
+  function setZoom(z) {
+    const clamped = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
+    body.style.setProperty('--zoom', String(clamped));
+  }
+
+  dialog.querySelector('.mermaid-modal__zoom').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-zoom]');
+    if (!btn) return;
+    const action = btn.dataset.zoom;
+    if (action === '+') setZoom(getZoom() + ZOOM_STEP);
+    else if (action === '-') setZoom(getZoom() - ZOOM_STEP);
+    else if (action === '0') {
+      setZoom(1);
+      body.scrollTo({ left: 0, top: 0 });
+    }
+  });
+
   return dialog;
 }
 
