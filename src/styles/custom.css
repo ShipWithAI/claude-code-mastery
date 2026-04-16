@@ -88,9 +88,17 @@
 /* Strategy: .modal — large or tall diagram shown as a capped thumbnail.
    SVG shrinks to fit within max-height while preserving aspect ratio. The
    full-size render happens in the dialog on click. */
+/* Once mermaid renders and the classifier assigns a strategy, the
+   --source-lines min-height reservation has served its CLS-prevention
+   purpose; release it so the card collapses to fit the actual SVG. */
+.mermaid-diagram.fits,
+.mermaid-diagram.scrolls,
+.mermaid-diagram.modal {
+  min-height: 0;
+}
+
 .mermaid-diagram.modal {
   cursor: zoom-in;
-  min-height: 0;           /* override the source-lines CLS reserve on modal thumbnails */
   max-height: 420px;
   overflow: hidden;
   text-align: center;
