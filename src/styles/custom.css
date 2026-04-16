@@ -4,22 +4,107 @@
   font-weight: 600;
 }
 
-/* ── Mermaid Diagrams ── */
-/* SVGs are rendered with hardcoded light-mode colors by rehype-mermaid.
-   In dark mode (the default for this site), wrap them in a light card so
-   connectors, node backgrounds, and text all remain readable. */
-svg[id^="mermaid-"] {
+/* ── Mermaid Diagrams — adaptive per-diagram rendering ── */
+
+/* Shared card wrapper (all three strategies) */
+.mermaid-diagram {
   display: block;
-  max-width: 100%;
-  margin: 1.5rem auto;
-  border-radius: 8px;
+  margin: 1.5rem 0;
   padding: 1.25rem 1.5rem;
-  background-color: #f8fafc;
   border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  min-height: calc(var(--source-lines, 4) * 1.75em);
+  box-sizing: border-box;
+  position: relative;
 }
 
-/* In light mode: transparent background (diagram colours already work) */
-[data-theme='light'] svg[id^="mermaid-"] {
-  background-color: transparent;
-  border-color: #e2e8f0;
+[data-theme='light'] .mermaid-diagram {
+  background: transparent;
+}
+
+/* Neutralize default <pre> styling inside the figure so the SVG paints cleanly. */
+.mermaid-diagram pre.mermaid {
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  font-family: inherit;
+  color: inherit;
+  overflow: visible;
+  white-space: normal;
+}
+
+/* Hide the raw mermaid text before mermaid renders the SVG (kills FOUT/flash). */
+.mermaid-diagram pre.mermaid:not([data-processed="true"]) {
+  visibility: hidden;
+}
+
+.mermaid-diagram figcaption.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Strategy: .fits — small diagram, centered at natural size */
+.mermaid-diagram.fits {
+  text-align: center;
+}
+.mermaid-diagram.fits pre.mermaid {
+  display: inline-block;
+}
+.mermaid-diagram.fits svg {
+  display: inline-block;
+  max-width: 100%;
+  width: auto;
+  height: auto;
+}
+
+/* Strategy: .scrolls — wide diagram, horizontal scroll preserves full size */
+.mermaid-diagram.scrolls {
+  overflow-x: auto;
+  overflow-y: hidden;
+  mask-image: linear-gradient(to right, black calc(100% - 24px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 24px), transparent 100%);
+}
+.mermaid-diagram.scrolls pre.mermaid {
+  width: max-content;
+  min-width: 100%;
+}
+.mermaid-diagram.scrolls svg {
+  width: auto;
+  max-width: none;
+  min-width: 100%;
+  height: auto;
+}
+
+/* Strategy: .modal — huge diagram, thumbnail with "expand" affordance */
+.mermaid-diagram.modal {
+  cursor: zoom-in;
+}
+.mermaid-diagram.modal svg {
+  width: 100%;
+  height: auto;
+}
+.mermaid-diagram.modal::after {
+  content: "⤢ expand";
+  position: absolute;
+  top: 0.5rem;
+  right: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 150ms;
+  pointer-events: none;
+}
+.mermaid-diagram.modal:hover::after,
+.mermaid-diagram.modal:focus-visible::after {
+  opacity: 1;
 }
