@@ -50,7 +50,8 @@
   border: 0;
 }
 
-/* Strategy: .fits — small diagram, centered at natural size */
+/* Strategy: .fits — small diagram, centered at natural size.
+   SVG dimensions set in JS (fixSvgDimensions) as explicit pixels from viewBox. */
 .mermaid-diagram.fits {
   text-align: center;
 }
@@ -60,34 +61,48 @@
 .mermaid-diagram.fits svg {
   display: inline-block;
   max-width: 100%;
-  width: auto;
   height: auto;
 }
 
-/* Strategy: .scrolls — wide diagram, horizontal scroll preserves full size */
+/* Strategy: .scrolls — wide diagram overflows horizontally inside the card.
+   Centering when SVG fits, scroll when it doesn't. Right-edge shadow hints
+   scrollability WITHOUT obscuring content (no mask-image fade). */
 .mermaid-diagram.scrolls {
   overflow-x: auto;
   overflow-y: hidden;
-  mask-image: linear-gradient(to right, black calc(100% - 24px), transparent 100%);
-  -webkit-mask-image: linear-gradient(to right, black calc(100% - 24px), transparent 100%);
+  text-align: center;
+  background-image: linear-gradient(to right, transparent calc(100% - 20px), rgba(0, 0, 0, 0.08) 100%);
+  background-repeat: no-repeat;
+  background-attachment: local;
 }
 .mermaid-diagram.scrolls pre.mermaid {
-  width: max-content;
-  min-width: 100%;
+  display: block;
 }
 .mermaid-diagram.scrolls svg {
-  width: auto;
+  display: inline-block;
+  /* Natural pixel width from fixSvgDimensions; override Starlight's global
+     `max-width: 100%` on SVG so wide diagrams can overflow the card. */
   max-width: none;
-  min-width: 100%;
-  height: auto;
 }
 
-/* Strategy: .modal — huge diagram, thumbnail with "expand" affordance */
+/* Strategy: .modal — large or tall diagram shown as a capped thumbnail.
+   SVG shrinks to fit within max-height while preserving aspect ratio. The
+   full-size render happens in the dialog on click. */
 .mermaid-diagram.modal {
   cursor: zoom-in;
+  min-height: 0;           /* override the source-lines CLS reserve on modal thumbnails */
+  max-height: 420px;
+  overflow: hidden;
+  text-align: center;
+}
+.mermaid-diagram.modal pre.mermaid {
+  display: block;
 }
 .mermaid-diagram.modal svg {
-  width: 100%;
+  display: inline-block;
+  max-width: 100%;
+  max-height: 380px;
+  width: auto;
   height: auto;
 }
 .mermaid-diagram.modal::after {
@@ -100,20 +115,13 @@
   background: rgba(0, 0, 0, 0.6);
   color: #fff;
   border-radius: 4px;
-  opacity: 0;
+  opacity: 0.55;
   transition: opacity 150ms;
   pointer-events: none;
 }
 .mermaid-diagram.modal:hover::after,
 .mermaid-diagram.modal:focus-visible::after {
   opacity: 1;
-}
-
-/* ── Carry-over polish from Task 4 review ── */
-
-/* Touch devices have no hover — always show the expand affordance on modal thumbnails. */
-@media (hover: none) {
-  .mermaid-diagram.modal::after { opacity: 0.9; }
 }
 
 /* If mermaid never sets data-processed (CDN failure, CSP block, render error),
@@ -149,10 +157,12 @@
   box-sizing: border-box;
 }
 .mermaid-modal__body > svg {
-  width: calc(var(--zoom, 1) * 100%);
+  /* At zoom 1, whole diagram fits within viewport (preserving aspect).
+     Zoom > 1 scales up proportionally; user can pan via native scroll. */
+  width: auto;
   height: auto;
-  min-width: 100%;
-  max-width: none;
+  max-width: calc(var(--zoom, 1) * 100%);
+  max-height: calc(var(--zoom, 1) * 100%);
 }
 
 .mermaid-modal__close {
