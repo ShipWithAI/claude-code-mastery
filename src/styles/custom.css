@@ -4,6 +4,13 @@
   font-weight: 600;
 }
 
+/* Light theme: white text disappears against the pale lavender background.
+   Use a dark indigo that matches the accent family instead. */
+[data-theme='light'] [aria-current="page"] {
+  color: #312e81 !important;
+  background-color: rgba(99, 102, 241, 0.18) !important;
+}
+
 /* ── Mermaid Diagrams — adaptive per-diagram rendering ── */
 
 /* Shared card wrapper (all three strategies) */
