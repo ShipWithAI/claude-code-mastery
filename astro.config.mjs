@@ -3,6 +3,8 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import sitemap from '@astrojs/sitemap';
 import { visit } from 'unist-util-visit';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 /** Lightweight rehype plugin: converts ```mermaid code blocks to <figure class="mermaid-diagram"> for client-side rendering. */
 const VALID_MODES = ['fit', 'scroll', 'modal'];
@@ -68,6 +70,11 @@ function rehypeMermaidPre() {
   };
 }
 
+const mermaidClientScript = readFileSync(
+  fileURLToPath(new URL('./src/scripts/mermaid-client.js', import.meta.url)),
+  'utf-8'
+);
+
 export default defineConfig({
   site: 'https://course.shipwithai.io',
   markdown: {
@@ -81,7 +88,7 @@ export default defineConfig({
         {
           tag: 'script',
           attrs: { type: 'module' },
-          content: `import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';mermaid.initialize({startOnLoad:true,theme:'dark'});`,
+          content: mermaidClientScript,
         },
         {
           tag: 'script',
