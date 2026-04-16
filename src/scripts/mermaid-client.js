@@ -32,9 +32,13 @@ function fixSvgDimensions(svg) {
 }
 
 // Classifier thresholds (tunable).
+// Rationale: diagrams where >~30% of content is off-screen on first render
+// feel broken — users don't reliably discover the scrollbar. Prefer
+// modal-thumbnail (whole diagram visible at a glance, click to zoom) over
+// horizontal scroll unless the overflow is small.
 const FITS_RATIO_MAX    = 1.05;  // within 5% of container width = fits
-const SCROLL_RATIO_MAX  = 2.5;   // up to 2.5x wider = horizontal scroll
-const TALL_HEIGHT_RATIO = 1.5;   // H/W_box > 1.5 = modal
+const SCROLL_RATIO_MAX  = 1.2;   // up to 1.2x wider = horizontal scroll (near-fit)
+const TALL_HEIGHT_RATIO = 1.0;   // H/W_box > 1.0 = modal
 
 function syncTabindex(figure) {
   if (figure.classList.contains('modal')) {
