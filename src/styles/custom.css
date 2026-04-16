@@ -120,7 +120,7 @@
    reveal the raw source after 3s so users see something rather than a blank card. */
 @keyframes mermaid-fallback-reveal { to { visibility: visible; } }
 .mermaid-diagram pre.mermaid:not([data-processed="true"]) {
-  animation: mermaid-fallback-reveal 0s 3s forwards;
+  animation: mermaid-fallback-reveal 0s 8s forwards;
 }
 
 /* ── Mermaid modal viewer ── */

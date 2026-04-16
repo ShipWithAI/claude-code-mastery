@@ -11,6 +11,14 @@ const FITS_RATIO_MAX    = 1.05;  // within 5% of container width = fits
 const SCROLL_RATIO_MAX  = 2.5;   // up to 2.5x wider = horizontal scroll
 const TALL_HEIGHT_RATIO = 1.5;   // H/W_box > 1.5 = modal
 
+function syncTabindex(figure) {
+  if (figure.classList.contains('modal')) {
+    figure.setAttribute('tabindex', '0');
+  } else {
+    figure.removeAttribute('tabindex');
+  }
+}
+
 function classify(figure) {
   // Manual override wins.
   if (figure.dataset.mode) {
@@ -18,6 +26,7 @@ function classify(figure) {
     // dataset values are 'fit' | 'scroll' | 'modal'; class form is 'fits' | 'scrolls' | 'modal'.
     const classForMode = { fit: 'fits', scroll: 'scrolls', modal: 'modal' }[figure.dataset.mode];
     if (classForMode) figure.classList.add(classForMode);
+    syncTabindex(figure);
     return;
   }
 
@@ -40,6 +49,7 @@ function classify(figure) {
 
   figure.classList.remove('fits', 'scrolls', 'modal');
   figure.classList.add(mode);
+  syncTabindex(figure);
 }
 
 // ── Modal singleton ────────────────────────────────────────────────
@@ -106,6 +116,17 @@ document.body.addEventListener('click', (e) => {
   if (e.target.closest('.mermaid-modal')) return;
   const figure = e.target.closest('.mermaid-diagram.modal');
   if (figure) openModalFor(figure);
+});
+
+// Keyboard activation: Enter or Space opens the modal when a .modal figure is focused.
+document.body.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  if (e.target.closest('.mermaid-modal')) return;
+  const figure = e.target.closest?.('.mermaid-diagram.modal');
+  if (figure && document.activeElement === figure) {
+    e.preventDefault();  // stop Space from scrolling the page
+    openModalFor(figure);
+  }
 });
 
 // Render every mermaid <pre> inside a figure and classify each figure.
