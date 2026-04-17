@@ -3,8 +3,12 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import sitemap from '@astrojs/sitemap';
 import { visit } from 'unist-util-visit';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
-/** Lightweight rehype plugin: converts ```mermaid code blocks to <pre class="mermaid"> for client-side rendering. */
+/** Lightweight rehype plugin: converts ```mermaid code blocks to <figure class="mermaid-diagram"> for client-side rendering. */
+const VALID_MODES = ['fit', 'scroll', 'modal'];
+
 function rehypeMermaidPre() {
   return (tree) => {
     visit(tree, 'element', (node, index, parent) => {
@@ -15,17 +19,61 @@ function rehypeMermaidPre() {
         node.children[0].properties?.className?.includes('language-mermaid')
       ) {
         const code = node.children[0];
-        const text = code.children?.find((c) => c.type === 'text')?.value || '';
+        let text = code.children?.find((c) => c.type === 'text')?.value || '';
+
+        // Parse manual override directive: %% mode:fit|scroll|modal %%
+        const directiveRe = /^\s*%%\s*mode:([a-z]+)\s*%%\s*$/m;
+        const match = text.match(directiveRe);
+        let mode = null;
+        if (match) {
+          mode = match[1];
+          if (!VALID_MODES.includes(mode)) {
+            throw new Error(
+              `[rehypeMermaidPre] Invalid mode "${mode}" in mermaid directive. ` +
+              `Valid values: ${VALID_MODES.join(', ')}.`
+            );
+          }
+          text = text.replace(directiveRe, '').replace(/^\n+/, '');
+        }
+
+        const sourceLines = Math.max(3, text.split('\n').length);
+
+        const figureProps = {
+          className: ['mermaid-diagram'],
+          role: 'img',
+          'aria-label': 'Diagram',
+          style: `--source-lines: ${sourceLines}`,
+        };
+        if (mode) figureProps['data-mode'] = mode;
+
         parent.children[index] = {
           type: 'element',
-          tagName: 'pre',
-          properties: { className: ['mermaid'] },
-          children: [{ type: 'text', value: text }],
+          tagName: 'figure',
+          properties: figureProps,
+          children: [
+            {
+              type: 'element',
+              tagName: 'pre',
+              properties: { className: ['mermaid'] },
+              children: [{ type: 'text', value: text }],
+            },
+            {
+              type: 'element',
+              tagName: 'figcaption',
+              properties: { className: ['sr-only'] },
+              children: [{ type: 'text', value: text }],
+            },
+          ],
         };
       }
     });
   };
 }
+
+const mermaidClientScript = readFileSync(
+  fileURLToPath(new URL('./src/scripts/mermaid-client.js', import.meta.url)),
+  'utf-8'
+);
 
 export default defineConfig({
   site: 'https://course.shipwithai.io',
@@ -40,7 +88,7 @@ export default defineConfig({
         {
           tag: 'script',
           attrs: { type: 'module' },
-          content: `import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';mermaid.initialize({startOnLoad:true,theme:'dark'});`,
+          content: mermaidClientScript,
         },
         {
           tag: 'script',

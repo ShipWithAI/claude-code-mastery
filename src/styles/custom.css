@@ -4,22 +4,229 @@
   font-weight: 600;
 }
 
-/* ── Mermaid Diagrams ── */
-/* SVGs are rendered with hardcoded light-mode colors by rehype-mermaid.
-   In dark mode (the default for this site), wrap them in a light card so
-   connectors, node backgrounds, and text all remain readable. */
-svg[id^="mermaid-"] {
-  display: block;
-  max-width: 100%;
-  margin: 1.5rem auto;
-  border-radius: 8px;
-  padding: 1.25rem 1.5rem;
-  background-color: #f8fafc;
-  border: 1px solid #e2e8f0;
+/* Light theme: white text disappears against the pale lavender background.
+   Use a dark indigo that matches the accent family instead. */
+[data-theme='light'] [aria-current="page"] {
+  color: #312e81 !important;
+  background-color: rgba(99, 102, 241, 0.18) !important;
 }
 
-/* In light mode: transparent background (diagram colours already work) */
-[data-theme='light'] svg[id^="mermaid-"] {
-  background-color: transparent;
-  border-color: #e2e8f0;
+/* ── Mermaid Diagrams — adaptive per-diagram rendering ── */
+
+/* Shared card wrapper (all three strategies) */
+.mermaid-diagram {
+  display: block;
+  margin: 1.5rem 0;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  min-height: calc(var(--source-lines, 4) * 1.75em);
+  box-sizing: border-box;
+  position: relative;
 }
+
+[data-theme='light'] .mermaid-diagram {
+  background: transparent;
+}
+
+/* Neutralize default <pre> styling inside the figure so the SVG paints cleanly. */
+.mermaid-diagram pre.mermaid {
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  font-family: inherit;
+  color: inherit;
+  overflow: visible;
+  white-space: normal;
+}
+
+/* Hide the raw mermaid text before mermaid renders the SVG (kills FOUT/flash). */
+.mermaid-diagram pre.mermaid:not([data-processed="true"]) {
+  visibility: hidden;
+}
+
+.mermaid-diagram figcaption.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Strategy: .fits — small diagram, centered at natural size.
+   SVG dimensions set in JS (fixSvgDimensions) as explicit pixels from viewBox. */
+.mermaid-diagram.fits {
+  text-align: center;
+}
+.mermaid-diagram.fits pre.mermaid {
+  display: inline-block;
+}
+.mermaid-diagram.fits svg {
+  display: inline-block;
+  max-width: 100%;
+  height: auto;
+}
+
+/* Strategy: .scrolls — wide diagram overflows horizontally inside the card.
+   Centering when SVG fits, scroll when it doesn't. Right-edge shadow hints
+   scrollability WITHOUT obscuring content (no mask-image fade). */
+.mermaid-diagram.scrolls {
+  overflow-x: auto;
+  overflow-y: hidden;
+  text-align: center;
+  background-image: linear-gradient(to right, transparent calc(100% - 20px), rgba(0, 0, 0, 0.08) 100%);
+  background-repeat: no-repeat;
+  background-attachment: local;
+}
+.mermaid-diagram.scrolls pre.mermaid {
+  display: block;
+}
+.mermaid-diagram.scrolls svg {
+  display: inline-block;
+  /* Natural pixel width from fixSvgDimensions; override Starlight's global
+     `max-width: 100%` on SVG so wide diagrams can overflow the card. */
+  max-width: none;
+}
+
+/* Strategy: .modal — large or tall diagram shown as a capped thumbnail.
+   SVG shrinks to fit within max-height while preserving aspect ratio. The
+   full-size render happens in the dialog on click. */
+/* Once mermaid renders and the classifier assigns a strategy, the
+   --source-lines min-height reservation has served its CLS-prevention
+   purpose; release it so the card collapses to fit the actual SVG. */
+.mermaid-diagram.fits,
+.mermaid-diagram.scrolls,
+.mermaid-diagram.modal {
+  min-height: 0;
+}
+
+.mermaid-diagram.modal {
+  cursor: zoom-in;
+  max-height: 420px;
+  overflow: hidden;
+  /* Grid centering puts the SVG in the visual center of the card both
+     horizontally and vertically — no inline-block descender space to skew it. */
+  display: grid;
+  place-items: center;
+}
+.mermaid-diagram.modal pre.mermaid {
+  /* Flex-centre the SVG within the pre so it doesn't sit on the text baseline
+     (which would leave descender space under the SVG and push it visually up
+     inside the grid-centred card). */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mermaid-diagram.modal svg {
+  display: block;
+  max-width: 100%;
+  max-height: 380px;
+  width: auto;
+  height: auto;
+}
+.mermaid-diagram.modal::after {
+  content: "⤢ expand";
+  position: absolute;
+  top: 0.5rem;
+  right: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border-radius: 4px;
+  opacity: 0.55;
+  transition: opacity 150ms;
+  pointer-events: none;
+}
+.mermaid-diagram.modal:hover::after,
+.mermaid-diagram.modal:focus-visible::after {
+  opacity: 1;
+}
+
+/* If mermaid never sets data-processed (CDN failure, CSP block, render error),
+   reveal the raw source after 3s so users see something rather than a blank card. */
+@keyframes mermaid-fallback-reveal { to { visibility: visible; } }
+.mermaid-diagram pre.mermaid:not([data-processed="true"]) {
+  animation: mermaid-fallback-reveal 0s 8s forwards;
+}
+
+/* ── Mermaid modal viewer ── */
+.mermaid-modal {
+  width: 95vw;
+  height: 90vh;
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  background: #f8fafc;
+  overflow: hidden;
+  /* Centre the dialog in the viewport. Starlight resets margin to 0 on all
+     elements, which clobbers <dialog>'s user-agent `margin: auto` that is
+     responsible for default centring. Re-assert it here. */
+  margin: auto;
+}
+.mermaid-modal::backdrop {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.mermaid-modal__body {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  box-sizing: border-box;
+}
+.mermaid-modal__body > svg {
+  /* At zoom 1, whole diagram fits within viewport (preserving aspect).
+     Zoom > 1 scales up proportionally; user can pan via native scroll. */
+  width: auto;
+  height: auto;
+  max-width: calc(var(--zoom, 1) * 100%);
+  max-height: calc(var(--zoom, 1) * 100%);
+}
+
+.mermaid-modal__close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+  z-index: 1;
+}
+.mermaid-modal__close:hover { background: rgba(0, 0, 0, 0.85); }
+
+.mermaid-modal__zoom {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.5rem;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 0.25rem;
+  border-radius: 8px;
+}
+.mermaid-modal__zoom > button {
+  min-width: 2.25rem;
+  padding: 0.35rem 0.75rem;
+  border: none;
+  background: transparent;
+  color: #fff;
+  font-size: 0.95rem;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.mermaid-modal__zoom > button:hover { background: rgba(255, 255, 255, 0.15); }
