@@ -169,7 +169,7 @@ function openModalFor(figure) {
 
 // Event delegation: click on a .modal figure opens the dialog.
 // Listener attached once on document.body — survives SPA nav.
-document.body.addEventListener('click', (e) => {
+document.addEventListener('click', (e) => {
   // Don't trigger when clicking inside the already-open dialog.
   if (e.target.closest('.mermaid-modal')) return;
   const figure = e.target.closest('.mermaid-diagram.modal');
@@ -177,7 +177,7 @@ document.body.addEventListener('click', (e) => {
 });
 
 // Keyboard activation: Enter or Space opens the modal when a .modal figure is focused.
-document.body.addEventListener('keydown', (e) => {
+document.addEventListener('keydown', (e) => {
   if (e.key !== 'Enter' && e.key !== ' ') return;
   if (e.target.closest('.mermaid-modal')) return;
   const figure = e.target.closest?.('.mermaid-diagram.modal');
