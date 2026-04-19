@@ -234,6 +234,12 @@ header {
   z-index: 50;
 }
 
+@media (max-width: 49.999rem) {
+  header {
+    z-index: var(--sl-z-index-navbar);
+  }
+}
+
 [data-theme="light"] header {
   background-color: rgba(248, 250, 252, 0.85);
 }
