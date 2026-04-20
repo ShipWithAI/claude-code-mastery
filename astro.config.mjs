@@ -98,6 +98,22 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
 })(window,document,'script','dataLayer','GTM-MJJNTKQR');`,
         },
+        {
+          tag: 'meta',
+          attrs: { property: 'og:image', content: 'https://course.shipwithai.io/og-image.png' },
+        },
+        {
+          tag: 'meta',
+          attrs: { property: 'og:image:width', content: '1200' },
+        },
+        {
+          tag: 'meta',
+          attrs: { property: 'og:image:height', content: '630' },
+        },
+        {
+          tag: 'meta',
+          attrs: { name: 'twitter:image', content: 'https://course.shipwithai.io/og-image.png' },
+        },
       ],
       customCss: [
         '@fontsource/ibm-plex-sans/300.css',
@@ -117,6 +133,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       },
       logo: {
         src: './src/assets/shipwithailogo.png',
+        alt: 'ShipWithAI Logo',
         replacesTitle: false,
       },
       defaultLocale: 'en',
