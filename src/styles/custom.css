@@ -11,6 +11,37 @@
   background-color: rgba(99, 102, 241, 0.18) !important;
 }
 
+.sl-heading-wrapper {
+  display: flex;
+  align-items: baseline;
+}
+.sl-anchor-link {
+  flex-shrink: 0;
+}
+.copy button[title="Copy to clipboard"] {
+  width: 26px;
+  height: 26px;
+}
+
+.content-panel:has(> .sl-container > h1#_top):not(:has(.sl-markdown-content)) {
+  display: none;
+}
+
+.sl-markdown-content table {
+  display: block;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.sl-markdown-content table td,
+.sl-markdown-content table th {
+  white-space: normal;
+  min-width: 120px;
+}
+
+.sl-heading-wrapper {
+  overflow: hidden;
+}
+
 /* ── Mermaid Diagrams — adaptive per-diagram rendering ── */
 
 /* Shared card wrapper (all three strategies) */
