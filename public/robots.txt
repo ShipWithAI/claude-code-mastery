@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+
+# Internal/utility pages
+Disallow: /social-preview.html
+Disallow: /index.html
+Disallow: /_image/
+
+Sitemap: https://course.shipwithai.io/sitemap-index.xml
