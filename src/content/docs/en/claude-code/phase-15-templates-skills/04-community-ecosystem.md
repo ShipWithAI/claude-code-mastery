@@ -129,13 +129,25 @@ $ code ~/my-k8s-project/CLAUDE.md
 - Added examples from your actual services
 ```
 
-### Step 4: Use and Contribute
+### Step 4: Install and Use
+
+Copy the skill into your skills directory:
 
 ```bash
-# ⚠️ Verify current implementation
-$ claude skill install kubernetes-production
-# Now Claude has production patterns, security best practices, debugging workflows
+# Personal use (all your projects):
+cp -r k8s-claude-template/.claude/skills/kubernetes ~/.claude/skills/
+
+# Or project-specific (committed to Git):
+cp -r k8s-claude-template/.claude/skills/kubernetes .claude/skills/
 ```
+
+Then invoke it in a Claude Code session:
+
+```text
+/kubernetes
+```
+
+Claude now has production patterns, security best practices, and debugging workflows loaded from the skill.
 
 **Found Issue?** Contribute back:
 1. Fork → Create branch → Fix → Test → PR
