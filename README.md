@@ -20,6 +20,11 @@ Not another Getting Started guide — this is a structured, senior-level curricu
 
 ---
 
+> **Finished learning? [Use production plugins next →](https://github.com/ShipWithAI/shipwithai-plugins)**
+> This course teaches how Claude Code works. [`shipwithai-plugins`](https://github.com/ShipWithAI/shipwithai-plugins) ships it — install a pre-built harness (and more) in minutes.
+
+---
+
 ## The Problem
 
 Most Claude Code tutorials teach individual features in isolation. But real productivity comes from combining features into workflows — and knowing which patterns to use (and avoid) in production. That's what this course teaches.
