@@ -1,6 +1,6 @@
 ---
 title: 'Claude Code Skills'
-description: 'Find, install, and use Claude Code Skills to extend capabilities with community-built enhancements.'
+description: 'Find, install, and use Claude Code Skills to extend capabilities with reusable, shareable workflows.'
 ---
 
 # Module 15.3: Claude Code Skills
@@ -9,261 +9,297 @@ description: 'Find, install, and use Claude Code Skills to extend capabilities w
 >
 > **Prerequisite**: Module 15.2 (Command & Prompt Templates)
 >
-> **Outcome**: After this module, you will understand Claude Code Skills, know how to find and install them, and be able to use Skills to extend Claude's capabilities.
+> **Outcome**: After this module, you will understand what Claude Code Skills really are, how to install them, invoke them, and share them with your team.
 
 ---
 
 ## 1. WHY — Why This Matters
 
-You want Claude to work with Kubernetes, Terraform, or a specific framework. Claude has general knowledge, but not the specialized commands, best practices, and workflows for your tool. You end up teaching Claude the same things repeatedly.
+You keep teaching Claude the same things in every session — your deployment workflow, your internal tool commands, your team's code review checklist. Each new session starts from zero. Results vary depending on how well you remember to include the right context.
 
-Skills package this knowledge. Install a skill, and Claude immediately knows the patterns, best practices, and workflows. No repeated teaching.
+Skills solve this by packaging reusable workflows into a folder Claude can load automatically or on demand. Install once, use everywhere. The knowledge is always there.
 
 ---
 
 ## 2. CONCEPT — Core Ideas
 
-### What is a Skill?
+### What Is a Skill?
+
+A Skill is a folder containing a `SKILL.md` file. That file tells Claude what the skill does and how to execute it. That's it — no special runtime, no CLI tool, no compilation step.
 
 ```text
-Skill = Knowledge + Tools + Workflows
-
-- Knowledge: Domain-specific information
-- Tools: Commands and integrations
-- Workflows: Step-by-step processes
+my-skill/
+└── SKILL.md          ← Required: YAML frontmatter + Markdown instructions
 ```
 
-### Skill Types
+The `SKILL.md` has two parts:
 
-| Type | Source | Examples |
-|------|--------|----------|
-| **Official** | Anthropic | Core development skills |
-| **Community** | Open source | Framework-specific skills |
-| **Custom** | You/team | Company-specific skills |
+```markdown
+---
+name: code-reviewer
+description: Review pull requests for logic errors, security, and standards
+---
 
-### Skill Components
+# Code Reviewer
+
+## When to use
+...
+
+## Instructions
+...
+```
+
+The **frontmatter** (`---` block) controls how Claude discovers and invokes the skill. The **Markdown body** is what Claude reads and follows when the skill runs.
+
+### How Skills Are Invoked
+
+Skills can be invoked in two ways:
+
+| Method | How | When to use |
+|--------|-----|-------------|
+| **Slash command** | User types `/skill-name` | Explicit, on-demand tasks |
+| **Auto-invocation** | Claude detects context | Repetitive background workflows |
+
+Auto-invocation is controlled by `disable-model-invocation` in the frontmatter. When `false` (default), Claude decides on its own when the skill is relevant. When `true`, only slash commands trigger it.
+
+### Where Skills Live
 
 ```text
-⚠️ Structure may vary — verify current implementation
-
-/skill-name/
-├── SKILL.md          # Skill documentation
-├── prompts/          # Prompt templates
-├── tools/            # Tool definitions
-├── workflows/        # Multi-step workflows
-└── examples/         # Usage examples
+~/.claude/skills/      ← Personal: available across all your projects
+.claude/skills/        ← Project: committed to Git, shared with team
 ```
 
-### How Skills Extend Claude
+### Full Skill Structure
+
+A simple skill only needs `SKILL.md`. For complex workflows, you can add supporting files that Claude loads lazily (only when needed):
 
 ```text
-Without Skill:
-You: "Create a Kubernetes deployment"
-Claude: [Generic YAML, might miss best practices]
-
-With Kubernetes Skill:
-You: "Create a Kubernetes deployment"
-Claude: [Production-ready YAML with health checks,
-         resource limits, proper labels]
+my-skill/
+├── SKILL.md           ← Required
+├── references/        ← Extra docs, loaded on demand
+│   └── best-practices.md
+├── scripts/           ← Executable scripts
+│   └── run.sh
+└── templates/         ← File templates
+    └── pr-template.md
 ```
-
-### Skill Discovery
-
-- Official skill repository
-- Community skill registries
-- GitHub search for Claude Code skills
-- Team internal skill libraries
 
 ---
 
 ## 3. DEMO — Step by Step
 
-**Scenario**: Using skills to improve Claude's domain knowledge.
+**Scenario**: Installing a community skill, then creating a custom one for your team.
 
-### Step 1: Explore Available Skills
+### Step 1: Install a Skill (3 Ways)
 
-```bash
-# ⚠️ Commands may vary — verify current implementation
+**Option A — Plugin browser (easiest)**
 
-$ claude skill list --available
-
-Official Skills:
-- docker: Docker container management
-- kubernetes: Kubernetes orchestration
-- terraform: Infrastructure as Code
-
-Community Skills:
-- nextjs: Next.js development patterns
-- prisma: Prisma ORM workflows
-```
-
-### Step 2: Install a Skill
-
-```bash
-# ⚠️ Verify current implementation
-
-$ claude skill install kubernetes
-
-Installing kubernetes skill...
-✓ Downloaded skill package
-✓ Registered tools
-✓ Loaded prompts
-
-Kubernetes skill installed.
-```
-
-### Step 3: Use Skill in Session
+Inside a Claude Code session:
 
 ```text
-You: Create a production-ready deployment for a Node.js app
-with 3 replicas.
-
-Claude: [Using kubernetes skill]
-
-I'll create a production-ready deployment:
+/plugin
 ```
 
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: nodejs-app
-  labels:
-    app: nodejs-app
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: nodejs-app
-  template:
-    spec:
-      containers:
-      - name: nodejs-app
-        image: your-registry/nodejs-app:latest
-        resources:
-          requests:
-            memory: "128Mi"
-            cpu: "100m"
-          limits:
-            memory: "256Mi"
-            cpu: "500m"
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 3000
-        readinessProbe:
-          httpGet:
-            path: /ready
-            port: 3000
+This opens the plugin/skill browser. Browse, find the skill, press Enter to install. Done.
+
+**Option B — Unzip manually**
+
+```bash
+# For personal use (all projects):
+unzip code-reviewer.zip -d ~/.claude/skills/
+
+# For project use (committed to Git):
+unzip code-reviewer.zip -d .claude/skills/
 ```
 
-**Skill ensured**:
-- Resource limits (prevent runaway containers)
-- Health probes (automatic restart on failure)
-- Proper labels (for service discovery)
+**Option C — Settings upload**
 
-### Step 4: Skill-Specific Commands
+Go to Settings → Customize → Skills → Upload ZIP. The ZIP must contain the skill folder at its root.
+
+### Step 2: Invoke the Skill
+
+After installing, the skill appears as a slash command matching its `name` in the frontmatter:
 
 ```text
-You: /k8s-debug my-pod is in CrashLoopBackOff
+/code-reviewer
+```
 
-Claude: [Skill-guided debugging]
+Or let Claude invoke it automatically when you paste a diff or ask for a review — depending on how the skill is configured.
 
-Kubernetes debugging workflow:
-1. Check pod status: kubectl describe pod my-pod
-2. Check logs: kubectl logs my-pod --previous
-3. Common causes:
-   - Application error (check logs)
-   - Missing config/secrets
-   - Resource limits too low
+### Step 3: Create a Custom Skill
+
+**Via conversation (recommended):**
+
+Start a new Claude session and say:
+
+```text
+I want to create a skill for reviewing our internal DeployBot deployment workflow.
+It should check our deployment checklist and guide the engineer step by step.
+```
+
+Claude will ask clarifying questions, generate the `SKILL.md`, and refine it based on your feedback.
+
+**Manually:**
+
+```bash
+mkdir -p ~/.claude/skills/deploybot
+```
+
+Create `~/.claude/skills/deploybot/SKILL.md`:
+
+```markdown
+---
+name: deploybot
+description: Guide engineers through the DeployBot deployment workflow with safety checks
+---
+
+# DeployBot Deployment Skill
+
+## When to use
+When an engineer asks to deploy a service or mentions DeployBot.
+
+## Pre-deployment checklist
+Before running any deployment command:
+- [ ] Is staging deployed and monitored for 15+ minutes?
+- [ ] Are error rates normal on staging?
+- [ ] Is the team notified in #deployments?
+
+## Commands
+
+### Deploy to staging
+deploybot deploy <service> --env staging
+
+### Deploy to production (requires 2 approvals)
+deploybot deploy <service> --env prod
+
+### Check status
+deploybot status <deployment-id>
+
+### Rollback
+deploybot rollback <deployment-id>
+
+## Common issues
+- **Deployment stuck**: Check `deploybot logs <id> --follow`
+- **Health check fails**: Verify service dependencies are up
+- **Need rollback**: Run rollback immediately, notify team, then investigate
+```
+
+### Step 4: Verify the Skill Works
+
+```text
+You: /deploybot
+Claude: Running DeployBot Deployment Skill...
+
+Pre-deployment checklist:
+- [ ] Staging deployed and monitored 15+ min?
+- [ ] Error rates normal on staging?
+- [ ] Team notified in #deployments?
+
+Which service are you deploying?
 ```
 
 ---
 
 ## 4. PRACTICE — Try It Yourself
 
-### Exercise 1: Explore Available Skills
+### Exercise 1: Explore What's Available
 
-**Goal**: Discover what skills exist.
+**Goal**: Find a skill relevant to your work.
 
 **Instructions**:
-1. List available official skills
-2. Read documentation for 2-3 skills
-3. Identify which would help your current project
+1. Open a Claude Code session and type `/plugin`
+2. Browse available skills
+3. Install one that matches your tech stack
+4. Invoke it with `/skill-name` and test a real task
 
 <details>
 <summary>💡 Hint</summary>
 
-Focus on skills matching your tech stack: cloud provider, framework, database.
+If the plugin browser is empty, search GitHub for skills: `claude code skill site:github.com`. Many developers publish skills as public repos.
 
 </details>
 
 <details>
 <summary>✅ Solution</summary>
 
-Useful skills by role:
-- **Backend**: kubernetes, docker, database skills
-- **Frontend**: nextjs, react, tailwind skills
-- **DevOps**: terraform, aws/gcp, ci-cd skills
-- **Data**: python, pandas, jupyter skills
+Good skill candidates by role:
+- **Backend**: database migration skill, API documentation skill
+- **Frontend**: component generator skill, accessibility checker skill
+- **DevOps**: deployment workflow skill, incident response skill
+- **Data**: data profiling skill, notebook formatter skill
 
-Pick 1-2 most relevant to your daily work.
+Install the closest match, test it, adapt the `SKILL.md` if needed.
 
 </details>
 
-### Exercise 2: Install and Use a Skill
+### Exercise 2: Create Your First Skill
 
-**Goal**: Experience skill-enhanced Claude output.
+**Goal**: Package knowledge you currently repeat every session.
 
 **Instructions**:
-1. Install a skill relevant to your project
-2. Ask Claude a domain-specific question
-3. Compare output quality with/without skill
+1. Identify something you explain to Claude repeatedly (a tool, a workflow, a checklist)
+2. Create a skill folder in `~/.claude/skills/`
+3. Write `SKILL.md` with frontmatter + instructions
+4. Invoke the skill and verify Claude follows it correctly
 
 <details>
 <summary>💡 Hint</summary>
 
-Try the same prompt before and after installing the skill to see the difference.
+Start with the smallest useful unit. A skill that does one thing well beats a skill that tries to do everything.
 
 </details>
 
 <details>
 <summary>✅ Solution</summary>
 
-Example comparison:
-- **Without skill**: Generic code, missing best practices
-- **With skill**: Production-ready code, includes error handling, follows conventions
+Minimal working `SKILL.md`:
 
-The skill provides domain expertise Claude wouldn't have otherwise.
+```markdown
+---
+name: my-workflow
+description: Guides my team's standard PR review process
+---
+
+# PR Review Workflow
+
+## Steps
+1. Check for missing tests
+2. Check for security issues (SQL injection, exposed secrets)
+3. Check naming conventions match our CLAUDE.md
+4. Leave inline comments using GitHub review format
+```
+
+Test by typing `/my-workflow` in a session, then asking Claude to review a diff.
 
 </details>
 
-### Exercise 3: Evaluate Skill Quality
+### Exercise 3: Share a Skill with Your Team
 
-**Goal**: Learn to assess community skills.
+**Goal**: Make a skill available to everyone on the project.
 
 **Instructions**:
-1. Find a community skill for your tech stack
-2. Test on 3 different tasks
-3. Evaluate: documentation, accuracy, maintenance
+1. Move your skill from `~/.claude/skills/` to `.claude/skills/` in your project repo
+2. Commit and push it
+3. Have a teammate pull and test `/skill-name`
 
 <details>
 <summary>💡 Hint</summary>
 
-Check: last updated, GitHub stars, issues/responses, example quality.
+Skills in `.claude/skills/` are automatically available to anyone who clones the repo. No setup needed — just `git pull`.
 
 </details>
 
 <details>
 <summary>✅ Solution</summary>
 
-Quality checklist:
-- [ ] Clear documentation with examples
-- [ ] Updated within last 6 months
-- [ ] Responsive maintainer
-- [ ] Accurate output on your tests
+```bash
+cp -r ~/.claude/skills/my-workflow .claude/skills/
+git add .claude/skills/
+git commit -m "feat: add PR review workflow skill"
+git push
+```
 
-Don't install skills that fail multiple checks.
+Teammates get the skill after `git pull`. They can invoke it with `/my-workflow` immediately.
 
 </details>
 
@@ -271,34 +307,44 @@ Don't install skills that fail multiple checks.
 
 ## 5. CHEAT SHEET
 
-### Skill Commands
+### Skill Structure
 
-```bash
-# ⚠️ Verify current implementation
-
-claude skill list             # List installed
-claude skill list --available # List all available
-claude skill install [name]   # Install skill
-claude skill remove [name]    # Remove skill
-claude skill info [name]      # Skill details
+```text
+~/.claude/skills/my-skill/   ← Personal (all projects)
+.claude/skills/my-skill/     ← Project (committed to Git)
+├── SKILL.md                 ← Required
+├── references/              ← Optional: extra docs
+├── scripts/                 ← Optional: helper scripts
+└── templates/               ← Optional: file templates
 ```
 
-### Popular Skill Categories
+### SKILL.md Frontmatter
 
-| Category | Examples |
-|----------|----------|
-| **Cloud** | AWS, GCP, Azure |
-| **DevOps** | Kubernetes, Docker, Terraform |
-| **Databases** | PostgreSQL, MongoDB, Redis |
-| **Frameworks** | Next.js, Django, FastAPI |
-| **Tools** | Git, CI/CD, Testing |
+```yaml
+---
+name: skill-name                     # Slash command name: /skill-name
+description: When Claude should use this skill (one sentence)
+disable-model-invocation: false      # true = only manual /slash, false = auto-detect
+allowed-tools: Read, Grep, Glob      # Optional: restrict tool access
+---
+```
 
-### Skill Quality Checklist
+### Install Methods
 
-- [ ] Clear documentation
-- [ ] Real code examples
-- [ ] Active maintenance
-- [ ] Positive community feedback
+| Method | Command |
+|--------|---------|
+| Plugin browser | Type `/plugin` in session |
+| Manual unzip | `unzip skill.zip -d ~/.claude/skills/` |
+| Settings UI | Settings → Customize → Skills → Upload ZIP |
+| Git (team) | Commit `.claude/skills/` to repo |
+
+### Sharing Scope
+
+| Scope | Location | Available to |
+|-------|----------|--------------|
+| Personal | `~/.claude/skills/` | You, all projects |
+| Project | `.claude/skills/` | Everyone who clones the repo |
+| Organization | Admin panel upload | All org members |
 
 ---
 
@@ -306,41 +352,35 @@ claude skill info [name]      # Skill details
 
 | ❌ Mistake | ✅ Correct Approach |
 |---|---|
-| Installing every skill | Only install what you need |
-| Trusting skill blindly | Review skill output critically |
-| Using outdated skills | Check version and maintenance |
-| Ignoring skill conflicts | Be aware of skill interactions |
-| Not reading skill docs | Understand capabilities first |
-| Ignoring skill commands | Learn the shortcuts |
-| Requiring skills | Skills enhance, shouldn't be required |
+| Looking for `claude skill install` CLI | Skills are installed by unzipping or using `/plugin` browser — no CLI install command exists |
+| One giant skill for everything | One skill per workflow — small, focused, testable |
+| No description in frontmatter | Write a clear one-sentence description so Claude knows when to auto-invoke |
+| Hardcoding secrets in SKILL.md | Use environment variables or secret managers instead |
+| Never updating the skill | Assign an owner; update when workflows change |
+| Skipping examples in SKILL.md | Include real input/output examples — Claude uses them to calibrate |
+| Personal skill when team needs it | Put team skills in `.claude/skills/` and commit to Git |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: Vietnamese fintech migrating to Kubernetes. Team had limited K8s experience. Claude helped but output was generic, missing production patterns.
+**Scenario**: Vietnamese fintech team, 8 engineers, migrating to Kubernetes. Claude kept generating generic manifests — missing RBAC, no resource limits, wrong namespace conventions.
 
-**Skill Solution**:
+**The fix**: One engineer built a `k8s-deploy` skill encoding the team's production standards.
 
-Installed kubernetes skill that provided:
-- Production-ready manifest templates
-- Security best practices (RBAC, NetworkPolicies)
-- Debugging workflows
-- Scaling patterns
+`SKILL.md` included:
+- Required labels and annotations for their monitoring stack
+- Resource limit templates based on service tier (small/medium/large)
+- RBAC role templates for their namespace structure
+- A deployment checklist: staging first, 15-minute soak, then prod
 
-**Team Workflow**:
-1. "Create deployment for payment-service"
-2. Claude uses skill → production-ready YAML
-3. Team reviews (learning while doing)
-4. Deploys with confidence
+**Result after 6 weeks**:
+- Every `kubectl apply` Claude generated followed production standards
+- Security audit findings dropped from 8 to 1 (RBAC was auto-included)
+- New engineers onboarded to K8s conventions in 1 day instead of 1 week
+- Skill took 3 hours to write; team estimated it saved 40+ hours over 6 weeks
 
-**Results (2 months)**:
-- Manifest quality: Generic → Production-ready
-- Security issues: 8 → 1 (skill enforced best practices)
-- Time to deploy: -40% (less back-and-forth fixing)
-- Team learning: Accelerated (skill explains patterns)
-
-**Quote**: "The skill was like having a Kubernetes expert pair programming with us. We got production-ready output while learning best practices."
+**Quote**: "We stopped teaching Claude our conventions. We packaged them once, and now every session starts with a senior engineer's knowledge already loaded."
 
 ---
 
