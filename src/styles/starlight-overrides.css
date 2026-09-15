@@ -1,191 +1,157 @@
 /* ============================================================
    starlight-overrides.css
-   Injects the ShipWithAI design system into course.shipwithai.io
-   Ported from shipwithai.io to maintain brand consistency.
+   Maps the ShipWithAI design system (src/styles/tokens.css,
+   vendored from @mangalahq/shipwithai-sot-design) onto Starlight.
+
+   Rules:
+   - Every value on the right-hand side is a token var, never raw.
+   - NEVER write `--x: var(--x)` — cyclic, voids the token.
+     --radius-*, --shadow-sm/md/lg already exist in tokens.css; use them directly.
+   - Dark-only. The design system is dark-first and ships no light tokens.
+     Light theme is disabled in src/components/ThemeProvider.astro.
+   - Surface = editorial (amber accent). data-surface is set on <html>
+     by ThemeProvider.astro; the alias block below assumes it.
    ============================================================ */
 
-/* Fonts are self-hosted via @fontsource — see astro.config.mjs */
-
-/* ── Starlight font overrides ── */
+/* ── Starlight font hooks ── */
 :root {
-  --sl-font: 'IBM Plex Sans', 'Inter', system-ui, sans-serif;
-  --sl-font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --sl-font: var(--type-family-body);
+  --sl-font-mono: var(--type-family-mono);
 }
 
 /* ============================================================
-   Design tokens — dark mode (default)
+   Site aliases → design tokens
    ============================================================ */
 :root {
   /* ── Typography ── */
-  --font-heading: 'JetBrains Mono', 'Fira Code', monospace;
-  --font-body: 'IBM Plex Sans', 'Inter', system-ui, sans-serif;
-  --font-code: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-heading: var(--type-family-heading);
+  --font-body: var(--type-family-body);
+  --font-code: var(--type-family-mono);
 
-  --text-xs: 0.75rem;
-  --text-sm: 0.875rem;
-  --text-base: 1rem;
-  --text-lg: 1.125rem;
-  --text-xl: 1.25rem;
-  --text-2xl: 1.5rem;
-  --text-3xl: 2rem;
-  --text-4xl: 2.5rem;
-  --text-5xl: 3rem;
+  --text-xs: var(--type-scale-xs);
+  --text-sm: var(--type-scale-sm);
+  --text-base: var(--type-scale-md);
+  --text-lg: var(--type-scale-lg);
+  --text-xl: var(--type-scale-xl);
+  --text-2xl: var(--type-scale-2xl);
+  --text-3xl: var(--type-scale-3xl);
+  --text-4xl: var(--type-scale-4xl);
+  --text-5xl: var(--type-scale-5xl);
 
-  --leading-tight: 1.2;
-  --leading-normal: 1.6;
-  --leading-relaxed: 1.75;
-  --line-length: 75ch;
+  --leading-tight: var(--type-line-height-tight);
+  --leading-normal: var(--type-line-height-normal);
+  --leading-relaxed: var(--type-line-height-body);
+  --line-length: var(--type-measure-body);
 
-  /* ── Background layers (dark) ── */
-  --color-bg-deepest: #0B0F19;
-  --color-bg-base: #111827;
-  --color-bg-surface: #1F2937;
-  --color-bg-surface-hover: #283548;
-  --color-bg-overlay: #374151;
+  /* ── Background layers ── */
+  --color-bg-deepest: var(--surface-canvas);
+  --color-bg-base: var(--surface-elevated);
+  --color-bg-surface: var(--surface-card);
+  --color-bg-surface-hover: var(--surface-card-hover);
+  --color-bg-overlay: var(--surface-popover);
 
   /* ── Text ── */
-  --color-text-primary: #F9FAFB;
-  --color-text-secondary: #D1D5DB;
-  --color-text-muted: #9CA3AF;
-  --color-text-faint: #6B7280;
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-text-faint: var(--text-faint);
 
-  /* ── Brand / Accent ── */
-  --color-accent: #818CF8;
-  --color-accent-hover: #6366F1;
-  --color-accent-subtle: rgba(129, 140, 248, 0.1);
-  --color-accent-border: rgba(129, 140, 248, 0.25);
+  /* ── Accent — editorial surface (amber) ── */
+  --color-accent: var(--accent-editorial);
+  --color-accent-hover: var(--accent-editorial-hover);
+  --color-accent-subtle: var(--accent-editorial-fill);
+  --color-accent-border: var(--border-accent);
 
-  /* ── CTA / Success ── */
-  --color-cta: #34D399;
-  --color-cta-hover: #10B981;
-  --color-cta-bg: rgba(52, 211, 153, 0.1);
+  /* ── CTA — always product (emerald), per DS newsletter hard rule ── */
+  --color-cta: var(--accent-product);
+  --color-cta-hover: var(--accent-product-hover);
+  --color-cta-bg: var(--accent-product-fill);
 
   /* ── Semantic ── */
-  --color-warning: #FBBF24;
-  --color-error: #F87171;
-  --color-info: #60A5FA;
+  --color-warning: var(--color-state-warn);
+  --color-error: var(--color-state-error);
+  --color-info: var(--color-state-info);
 
-  /* ── Borders & Dividers ── */
-  --color-border: rgba(255, 255, 255, 0.08);
-  --color-border-hover: rgba(255, 255, 255, 0.15);
-  --color-border-accent: rgba(129, 140, 248, 0.3);
+  /* ── Borders ── */
+  --color-border: var(--border-default);
+  --color-border-hover: var(--border-strong);
+  --color-border-accent: var(--border-accent);
 
-  /* ── Shadows ── */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 20px rgba(129, 140, 248, 0.15);
+  /* ── Shadows — --shadow-sm/md/lg come straight from tokens.css ── */
+  --shadow-glow: var(--shadow-glow-editorial);
 
   /* ── Spacing ── */
-  --space-xs: 0.25rem;
-  --space-sm: 0.5rem;
-  --space-md: 1rem;
-  --space-lg: 1.5rem;
-  --space-xl: 2rem;
-  --space-2xl: 3rem;
-  --space-3xl: 4rem;
-  --space-4xl: 6rem;
+  --space-xs: var(--space-1);
+  --space-sm: var(--space-2);
+  --space-md: var(--space-4);
+  --space-lg: var(--space-6);
+  --space-xl: var(--space-8);
+  --space-2xl: var(--space-12);
+  --space-3xl: var(--space-16);
+  --space-4xl: var(--space-24);
 
-  /* ── Border radius ── */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 20px;
-  --radius-full: 9999px;
+  /* ── Radius — --radius-sm/md/lg/xl/full come straight from tokens.css ── */
 
-  /* ── Transitions ── */
-  --transition-fast: 150ms ease-out;
-  --transition-normal: 200ms ease-out;
-  --transition-slow: 300ms ease-out;
+  /* ── Motion ── */
+  --transition-fast: var(--motion-duration-fast) var(--motion-easing-out);
+  --transition-normal: var(--motion-duration-normal) var(--motion-easing-out);
+  --transition-slow: var(--motion-duration-slow) var(--motion-easing-out);
 
-  /* ── Starlight backward compat aliases ── */
-  --sl-color-bg: var(--color-bg-deepest);
-  --sl-color-white: var(--color-text-primary);
-  --sl-color-gray-1: #e4e4e7;
-  --sl-color-gray-2: var(--color-text-secondary);
-  --sl-color-gray-3: var(--color-text-muted);
-  --sl-color-gray-4: var(--color-text-faint);
-  --sl-color-gray-6: var(--color-accent-subtle);
-  --sl-color-gray-7: var(--color-bg-base);
-  --sl-color-black: var(--color-bg-deepest);
-  --sl-color-hairline: var(--color-border);
-  --sl-color-accent: var(--color-accent);
-  --sl-color-accent-high: var(--color-accent-hover);
+  /* ── Starlight palette compat ── */
+  --sl-color-white: var(--text-primary);
+  --sl-color-gray-1: var(--text-secondary);
+  --sl-color-gray-2: var(--text-secondary);
+  --sl-color-gray-3: var(--text-muted);
+  --sl-color-gray-4: var(--text-faint);
+  --sl-color-gray-5: var(--surface-card);
+  --sl-color-gray-6: var(--surface-elevated);
+  --sl-color-gray-7: var(--surface-elevated);
+  --sl-color-black: var(--surface-canvas);
+
+  --sl-color-accent-low: var(--accent-editorial-fill);
+  --sl-color-accent: var(--accent-editorial);
+  --sl-color-accent-high: var(--accent-editorial-hover);
+
+  --sl-color-text: var(--text-secondary);
+  --sl-color-text-accent: var(--accent-editorial);
+  --sl-color-text-invert: var(--text-inverse);
+
+  --sl-color-bg: var(--surface-canvas);
+  --sl-color-bg-nav: var(--surface-elevated);
+  --sl-color-bg-sidebar: var(--surface-elevated);
+  --sl-color-bg-inline-code: var(--surface-code);
+  --sl-color-hairline-light: var(--border-strong);
+  --sl-color-hairline: var(--border-default);
+  --sl-color-hairline-shade: var(--border-subtle);
+
   --sl-text-sm: var(--text-sm);
   --sl-text-xs: var(--text-xs);
-  --sl-font-mono: var(--font-code);
 
   color-scheme: dark;
 }
 
 /* ============================================================
-   Light mode overrides
+   Typography
    ============================================================ */
-[data-theme="light"] {
-  --color-bg-deepest: #F8FAFC;
-  --color-bg-base: #FFFFFF;
-  --color-bg-surface: #F1F5F9;
-  --color-bg-surface-hover: #E2E8F0;
-  --color-bg-overlay: #FFFFFF;
-
-  --color-text-primary: #0F172A;
-  --color-text-secondary: #334155;
-  --color-text-muted: #64748B;
-  --color-text-faint: #94A3B8;
-
-  --color-accent: #4F46E5;
-  --color-accent-hover: #4338CA;
-  --color-accent-subtle: rgba(79, 70, 229, 0.08);
-  --color-accent-border: rgba(79, 70, 229, 0.2);
-
-  --color-cta: #059669;
-  --color-cta-hover: #047857;
-
-  --color-border: rgba(0, 0, 0, 0.08);
-  --color-border-hover: rgba(0, 0, 0, 0.15);
-  --color-border-accent: rgba(79, 70, 229, 0.25);
-
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
-  --shadow-glow: 0 0 20px rgba(79, 70, 229, 0.1);
-
-  /* ── Starlight compat ── */
-  --sl-color-bg: var(--color-bg-deepest);
-  --sl-color-white: var(--color-text-primary);
-  --sl-color-gray-1: #27272a;
-  --sl-color-gray-2: var(--color-text-secondary);
-  --sl-color-gray-3: var(--color-text-muted);
-  --sl-color-gray-6: rgba(0, 0, 0, 0.06);
-  --sl-color-gray-7: var(--color-bg-surface);
-  --sl-color-hairline: var(--color-border);
-  --sl-color-accent: var(--color-accent);
-  --sl-color-accent-high: var(--color-accent-hover);
-
-  color-scheme: light;
-}
-
-/* ============================================================
-   Typography overrides
-   ============================================================ */
-
 .sl-markdown-content {
   font-family: var(--font-body);
-  line-height: 1.75;
+  line-height: var(--leading-relaxed);
 }
 
+h1, h2, h3, h4,
 .sl-markdown-content h1,
 .sl-markdown-content h2,
 .sl-markdown-content h3,
 .sl-markdown-content h4 {
   font-family: var(--font-heading);
-  line-height: 1.2;
-  letter-spacing: -0.02em;
+  font-weight: var(--type-weight-semibold);
+  line-height: var(--type-line-height-snug);
+  letter-spacing: var(--type-tracking-snug);
 }
 
 .sl-markdown-content h2 {
-  margin-top: 2.5rem;
-  padding-bottom: 0.5rem;
+  margin-top: var(--space-10);
+  padding-bottom: var(--space-2);
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -194,44 +160,38 @@
   font-family: var(--font-code);
 }
 
-/* Inline code styling */
+/* Inline code */
 .sl-markdown-content :not(pre) > code {
-  background: var(--color-bg-surface);
+  background: var(--surface-code);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   padding: 0.15em 0.35em;
-  font-size: 0.875em;
+  font-size: var(--type-style-code-inline-font-size);
 }
 
-/* Code block styling */
+/* Code blocks */
 .sl-markdown-content pre {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
 }
 
-/* Sidebar typography */
+/* Sidebar uses body font, not heading serif */
 nav.sidebar-content,
 .sidebar-content,
 starlight-menu-button + nav {
   font-family: var(--font-body);
 }
 
-/* Global heading override */
-h1, h2, h3, h4 {
-  font-family: var(--font-heading);
-}
-
 /* ============================================================
    Header / Navigation bar
    ============================================================ */
-
 header {
-  background-color: rgba(11, 15, 25, 0.85);
+  background-color: var(--surface-canvas-glass);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--color-border);
-  z-index: 50;
+  z-index: var(--z-layer-sticky);
 }
 
 @media (max-width: 49.999rem) {
@@ -240,51 +200,36 @@ header {
   }
 }
 
-[data-theme="light"] header {
-  background-color: rgba(248, 250, 252, 0.85);
-}
-
-/* ── Header controls: theme & language selectors ── */
-/* Starlight's Select.astro reads --sl-color-bg-nav for <option> bg.
-   Our gray-6 override makes it near-transparent, so dropdown options
-   render as white-on-white. Fix by pointing it to a solid surface. */
-:root {
-  --sl-color-bg-nav: var(--color-bg-base);
-}
-[data-theme="light"] {
-  --sl-color-bg-nav: var(--color-bg-base);
+/* Site title in the header uses the heading serif */
+.site-title {
+  font-family: var(--font-heading);
+  font-weight: var(--type-weight-semibold);
 }
 
 /* ============================================================
-   Sidebar improvements
+   Sidebar
    ============================================================ */
-
-/* Sidebar group labels (Phase headings) */
 .sidebar-content .top-level > li > details > summary,
 .sidebar-content .top-level > li > a {
-  font-weight: 600;
-  letter-spacing: 0.01em;
+  font-weight: var(--type-weight-semibold);
+  letter-spacing: var(--type-tracking-normal);
 }
 
-/* Active sidebar item */
 [aria-current="page"],
 [aria-current="true"] {
-  background: var(--color-accent-subtle) !important;
-  border-left: 3px solid var(--color-accent) !important;
-  font-weight: 600;
+  background: var(--accent-editorial-fill) !important;
+  border-left: 3px solid var(--accent-editorial) !important;
+  font-weight: var(--type-weight-semibold);
 }
 
-/* Sidebar hover */
 .sidebar-content a:hover {
   background: var(--color-bg-surface-hover);
   transition: background var(--transition-fast);
 }
 
 /* ============================================================
-   Content area improvements
+   Content
    ============================================================ */
-
-/* Tables */
 .sl-markdown-content table {
   border-collapse: collapse;
   width: 100%;
@@ -293,16 +238,16 @@ header {
 
 .sl-markdown-content th {
   background: var(--color-bg-surface);
-  font-family: var(--font-heading);
-  font-weight: 600;
+  font-family: var(--font-body);
+  font-weight: var(--type-weight-semibold);
   font-size: var(--text-xs);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: var(--type-tracking-extra-wide);
 }
 
 .sl-markdown-content th,
 .sl-markdown-content td {
-  padding: 0.75rem 1rem;
+  padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-border);
 }
 
@@ -310,66 +255,62 @@ header {
   background: var(--color-bg-surface-hover);
 }
 
-/* Blockquotes */
 .sl-markdown-content blockquote {
-  border-left: 3px solid var(--color-accent);
-  background: var(--color-accent-subtle);
-  padding: 1rem 1.25rem;
+  border-left: 3px solid var(--accent-editorial);
+  background: var(--accent-editorial-fill-subtle);
+  padding: var(--space-4) var(--space-5);
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
   font-style: normal;
 }
 
-/* Details/Summary (collapsible sections) */
 .sl-markdown-content details {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  padding: 0.75rem 1rem;
-  margin: 1rem 0;
+  padding: var(--space-3) var(--space-4);
+  margin: var(--space-4) 0;
   background: var(--color-bg-surface);
 }
 
 .sl-markdown-content details summary {
   cursor: pointer;
-  font-weight: 600;
-  font-family: var(--font-heading);
-  color: var(--color-accent);
+  font-weight: var(--type-weight-semibold);
+  font-family: var(--font-body);
+  color: var(--accent-editorial);
 }
 
 .sl-markdown-content details[open] summary {
-  margin-bottom: 0.75rem;
-  padding-bottom: 0.5rem;
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-2);
   border-bottom: 1px solid var(--color-border);
 }
 
-/* Links */
 .sl-markdown-content a {
-  color: var(--color-accent);
-  text-decoration-color: var(--color-accent-border);
+  color: var(--accent-editorial);
+  text-decoration-color: var(--border-accent);
   text-underline-offset: 0.15em;
   transition: color var(--transition-fast);
 }
 
 .sl-markdown-content a:hover {
-  color: var(--color-accent-hover);
+  color: var(--accent-editorial-hover);
 }
 
 /* ============================================================
-   Global base styles
+   Global base
    ============================================================ */
-
 html {
   -webkit-font-smoothing: antialiased;
   scroll-behavior: smooth;
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--border-focus);
   outline-offset: 2px;
 }
 
 ::selection {
-  background: var(--color-accent-subtle);
-  color: var(--color-text-primary);
+  background: var(--accent-editorial-fill);
+  color: var(--text-primary);
 }
 
 @media (prefers-reduced-motion: reduce) {

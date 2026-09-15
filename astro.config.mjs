@@ -125,6 +125,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         '@fontsource/jetbrains-mono/500.css',
         '@fontsource/jetbrains-mono/600.css',
         '@fontsource/jetbrains-mono/700.css',
+        // Design system — vendored tokens MUST load before the overrides that alias them.
+        './src/styles/tokens.css',
         './src/styles/starlight-overrides.css',
         './src/styles/custom.css',
       ],
