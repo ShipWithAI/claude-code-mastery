@@ -5,6 +5,7 @@ import sitemap from '@astrojs/sitemap';
 import { visit } from 'unist-util-visit';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { remapMermaidStyles } from './src/lib/mermaid-dark-styles.mjs';
 
 /** Lightweight rehype plugin: converts ```mermaid code blocks to <figure class="mermaid-diagram"> for client-side rendering. */
 const VALID_MODES = ['fit', 'scroll', 'modal'];
@@ -35,6 +36,10 @@ function rehypeMermaidPre() {
           }
           text = text.replace(directiveRe, '').replace(/^\n+/, '');
         }
+
+        // Content diagrams were authored with light pastel `style X fill:` directives.
+        // Remap them onto the dark design-system palette (hue-preserving).
+        text = remapMermaidStyles(text);
 
         const sourceLines = Math.max(3, text.split('\n').length);
 

@@ -4,18 +4,42 @@
 
 import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
 
+// Values mirror src/styles/tokens.css (dark). Mermaid renders inside <svg> and
+// can't read CSS custom properties at initialize() time, so they are literal.
+//   surface-card #2a2722 · surface-popover #3a3630 · surface-elevated #1f1d18
+//   text-primary #fbf9f4 · text-muted #9b958a
+//   accent-editorial #efbf57 · accent-product #34d399
 mermaid.initialize({
   startOnLoad: false,
-  theme: 'default',
+  theme: 'base',
   themeVariables: {
-    fontFamily: "'IBM Plex Sans', system-ui, sans-serif",
+    darkMode: true,
+    fontFamily: 'Inter, system-ui, sans-serif',
     fontSize: '14px',
-    primaryColor: '#e0e7ff',
-    primaryTextColor: '#1f2937',
-    primaryBorderColor: '#6366f1',
-    lineColor: '#4b5563',
-    secondaryColor: '#fef3c7',
-    tertiaryColor: '#fee2e2',
+    background: '#2a2722',
+    mainBkg: '#3a3630',
+    primaryColor: '#3a3630',
+    primaryTextColor: '#fbf9f4',
+    primaryBorderColor: '#efbf57',
+    secondaryColor: '#1f1d18',
+    secondaryTextColor: '#fbf9f4',
+    secondaryBorderColor: '#9b958a',
+    tertiaryColor: '#2a2722',
+    tertiaryTextColor: '#fbf9f4',
+    tertiaryBorderColor: '#34d399',
+    lineColor: '#9b958a',
+    textColor: '#fbf9f4',
+    edgeLabelBackground: '#2a2722',
+    clusterBkg: '#1f1d18',
+    clusterBorder: '#9b958a',
+    noteBkgColor: '#3a3630',
+    noteTextColor: '#fbf9f4',
+    noteBorderColor: '#efbf57',
+    actorBkg: '#3a3630',
+    actorBorder: '#efbf57',
+    actorTextColor: '#fbf9f4',
+    signalColor: '#9b958a',
+    signalTextColor: '#fbf9f4',
   },
 });
 
