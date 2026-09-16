@@ -13,17 +13,23 @@
 
 interface Props {
   locale: 'en' | 'vi';
+  /** `card` (default) = end-of-module box; `flat` = no chrome, left-aligned (site footer). */
+  variant?: 'card' | 'flat';
+  /** Anchor id. Defaults to `newsletter` (header CTA target); the footer uses its own. */
+  id?: string;
 }
 
-const { locale } = Astro.props;
+const { locale, variant = 'card', id: anchorId = 'newsletter' } = Astro.props;
 
 // Same ConvertKit form as shipwithai.io — one subscriber list.
 const CONVERTKIT_ACTION = 'https://app.convertkit.com/forms/9065097/subscriptions';
 
 const copy = {
   en: {
-    heading: 'Enjoying this module?',
-    description: 'Get weekly AI-coding tips and hear first when new modules ship.',
+    heading: variant === 'flat' ? 'The Brief · Weekly' : 'Enjoying this module?',
+    description: variant === 'flat'
+      ? 'One email per week. Practical tips, no fluff.'
+      : 'Get weekly AI-coding tips and hear first when new modules ship.',
     placeholder: 'your@email.com',
     button: 'Subscribe',
     success: 'Welcome aboard! Check your inbox to confirm.',
@@ -31,8 +37,10 @@ const copy = {
     invalid: 'Please enter a valid email address.',
   },
   vi: {
-    heading: 'Thấy module này hữu ích?',
-    description: 'Nhận mẹo AI coding mỗi tuần và biết ngay khi có module mới.',
+    heading: variant === 'flat' ? 'The Brief · Hàng tuần' : 'Thấy module này hữu ích?',
+    description: variant === 'flat'
+      ? 'Một email mỗi tuần. Mẹo thực chiến, không spam.'
+      : 'Nhận mẹo AI coding mỗi tuần và biết ngay khi có module mới.',
     placeholder: 'email@cuaban.com',
     button: 'Đăng ký',
     success: 'Chào mừng bạn! Kiểm tra hộp thư để xác nhận nhé.',
@@ -44,7 +52,7 @@ const copy = {
 const id = `newsletter-${crypto.randomUUID().slice(0, 8)}`;
 ---
 
-<aside class="newsletter-signup course-cta" id="newsletter" aria-labelledby={`${id}-heading`}>
+<aside class:list={['newsletter-signup', 'course-cta', `course-cta--${variant}`]} id={anchorId} aria-labelledby={`${id}-heading`}>
   <h3 class="course-cta__heading" id={`${id}-heading`}>{copy.heading}</h3>
   <p class="course-cta__description">{copy.description}</p>
 
@@ -82,6 +90,37 @@ const id = `newsletter-${crypto.randomUUID().slice(0, 8)}`;
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-lg);
     text-align: center;
+  }
+
+  /* Flat — lives inside the site footer column: no card, no margin, left-aligned. */
+  .course-cta--flat {
+    margin-top: 0;
+    padding: 0;
+    background: none;
+    border: none;
+    border-radius: 0;
+    text-align: left;
+  }
+  .course-cta--flat .course-cta__heading {
+    font-family: var(--type-family-body);
+    font-size: var(--type-scale-sm);
+    font-weight: var(--type-weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
+  .course-cta--flat .course-cta__description {
+    margin-bottom: var(--space-3);
+    font-size: var(--type-scale-sm);
+    color: var(--text-muted);
+  }
+  .course-cta--flat .course-cta__row {
+    margin: 0;
+  }
+  .course-cta--flat .course-cta__input,
+  .course-cta--flat .course-cta__button {
+    padding-block: var(--space-2);
+    font-size: var(--type-scale-sm);
   }
 
   .course-cta__heading {
