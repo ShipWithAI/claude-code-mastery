@@ -44,7 +44,7 @@ const copy = {
 const id = `newsletter-${crypto.randomUUID().slice(0, 8)}`;
 ---
 
-<aside class="newsletter-signup course-cta" aria-labelledby={`${id}-heading`}>
+<aside class="newsletter-signup course-cta" id="newsletter" aria-labelledby={`${id}-heading`}>
   <h3 class="course-cta__heading" id={`${id}-heading`}>{copy.heading}</h3>
   <p class="course-cta__description">{copy.description}</p>
 
@@ -110,6 +110,7 @@ const id = `newsletter-${crypto.randomUUID().slice(0, 8)}`;
     flex: 1;
     min-width: 0;
     padding: var(--space-3) var(--space-4);
+    scroll-margin-top: var(--space-24);
     font: inherit;
     font-size: var(--type-scale-md);
     color: var(--text-primary);
@@ -133,7 +134,7 @@ const id = `newsletter-${crypto.randomUUID().slice(0, 8)}`;
     color: var(--text-inverse);
     background: var(--accent-product);
     border: none;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-full);
     cursor: pointer;
     white-space: nowrap;
     transition: background var(--motion-duration-fast) var(--motion-easing-out);

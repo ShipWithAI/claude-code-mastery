@@ -6,14 +6,11 @@
  */
 import '@astrojs/starlight/style/markdown.css';
 import NewsletterCta from './NewsletterCta.astro';
+import { pageHasNewsletter } from '../config/navigation';
 
 const route = Astro.locals.starlightRoute;
-const routeId = route?.id ?? '';
 const locale: 'en' | 'vi' = route?.lang?.startsWith('vi') ? 'vi' : 'en';
-
-const isSplash = route?.entry?.data?.template === 'splash';
-const isAuthor = /(^|\/)author$/.test(routeId);
-const showCta = !isSplash && !isAuthor;
+const showCta = pageHasNewsletter(route);
 ---
 
 <div class="sl-markdown-content">

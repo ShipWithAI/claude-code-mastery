@@ -144,6 +144,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         './src/styles/custom.css',
       ],
       components: {
+        Header: './src/components/Header.astro',
+        MobileMenuFooter: './src/components/MobileMenuFooter.astro',
         Footer: './src/components/Footer.astro',
         MarkdownContent: './src/components/MarkdownContent.astro',
         // Dark-only: design system ships no light tokens.
