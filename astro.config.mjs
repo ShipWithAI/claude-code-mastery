@@ -77,6 +77,9 @@ const mermaidClientScript = readFileSync(
 
 export default defineConfig({
   site: 'https://course.shipwithai.io',
+  // Root has no page of its own. Redirect to the default locale so `/` works in
+  // dev too (production additionally has the same redirect in vercel.json).
+  redirects: { '/': '/en/' },
   markdown: {
     rehypePlugins: [rehypeMermaidPre],
   },
