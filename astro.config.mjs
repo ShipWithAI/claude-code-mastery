@@ -119,11 +119,16 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         },
       ],
       customCss: [
-        '@fontsource/ibm-plex-sans/300.css',
-        '@fontsource/ibm-plex-sans/400.css',
-        '@fontsource/ibm-plex-sans/500.css',
-        '@fontsource/ibm-plex-sans/600.css',
-        '@fontsource/ibm-plex-sans/700.css',
+        // Fonts — self-hosted. Family names must match tokens.css:
+        // --type-family-body: Inter, --type-family-heading: Lora, --type-family-mono: 'JetBrains Mono'
+        '@fontsource/inter/400.css',
+        '@fontsource/inter/500.css',
+        '@fontsource/inter/600.css',
+        '@fontsource/inter/700.css',
+        '@fontsource/lora/400.css',
+        '@fontsource/lora/400-italic.css',
+        '@fontsource/lora/600.css',
+        '@fontsource/lora/700.css',
         '@fontsource/jetbrains-mono/400.css',
         '@fontsource/jetbrains-mono/500.css',
         '@fontsource/jetbrains-mono/600.css',
