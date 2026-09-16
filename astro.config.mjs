@@ -144,6 +144,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         './src/styles/custom.css',
       ],
       components: {
+        Head: './src/components/Head.astro',
         Header: './src/components/Header.astro',
         MobileMenuFooter: './src/components/MobileMenuFooter.astro',
         Footer: './src/components/Footer.astro',

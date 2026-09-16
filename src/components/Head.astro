@@ -1,0 +1,41 @@
+---
+/**
+ * Head — Starlight override.
+ * Adds <link rel="preload"> for the web fonts used above the fold so the first
+ * paint already has Lora / Inter / JetBrains Mono. Without it, `font-display:
+ * swap` paints every navigation with Georgia / system-ui first and re-flows
+ * when the fonts arrive (visible as a full-page flash between lessons).
+ *
+ * `?url` imports go through the same asset pipeline as the @font-face url()s,
+ * so the preload href matches the hashed file the CSS requests.
+ */
+import Default from '@astrojs/starlight/components/Head.astro';
+
+import interLatin400 from '@fontsource/inter/files/inter-latin-400-normal.woff2?url';
+import interLatin500 from '@fontsource/inter/files/inter-latin-500-normal.woff2?url';
+import interLatin600 from '@fontsource/inter/files/inter-latin-600-normal.woff2?url';
+import interLatin700 from '@fontsource/inter/files/inter-latin-700-normal.woff2?url';
+import loraLatin400 from '@fontsource/lora/files/lora-latin-400-normal.woff2?url';
+import loraLatin600 from '@fontsource/lora/files/lora-latin-600-normal.woff2?url';
+// Requested on every module page (measured via the resource timing API), so keep it warm too.
+import loraSymbols600 from '@fontsource/lora/files/lora-symbols-600-normal.woff2?url';
+import monoLatin400 from '@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2?url';
+
+import interVi400 from '@fontsource/inter/files/inter-vietnamese-400-normal.woff2?url';
+import interVi500 from '@fontsource/inter/files/inter-vietnamese-500-normal.woff2?url';
+import interVi600 from '@fontsource/inter/files/inter-vietnamese-600-normal.woff2?url';
+import loraVi400 from '@fontsource/lora/files/lora-vietnamese-400-normal.woff2?url';
+import loraVi600 from '@fontsource/lora/files/lora-vietnamese-600-normal.woff2?url';
+import monoVi400 from '@fontsource/jetbrains-mono/files/jetbrains-mono-vietnamese-400-normal.woff2?url';
+
+const isVi = Astro.locals.starlightRoute?.lang?.startsWith('vi') ?? false;
+
+const latin = [interLatin400, interLatin500, interLatin600, interLatin700, loraLatin400, loraLatin600, loraSymbols600, monoLatin400];
+const vietnamese = [interVi400, interVi500, interVi600, loraVi400, loraVi600, monoVi400];
+const preload = isVi ? [...latin, ...vietnamese] : latin;
+---
+
+<Default><slot /></Default>
+{preload.map((href) => (
+  <link rel="preload" as="font" type="font/woff2" href={href} crossorigin />
+))}
