@@ -140,6 +140,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       ],
       components: {
         Footer: './src/components/Footer.astro',
+        // Dark-only: design system ships no light tokens.
+        ThemeProvider: './src/components/ThemeProvider.astro',
+        ThemeSelect: './src/components/ThemeSelect.astro',
       },
       logo: {
         src: './src/assets/shipwithailogo.png',
