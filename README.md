@@ -197,3 +197,22 @@ If this course helped you, consider giving it a ⭐ — it helps others find it 
 Built by the [ShipWithAI](https://shipwithai.io) community
 
 </div>
+
+---
+
+## Design System
+
+The site's colours, type scale and spacing come from the ShipWithAI design system.
+`src/styles/tokens.css` is a **vendored copy** of the compiled tokens (the design
+package itself is private, and this repo must stay installable without a token).
+
+To update after a design-system release:
+
+```bash
+./scripts/sync-design-tokens.sh      # copies dist/tokens.css from ../shipwithai.io
+./scripts/check-design-tokens.sh     # lint gate: no light theme, no indigo
+npm run build
+```
+
+Never edit `tokens.css` by hand; put site-specific overrides in
+`src/styles/starlight-overrides.css`.

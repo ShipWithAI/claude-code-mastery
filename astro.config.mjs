@@ -5,6 +5,7 @@ import sitemap from '@astrojs/sitemap';
 import { visit } from 'unist-util-visit';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { remapMermaidStyles } from './src/lib/mermaid-dark-styles.mjs';
 
 /** Lightweight rehype plugin: converts ```mermaid code blocks to <figure class="mermaid-diagram"> for client-side rendering. */
 const VALID_MODES = ['fit', 'scroll', 'modal'];
@@ -35,6 +36,10 @@ function rehypeMermaidPre() {
           }
           text = text.replace(directiveRe, '').replace(/^\n+/, '');
         }
+
+        // Content diagrams were authored with light pastel `style X fill:` directives.
+        // Remap them onto the dark design-system palette (hue-preserving).
+        text = remapMermaidStyles(text);
 
         const sourceLines = Math.max(3, text.split('\n').length);
 
@@ -77,6 +82,9 @@ const mermaidClientScript = readFileSync(
 
 export default defineConfig({
   site: 'https://course.shipwithai.io',
+  // Root has no page of its own. Redirect to the default locale so `/` works in
+  // dev too (production additionally has the same redirect in vercel.json).
+  redirects: { '/': '/en/' },
   markdown: {
     rehypePlugins: [rehypeMermaidPre],
   },
@@ -116,20 +124,34 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         },
       ],
       customCss: [
-        '@fontsource/ibm-plex-sans/300.css',
-        '@fontsource/ibm-plex-sans/400.css',
-        '@fontsource/ibm-plex-sans/500.css',
-        '@fontsource/ibm-plex-sans/600.css',
-        '@fontsource/ibm-plex-sans/700.css',
+        // Fonts — self-hosted. Family names must match tokens.css:
+        // --type-family-body: Inter, --type-family-heading: Lora, --type-family-mono: 'JetBrains Mono'
+        '@fontsource/inter/400.css',
+        '@fontsource/inter/500.css',
+        '@fontsource/inter/600.css',
+        '@fontsource/inter/700.css',
+        '@fontsource/lora/400.css',
+        '@fontsource/lora/400-italic.css',
+        '@fontsource/lora/600.css',
+        '@fontsource/lora/700.css',
         '@fontsource/jetbrains-mono/400.css',
         '@fontsource/jetbrains-mono/500.css',
         '@fontsource/jetbrains-mono/600.css',
         '@fontsource/jetbrains-mono/700.css',
+        // Design system — vendored tokens MUST load before the overrides that alias them.
+        './src/styles/tokens.css',
         './src/styles/starlight-overrides.css',
         './src/styles/custom.css',
       ],
       components: {
+        Head: './src/components/Head.astro',
+        Header: './src/components/Header.astro',
+        MobileMenuFooter: './src/components/MobileMenuFooter.astro',
         Footer: './src/components/Footer.astro',
+        MarkdownContent: './src/components/MarkdownContent.astro',
+        // Dark-only: design system ships no light tokens.
+        ThemeProvider: './src/components/ThemeProvider.astro',
+        ThemeSelect: './src/components/ThemeSelect.astro',
       },
       logo: {
         src: './src/assets/shipwithailogo.png',

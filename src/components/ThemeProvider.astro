@@ -1,0 +1,15 @@
+---
+/**
+ * ThemeProvider — Starlight override.
+ *
+ * The ShipWithAI design system is dark-first and ships no light tokens, so the
+ * course is dark-only. Starlight's default provider reads `starlight-theme`
+ * from localStorage and would restore a stale "light" choice; this one
+ * ignores storage and pins the theme + editorial surface before first paint.
+ */
+---
+
+<script is:inline>
+	document.documentElement.dataset.theme = 'dark';
+	document.documentElement.dataset.surface = 'editorial';
+</script>

@@ -1,0 +1,19 @@
+---
+/**
+ * MarkdownContent — Starlight override.
+ * Renders the page body, then a newsletter CTA on every course/reference page
+ * (not on the splash pages or the author page).
+ */
+import '@astrojs/starlight/style/markdown.css';
+import NewsletterCta from './NewsletterCta.astro';
+import { pageHasNewsletter } from '../config/navigation';
+
+const route = Astro.locals.starlightRoute;
+const locale: 'en' | 'vi' = route?.lang?.startsWith('vi') ? 'vi' : 'en';
+const showCta = pageHasNewsletter(route);
+---
+
+<div class="sl-markdown-content">
+  <slot />
+  {showCta && <NewsletterCta locale={locale} />}
+</div>

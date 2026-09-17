@@ -1,0 +1,158 @@
+---
+/**
+ * Header — Starlight override, restyled to match the ShipWithAI design-system
+ * SiteHeader (glass bar, Lora wordmark, primary nav, emerald pill CTA) while
+ * keeping Starlight's Search, SocialIcons and LanguageSelect.
+ *
+ * Not the DS SiteHeader molecule itself: that component has no slot for
+ * Starlight's Pagefind search, and the course needs search.
+ */
+import config from 'virtual:starlight/user-config';
+import LanguageSelect from 'virtual:starlight/components/LanguageSelect';
+import Search from 'virtual:starlight/components/Search';
+import SiteTitle from 'virtual:starlight/components/SiteTitle';
+import SocialIcons from 'virtual:starlight/components/SocialIcons';
+import { headerNav, headerCta, pageHasNewsletter, type Locale } from '../config/navigation';
+
+const shouldRenderSearch =
+  config.pagefind || config.components.Search !== '@astrojs/starlight/components/Search.astro';
+
+const route = Astro.locals.starlightRoute;
+const locale: Locale = route?.lang?.startsWith('vi') ? 'vi' : 'en';
+const nav = headerNav[locale];
+const cta = {
+  label: headerCta[locale].label,
+  href: pageHasNewsletter(route) ? '#newsletter' : headerCta[locale].fallbackHref,
+};
+---
+
+<div class="header">
+  <div class="title-wrapper sl-flex">
+    <SiteTitle />
+  </div>
+  <div class="sl-flex print:hidden">
+    {shouldRenderSearch && <Search />}
+  </div>
+  <nav class="site-nav sl-hidden lg:sl-flex print:hidden" aria-label="ShipWithAI">
+    {nav.map((item) => (
+      <a class="site-nav__link" href={item.href}>{item.label}</a>
+    ))}
+  </nav>
+  <div class="sl-hidden md:sl-flex print:hidden right-group">
+    <div class="sl-flex social-icons">
+      <SocialIcons />
+    </div>
+    <LanguageSelect />
+    <a class="site-cta" href={cta.href}>{cta.label}</a>
+  </div>
+</div>
+
+<style>
+  @layer starlight.core {
+    .header {
+      display: flex;
+      gap: var(--sl-nav-gap);
+      justify-content: space-between;
+      align-items: center;
+      height: 100%;
+    }
+
+    .title-wrapper {
+      overflow: clip;
+      padding: 0.25rem;
+      margin: -0.25rem;
+      min-width: 0;
+    }
+
+    .right-group,
+    .social-icons {
+      gap: 1rem;
+      align-items: center;
+    }
+    .social-icons::after {
+      content: '';
+      height: 2rem;
+      border-inline-end: 1px solid var(--sl-color-gray-5);
+    }
+
+    @media (min-width: 50rem) {
+      :global(:root[data-has-sidebar]) {
+        --__sidebar-pad: calc(2 * var(--sl-nav-pad-x));
+      }
+      :global(:root:not([data-has-toc])) {
+        --__toc-width: 0rem;
+      }
+      .header {
+        --__sidebar-width: max(0rem, var(--sl-content-inline-start, 0rem) - var(--sl-nav-pad-x));
+        --__main-column-fr: calc(
+          (
+              100% + var(--__sidebar-pad, 0rem) - var(--__toc-width, var(--sl-sidebar-width)) -
+                (2 * var(--__toc-width, var(--sl-nav-pad-x))) - var(--sl-content-inline-start, 0rem) -
+                var(--sl-content-width)
+            ) / 2
+        );
+        display: grid;
+        /* title | search (all free space) | nav | right items */
+        grid-template-columns:
+          minmax(
+            calc(var(--__sidebar-width) + max(0rem, var(--__main-column-fr) - var(--sl-nav-gap))),
+            auto
+          )
+          1fr
+          auto
+          auto;
+        align-content: center;
+      }
+    }
+  }
+
+  /* ── DS SiteHeader look ── */
+  .site-nav {
+    gap: var(--space-5);
+    align-items: center;
+  }
+  .site-nav__link {
+    font-family: var(--type-family-body);
+    font-size: var(--type-scale-sm);
+    font-weight: var(--type-weight-medium);
+    color: var(--text-secondary);
+    text-decoration: none;
+    padding-block: var(--space-1);
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: color var(--motion-duration-fast) var(--motion-easing-out);
+  }
+  .site-nav__link:hover {
+    color: var(--text-primary);
+  }
+  .site-nav__link:focus-visible {
+    outline: 2px solid var(--border-focus);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Primary CTA — DS Button primary/product: emerald pill (newsletter is always emerald). */
+  .site-cta {
+    display: inline-flex;
+    align-items: center;
+    height: 2rem;
+    padding-inline: var(--space-4);
+    font-family: var(--type-family-body);
+    font-size: var(--type-scale-sm);
+    font-weight: var(--type-weight-medium);
+    color: var(--text-inverse);
+    background: var(--accent-product);
+    border-radius: var(--radius-full);
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background-color var(--motion-duration-fast) var(--motion-easing-out);
+  }
+  .site-cta:hover {
+    background: var(--accent-product-hover);
+    color: var(--text-inverse);
+  }
+  .site-cta:focus-visible {
+    outline: 2px solid var(--border-focus);
+    outline-offset: 2px;
+  }
+</style>
