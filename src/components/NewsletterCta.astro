@@ -1,0 +1,265 @@
+---
+/**
+ * NewsletterCta — end-of-module email capture, posts straight to ConvertKit.
+ *
+ * Course-owned (not the design-system NewsletterSignup): the site is static,
+ * and the DS component's submit path had two lead-dropping defects (unnamed
+ * email input; input disabled before FormData serialisation). This one names
+ * the field `email_address` (what ConvertKit expects) and serialises first.
+ *
+ * Always emerald per DS hard rule — the `.newsletter-signup` class picks up the
+ * `--accent-primary` override that ships in tokens.css.
+ */
+
+interface Props {
+  locale: 'en' | 'vi';
+  /** `card` (default) = end-of-module box; `flat` = no chrome, left-aligned (site footer). */
+  variant?: 'card' | 'flat';
+  /** Anchor id. Defaults to `newsletter` (header CTA target); the footer uses its own. */
+  id?: string;
+}
+
+const { locale, variant = 'card', id: anchorId = 'newsletter' } = Astro.props;
+
+// Same ConvertKit form as shipwithai.io — one subscriber list.
+const CONVERTKIT_ACTION = 'https://app.convertkit.com/forms/9065097/subscriptions';
+
+const copy = {
+  en: {
+    heading: variant === 'flat' ? 'The Brief · Weekly' : 'Enjoying this module?',
+    description: variant === 'flat'
+      ? 'One email per week. Practical tips, no fluff.'
+      : 'Get weekly AI-coding tips and hear first when new modules ship.',
+    placeholder: 'your@email.com',
+    button: 'Subscribe',
+    success: 'Welcome aboard! Check your inbox to confirm.',
+    error: 'Something went wrong — please try again.',
+    invalid: 'Please enter a valid email address.',
+  },
+  vi: {
+    heading: variant === 'flat' ? 'The Brief · Hàng tuần' : 'Thấy module này hữu ích?',
+    description: variant === 'flat'
+      ? 'Một email mỗi tuần. Mẹo thực chiến, không spam.'
+      : 'Nhận mẹo AI coding mỗi tuần và biết ngay khi có module mới.',
+    placeholder: 'email@cuaban.com',
+    button: 'Đăng ký',
+    success: 'Chào mừng bạn! Kiểm tra hộp thư để xác nhận nhé.',
+    error: 'Có lỗi xảy ra — thử lại nhé.',
+    invalid: 'Vui lòng nhập email hợp lệ.',
+  },
+}[locale];
+
+const id = `newsletter-${crypto.randomUUID().slice(0, 8)}`;
+---
+
+<aside class:list={['newsletter-signup', 'course-cta', `course-cta--${variant}`]} id={anchorId} aria-labelledby={`${id}-heading`}>
+  <h3 class="course-cta__heading" id={`${id}-heading`}>{copy.heading}</h3>
+  <p class="course-cta__description">{copy.description}</p>
+
+  <form
+    class="course-cta__form"
+    action={CONVERTKIT_ACTION}
+    method="post"
+    data-success={copy.success}
+    data-error={copy.error}
+    data-invalid={copy.invalid}
+  >
+    <div class="course-cta__row">
+      <label class="sr-only" for={`${id}-email`}>Email</label>
+      <input
+        class="course-cta__input"
+        id={`${id}-email`}
+        type="email"
+        name="email_address"
+        autocomplete="email"
+        placeholder={copy.placeholder}
+        required
+      />
+      <button class="course-cta__button" type="submit">{copy.button}</button>
+    </div>
+    <p class="course-cta__feedback" role="status" aria-live="polite"></p>
+  </form>
+</aside>
+
+<style>
+  .course-cta {
+    container-type: inline-size;
+    margin-top: var(--space-12);
+    padding: var(--space-8) var(--space-6);
+    background: var(--surface-card);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-lg);
+    text-align: center;
+  }
+
+  /* Flat — lives inside the site footer column: no card, no margin, left-aligned. */
+  .course-cta--flat {
+    margin-top: 0;
+    padding: 0;
+    background: none;
+    border: none;
+    border-radius: 0;
+    text-align: left;
+  }
+  .course-cta--flat .course-cta__heading {
+    font-family: var(--type-family-body);
+    font-size: var(--type-scale-sm);
+    font-weight: var(--type-weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
+  .course-cta--flat .course-cta__description {
+    margin-bottom: var(--space-3);
+    font-size: var(--type-scale-sm);
+    color: var(--text-muted);
+  }
+  .course-cta--flat .course-cta__row {
+    margin: 0;
+  }
+  .course-cta--flat .course-cta__input,
+  .course-cta--flat .course-cta__button {
+    padding-block: var(--space-2);
+    font-size: var(--type-scale-sm);
+  }
+
+  .course-cta__heading {
+    margin: 0 0 var(--space-2);
+    font-family: var(--type-family-heading);
+    font-size: var(--type-scale-xl);
+    font-weight: var(--type-weight-semibold);
+    color: var(--text-primary);
+  }
+
+  .course-cta__description {
+    margin: 0 0 var(--space-5);
+    font-family: var(--type-family-body);
+    font-size: var(--type-scale-md);
+    color: var(--text-secondary);
+  }
+
+  .course-cta__row {
+    display: flex;
+    gap: var(--space-2);
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
+  .course-cta__input {
+    flex: 1;
+    min-width: 0;
+    padding: var(--space-3) var(--space-4);
+    scroll-margin-top: var(--space-24);
+    font: inherit;
+    font-size: var(--type-scale-md);
+    color: var(--text-primary);
+    background: var(--surface-elevated);
+    border: 1px solid var(--border-input-strong);
+    border-radius: var(--radius-md);
+    transition: border-color var(--motion-duration-fast) var(--motion-easing-out);
+  }
+  .course-cta__input::placeholder { color: var(--text-faint); }
+  .course-cta__input:focus-visible {
+    outline: none;
+    border-color: var(--accent-product);
+    box-shadow: 0 0 0 3px var(--accent-product-fill);
+  }
+
+  .course-cta__button {
+    padding: var(--space-3) var(--space-5);
+    font: inherit;
+    font-size: var(--type-scale-md);
+    font-weight: var(--type-weight-semibold);
+    color: var(--text-inverse);
+    background: var(--accent-product);
+    border: none;
+    border-radius: var(--radius-full);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background var(--motion-duration-fast) var(--motion-easing-out);
+  }
+  .course-cta__button:hover { background: var(--accent-product-hover); }
+  .course-cta__form[data-loading] .course-cta__button {
+    opacity: 0.6;
+    cursor: progress;
+  }
+
+  .course-cta__feedback {
+    margin: 0;
+    font-size: var(--type-scale-sm);
+  }
+  .course-cta__feedback:not(:empty) { margin-top: var(--space-3); }
+  .course-cta__feedback[data-state="success"] { color: var(--color-state-success); }
+  .course-cta__feedback[data-state="error"] { color: var(--color-state-error); }
+
+  .sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  @container (max-width: 480px) {
+    .course-cta__row { flex-direction: column; }
+  }
+</style>
+
+<script>
+  // Progressive enhancement: without JS the native POST still reaches ConvertKit
+  // (it 302s to its own confirmation page).
+  function pushEvent(event: string, params: Record<string, unknown> = {}) {
+    const w = window as unknown as { dataLayer?: Record<string, unknown>[] };
+    w.dataLayer = w.dataLayer || [];
+    w.dataLayer.push({ event, ...params });
+  }
+
+  function setFeedback(el: HTMLElement, text: string, state: 'success' | 'error') {
+    el.textContent = text;
+    el.dataset.state = state;
+  }
+
+  document.querySelectorAll<HTMLFormElement>('.course-cta__form').forEach((form) => {
+    const input = form.querySelector<HTMLInputElement>('input[name="email_address"]')!;
+    const feedback = form.querySelector<HTMLElement>('.course-cta__feedback')!;
+    const locale = location.pathname.startsWith('/vi') ? 'vi' : 'en';
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = input.value.trim();
+      if (!email || !input.checkValidity()) {
+        setFeedback(feedback, form.dataset.invalid ?? '', 'error');
+        input.focus();
+        return;
+      }
+
+      // Serialise BEFORE disabling — FormData skips disabled fields.
+      const body = new URLSearchParams(new FormData(form) as unknown as Record<string, string>);
+      form.setAttribute('data-loading', '');
+      input.disabled = true;
+      pushEvent('course_newsletter_submit', { locale });
+
+      try {
+        const res = await fetch(form.action, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body,
+        });
+        if (res.ok) {
+          setFeedback(feedback, form.dataset.success ?? '', 'success');
+          input.value = '';
+          pushEvent('course_newsletter_success', { locale });
+        } else {
+          setFeedback(feedback, form.dataset.error ?? '', 'error');
+        }
+      } catch {
+        setFeedback(feedback, form.dataset.error ?? '', 'error');
+      } finally {
+        form.removeAttribute('data-loading');
+        input.disabled = false;
+      }
+    });
+  });
+</script>
