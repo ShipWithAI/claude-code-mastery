@@ -87,7 +87,7 @@ $ claude -p "Create initial CLAUDE.md with /init"
 ```
 
 Expected output:
-```
+```text
 Created CLAUDE.md with basic template.
 ```
 
@@ -130,7 +130,7 @@ src/
 ├── middleware/      ← Express middleware (auth, validation, error)
 ├── types/           ← TypeScript interfaces and types
 └── utils/           ← Pure functions (no dependencies)
-```
+```text
 
 **Layering (enforced):**
 - Routes → Services → Repositories → Database
@@ -248,7 +248,7 @@ $ claude
 
 Now try a task that requires project knowledge:
 
-```
+```text
 You: Add error handling to the task creation endpoint
 ```
 

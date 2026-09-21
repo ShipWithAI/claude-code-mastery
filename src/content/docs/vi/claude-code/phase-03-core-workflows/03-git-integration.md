@@ -87,12 +87,12 @@ Giờ mọi commit message Claude generate sẽ theo chuẩn team.
 
 ### Bước 1: Review thay đổi
 
-```
+```text
 Tôi đã thay đổi những file nào? Tóm tắt mỗi thay đổi làm gì.
 ```
 
 Expected output:
-```
+```text
 File đã thay đổi (7):
 
 1. src/payment/validator.ts
@@ -125,12 +125,12 @@ File đã thay đổi (7):
 
 ### Bước 2: Chia thành commit logic
 
-```
+```text
 Giúp tôi chia các thay đổi này thành các commit logic. Group related changes lại.
 ```
 
 Expected output:
-```
+```text
 Đề xuất cấu trúc commit:
 
 Commit 1: Add payment validation
@@ -160,12 +160,12 @@ $ git add src/payment/validator.ts src/payment/types.ts tests/payment/validator.
 ```
 
 Hỏi Claude:
-```
+```text
 Viết commit message cho staged changes. Dùng format Conventional Commits.
 ```
 
 Expected output:
-```
+```text
 feat(payment): add credit card validation với Luhn algorithm
 
 - Implement card number validation dùng Luhn checksum
@@ -188,12 +188,12 @@ CONFLICT (content): Merge conflict in src/payment/processor.ts
 ```
 
 Hỏi Claude:
-```
+```text
 Tôi có merge conflict ở src/payment/processor.ts. Show cả hai bên và giúp resolve. Giữ Result type error handling mới của tôi nhưng integrate PaymentGateway interface cập nhật từ họ.
 ```
 
 Expected output:
-```
+```text
 Phân tích conflict:
 
 BÊN MÌNH (feature/payment-processing):
@@ -216,12 +216,12 @@ Chạy test verify: npm test src/payment/
 
 ### Bước 5: Pre-push review
 
-```
+```text
 Review tất cả commit trên branch này so với main. History có clean không? Commit nào nên squash?
 ```
 
 Expected output:
-```
+```text
 Branch: feature/payment-processing (3 commits ahead of main)
 
 Commit history:
@@ -242,7 +242,7 @@ Sẵn sàng cho PR.
 
 ### Bước 6: Generate PR description
 
-```
+```text
 Viết PR description cho branch này. Gồm: summary, changes breakdown, testing đã làm, và deployment notes.
 ```
 

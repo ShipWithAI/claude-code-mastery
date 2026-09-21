@@ -134,7 +134,7 @@ jobs:
 
 Navigate to your repository on GitHub:
 
-```
+```text
 Settings → Secrets and variables → Actions → New repository secret
 ```
 
@@ -157,7 +157,7 @@ Open PR via GitHub UI.
 
 Expected output in Actions tab:
 
-```
+```text
 Run Claude review
 ✓ Install Claude Code (12s)
 ✓ Get changed files (2s)
@@ -167,7 +167,7 @@ Run Claude review
 
 Check PR — you'll see a comment from `github-actions[bot]`:
 
-```
+```text
 ## Claude Code Review
 
 - [src/test.js] Missing semicolon may cause ASI issues
@@ -225,7 +225,7 @@ jobs:
 
 Test by commenting on any PR:
 
-```
+```text
 /claude explain the purpose of src/auth.ts
 ```
 

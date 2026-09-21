@@ -60,7 +60,7 @@ $ node --version
 ```
 
 Output mong đợi:
-```
+```text
 v18.0.0   # hoặc cao hơn
 ```
 
@@ -77,7 +77,7 @@ $ npm install -g @anthropic-ai/claude-code
 ```
 
 Output mong đợi:
-```
+```text
 # Output có thể khác
 added 1 package in Xs
 ```
@@ -108,7 +108,7 @@ $ claude --version
 ```
 
 Output mong đợi:
-```
+```text
 # Output có thể khác
 claude version X.Y.Z
 ```
@@ -149,7 +149,7 @@ Lệnh này hiển thị tất cả slash command có sẵn. Bạn sẽ thấy c
 
 Trong Claude Code session, hỏi một câu đơn giản để xác minh mọi thứ hoạt động:
 
-```
+```text
 > Best practice cho error handling trong Go là gì?
 ```
 

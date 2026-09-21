@@ -94,7 +94,7 @@ Note: A' ≈ A ≈ A'' — slight variations of the same approach, all failing t
 
 ### Step 1: Observe the Loop Forming
 
-```
+```text
 Claude: I'll fix the type error in userService.ts...
 [Edits file]
 
@@ -124,7 +124,7 @@ Checklist:
 
 Instead of letting Claude try a 4th type adjustment, you interrupt:
 
-```
+```text
 Stop. You've tried type adjustments 3 times and got the same error.
 
 Let's step back. Before trying to fix, explain:
@@ -137,7 +137,7 @@ Let's step back. Before trying to fix, explain:
 
 ### Step 4: Claude Reframes the Problem
 
-```
+```text
 Claude: You're right. Let me trace the data flow...
 
 [Reads calling code]
@@ -156,7 +156,7 @@ $ npm run typecheck
 ```
 
 Expected output:
-```
+```text
 No errors found.
 ```
 
@@ -205,7 +205,7 @@ Watch for the signals: repeated errors, same file edits, apologetic language.
 **Effective intervention patterns**:
 
 After 3 type errors:
-```
+```text
 Stop. The type error keeps recurring. Before another fix attempt:
 1. Read the actual runtime value with console.log
 2. Compare to what the type expects
@@ -213,7 +213,7 @@ Stop. The type error keeps recurring. Before another fix attempt:
 ```
 
 After 3 test failures:
-```
+```text
 Stop. Let's check our assumptions:
 1. What does the test actually assert?
 2. What does the function actually return?
@@ -259,7 +259,7 @@ The key is asking Claude to ANALYZE before attempting again.
 
 ### Intervention Prompts
 
-```
+```text
 "Stop. You've tried X three times. Explain why it's failing."
 
 "Before fixing, analyze: where does this data actually come from?"
@@ -302,7 +302,7 @@ The key is asking Claude to ANALYZE before attempting again.
 
 **The break**: After 7 attempts, the dev finally said:
 
-```
+```text
 Stop. Forget token refresh. Read the ACTUAL error log, not just
 the error message. What's the full context?
 ```

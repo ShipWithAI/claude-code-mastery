@@ -211,7 +211,7 @@ $ claude -p "Design một API endpoint để quản lý user preferences (theme,
 
 **Kết quả**: File `architecture.md` được tạo với nội dung:
 
-```
+```text
 Reading codebase structure...
 Analyzing existing API patterns...
 
@@ -237,7 +237,7 @@ $ claude -p "Đọc architecture.md. Implement preferences endpoint trong src/ro
 
 **Kết quả**:
 
-```
+```text
 Reading architecture.md...
 Analyzing src/routes/ structure...
 
@@ -267,7 +267,7 @@ $ claude -p "Đọc architecture.md và src/routes/userPreferences.ts. Viết co
 
 **Kết quả**:
 
-```
+```text
 Reading architecture.md...
 Reading implementation...
 
@@ -301,7 +301,7 @@ $ claude -p "Đọc architecture.md và src/routes/userPreferences.ts. Update AP
 
 **Kết quả**:
 
-```
+```text
 Reading architecture.md...
 Reading implementation...
 Reading existing API.md format...

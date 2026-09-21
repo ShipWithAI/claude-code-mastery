@@ -110,7 +110,7 @@ session.
 
 **Bước 2: Có conversation nhiều lượt**
 
-```
+```text
 > Cách tốt nhất để handle error trong TypeScript là gì?
 
 Claude giải thích try/catch, Result type, error boundary, v.v.
@@ -126,12 +126,12 @@ Claude refactor ví dụ trước, duy trì context.
 
 **Bước 3: Dùng slash commands**
 
-```
+```text
 /help
 ```
 
 Output hiển thị các lệnh có sẵn:
-```
+```text
 # Output có thể khác
 Available commands:
   /help     - Show this help
@@ -174,7 +174,7 @@ $ claude -p "Sự khác biệt giữa let và const trong JavaScript là gì?"
 ```
 
 Output mong đợi:
-```
+```text
 # Output có thể khác
 Trong JavaScript, `let` và `const` đều khai báo biến block-scoped, nhưng:
 
@@ -233,7 +233,7 @@ $ git diff HEAD~1 | claude -p "Tóm tắt những thay đổi này"
 ```
 
 Output mong đợi:
-```
+```text
 # Output có thể khác
 Diff này cho thấy:
 1. Thêm error handling cho function fetchUser

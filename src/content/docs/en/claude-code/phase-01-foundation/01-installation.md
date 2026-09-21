@@ -61,7 +61,7 @@ $ node --version
 ```
 
 Expected output:
-```
+```text
 v18.0.0   # or higher
 ```
 
@@ -78,7 +78,7 @@ $ npm install -g @anthropic-ai/claude-code
 ```
 
 Expected output:
-```
+```text
 # Output may vary
 added 1 package in Xs
 ```
@@ -108,7 +108,7 @@ $ claude --version
 ```
 
 Expected output:
-```
+```text
 # Output may vary
 claude version X.Y.Z
 ```
@@ -151,7 +151,7 @@ This displays all available slash commands. You should see commands like
 Inside the Claude Code session, ask a simple question to verify everything
 works:
 
-```
+```text
 > What's the best practice for error handling in Go?
 ```
 

@@ -96,7 +96,7 @@ $ claude
 ```
 
 **Prompt:**
-```
+```text
 Refactor src/payment.ts to support multiple payment gateways: Stripe, PayPal, VNPay
 ```
 
@@ -118,7 +118,7 @@ class StripeGateway implements PaymentGateway { ... }
 ### Bước 2: CÓ Think Mode Level 2
 
 **Prompt:**
-```
+```text
 Think step by step:
 1. What are the key differences between Stripe, PayPal, and VNPay?
 2. What edge cases exist for Vietnamese payment gateways?
@@ -128,7 +128,7 @@ Then refactor src/payment.ts
 ```
 
 **Kết quả Claude thinking (excerpt):**
-```
+```text
 Step 1 Analysis:
 - Stripe: webhook-based, USD by default
 - PayPal: redirect flow, sandbox required
@@ -150,7 +150,7 @@ Step 3 Architecture:
 ### Bước 3: CÓ Think Mode Level 3 (Carefully)
 
 **Prompt:**
-```
+```text
 Think carefully about this payment refactoring:
 - What could go wrong in production?
 - What security risks exist?
@@ -161,7 +161,7 @@ Then design and refactor src/payment.ts
 ```
 
 **Kết quả thinking thêm:**
-```
+```text
 Security Risks:
 - VNPay hash must use secret key - never expose in client
 - Webhook endpoint needs CSRF protection
@@ -185,7 +185,7 @@ Impact on Existing Data:
 
 **Best practice**: Think trước, act sau — không trộn lẫn.
 
-```
+```text
 # Phase 1: Think
 Think carefully: design a payment gateway abstraction that supports
 Stripe, PayPal, VNPay with proper security and audit trail.
@@ -209,7 +209,7 @@ Based on the design above, implement:
 ```
 
 **Output:**
-```
+```text
 Recent conversation costs:
 - No think mode:    850 input tokens,  2,100 output tokens
 - Think level 2:  1,200 input tokens,  4,500 output tokens
@@ -232,12 +232,12 @@ Think level 3 cost ~3x more BUT prevented 2 rework cycles
 **Hướng dẫn**:
 1. Chọn task refactoring vừa phải (ví dụ: thêm caching layer cho user profile API)
 2. Lần 1 — KHÔNG think mode:
-   ```
+   ```text
    Add Redis caching to src/api/user.ts for getProfile() endpoint
    ```
 3. Ghi lại: code quality, có xử lý cache invalidation không, có TTL strategy không
 4. Lần 2 — CÓ think mode:
-   ```
+   ```text
    Think carefully: Design a Redis caching strategy for user profile API
    - When to invalidate cache?
    - What TTL is appropriate?
@@ -325,7 +325,7 @@ Think về:
 
 ### Quy Tắc Vàng
 
-```
+```text
 Complexity × Risk = Think Level
 
 Nghi ngờ → Lên 1 bậc
@@ -371,7 +371,7 @@ Nghi ngờ → Lên 1 bậc
 
 **Lần 1 — Không Think Mode**:
 
-```
+```text
 Implement payment reconciliation logic in src/reconcile.ts
 ```
 
@@ -387,7 +387,7 @@ Kết quả:
 
 **Lần 2 — Có Think Mode Level 3**:
 
-```
+```text
 Think carefully about payment reconciliation for Vietnamese banking:
 - VND currency specifics (no decimal)
 - Multi-bank API differences (VietcomBank, Techcombank, MBBank)

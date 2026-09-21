@@ -75,7 +75,7 @@ $ git status
 ```
 
 Expected output:
-```
+```text
 Changes not staged for commit:
   deleted:    .env
   deleted:    config/production.json
@@ -88,7 +88,7 @@ $ git stash
 ```
 
 Expected output:
-```
+```text
 Saved working directory and index state WIP on main: abc1234 Last commit
 ```
 
@@ -98,7 +98,7 @@ $ git checkout .
 ```
 
 Expected output:
-```
+```text
 Updated 3 paths from the index
 ```
 
@@ -108,7 +108,7 @@ $ ls .env config/production.json
 ```
 
 Expected output:
-```
+```text
 .env  config/production.json
 ```
 
@@ -124,7 +124,7 @@ $ git diff --stat
 ```
 
 Expected output:
-```
+```text
  50 files changed, 2000 insertions(+), 500 deletions(-)
 ```
 
@@ -133,7 +133,7 @@ $ git diff --name-only
 ```
 
 Expected output:
-```
+```text
 src/api/users.ts
 src/api/products.ts
 ... (48 more files)
@@ -164,7 +164,7 @@ $ git reflog
 ```
 
 Expected output:
-```
+```text
 abc1234 HEAD@{0}: reset: moving to HEAD
 def5678 HEAD@{1}: commit: My work before disaster
 ghi9012 HEAD@{2}: commit: Earlier work
@@ -247,7 +247,7 @@ Example post-mortem:
 **Why**: Vague prompt ("clean up") + approved without reviewing
 
 **Prevention**: Add to CLAUDE.md:
-```
+```text
 ## Dangerous Operations
 NEVER delete without explicit approval:
 - .env files

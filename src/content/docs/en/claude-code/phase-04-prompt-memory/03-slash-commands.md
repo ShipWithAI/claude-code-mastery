@@ -93,13 +93,13 @@ The `/compact` command is your most critical tool for long sessions. Here's how 
 Claude Code supports custom slash commands via Markdown files in the `.claude/commands/` directory:
 
 **Project-level commands** (shared with team via git):
-```
+```text
 .claude/commands/review.md     → appears as /project:review
 .claude/commands/test.md       → appears as /project:test
 ```
 
 **Global commands** (available in all projects):
-```
+```text
 ~/.claude/commands/my-prompt.md  → appears as /user:my-prompt
 ```
 
@@ -136,12 +136,12 @@ $ claude
 
 You're in the session. First, see what's available:
 
-```
+```text
 /help
 ```
 
 Expected output:
-```
+```text
 Available commands:
   /help     - Show this help message
   /compact  - Compress conversation history to free context space
@@ -160,12 +160,12 @@ Type a command or describe what you want to build.
 
 You're starting fresh on a new project. Set up project memory:
 
-```
+```text
 /init
 ```
 
 Expected output:
-```
+```text
 Creating CLAUDE.md in current directory...
 
 I've created a starter CLAUDE.md file. Let me open it so we can configure
@@ -184,12 +184,12 @@ What kind of project is this? I'll help you customize the configuration.
 
 You've implemented the first two API endpoints. Time to check cost:
 
-```
+```text
 /cost
 ```
 
 Expected output:
-```
+```text
 Session Token Usage:
   Input tokens:  12,847
   Output tokens:  8,392
@@ -209,12 +209,12 @@ Context window: ~21% full
 
 You're 40 minutes in. Responses feel slightly less precise. Check cost again, then compact:
 
-```
+```text
 /cost
 ```
 
 Expected output:
-```
+```text
 Session Token Usage:
   Input tokens:  38,291
   Output tokens: 24,103
@@ -228,12 +228,12 @@ Context window: ~62% full
 
 Now compact:
 
-```
+```text
 /compact
 ```
 
 Expected output:
-```
+```text
 Compacting conversation history...
 
 ✓ Compressed 62,394 tokens → 18,203 tokens (71% reduction)
@@ -254,22 +254,22 @@ You can continue working. Context window freed.
 
 The API is done. Now you need to work on a React dashboard (totally different codebase). Clear everything:
 
-```
+```text
 /clear
 ```
 
 Expected output:
-```
+```text
 Are you sure you want to clear all conversation history? This cannot be undone.
 Type 'yes' to confirm, or anything else to cancel.
 ```
 
-```
+```text
 yes
 ```
 
 Expected output:
-```
+```text
 ✓ Conversation history cleared.
 ✓ Context window reset.
 
@@ -350,7 +350,7 @@ Use `/compact` when switching sub-tasks within the same project. Use `/clear` on
 <summary>✅ Solution</summary>
 
 **After /compact:**
-```
+```text
 You: What did we just build?
 
 Claude: We implemented an email validation function with regex pattern matching,
@@ -359,7 +359,7 @@ internationalized domains.
 ```
 
 **After /clear:**
-```
+```text
 You: What did we just build?
 
 Claude: I don't have any context about what we built previously. The conversation

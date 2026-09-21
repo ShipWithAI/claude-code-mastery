@@ -102,7 +102,7 @@ You're now in an interactive session. Let's watch context grow with each turn.
 
 **Step 2: Ask a question and check the token cost**
 
-```
+```text
 > What is the Observer pattern in software design?
 ```
 
@@ -110,13 +110,13 @@ Claude responds with a detailed explanation (maybe 300–400 words).
 
 **Step 3: View token usage**
 
-```
+```text
 /cost
 ```
 
 Expected output (output may vary):
 
-```
+```text
 # Output may vary
 Session tokens used:
   Input tokens: 45
@@ -129,7 +129,7 @@ Note the total. This is how much context your session has consumed so far.
 
 **Step 4: Ask a follow-up question**
 
-```
+```text
 > Can you show me a concrete example in Python?
 ```
 
@@ -137,13 +137,13 @@ Claude responds with Python code implementing the Observer pattern.
 
 **Step 5: Check cost again**
 
-```
+```text
 /cost
 ```
 
 Expected output:
 
-```
+```text
 # Output may vary
 Session tokens used:
   Input tokens: 120
@@ -160,7 +160,7 @@ clear: each turn adds to the total.
 
 Ask a few more questions about different topics:
 
-```
+```text
 > What's the difference between design patterns and architectural patterns?
 > How do I choose which pattern to use?
 > Can you explain the Strategy pattern in contrast to Observer?
@@ -173,13 +173,13 @@ Run `/cost` after each to see the cumulative growth.
 Once you've had enough conversation that context is taking up noticeable space,
 compress:
 
-```
+```text
 /compact
 ```
 
 Expected output:
 
-```
+```text
 # Output may vary
 Compacting context...
 Old context: 15,400 tokens
@@ -193,13 +193,13 @@ and answers.
 
 **Step 8: Verify space freed**
 
-```
+```text
 /cost
 ```
 
 Expected output:
 
-```
+```text
 # Output may vary
 Session tokens used:
   Input tokens: 45
@@ -213,7 +213,7 @@ usage and can continue the session smoothly.
 
 **Step 9: Exit**
 
-```
+```text
 /exit
 ```
 
@@ -316,7 +316,7 @@ reduces noticeably while you retain the ability to ask follow-up questions.
 
 If you don't have a large file handy, Claude can generate one for you:
 
-```
+```text
 > Create a Python file with a BankAccount class that has 15 methods (deposit,
 > withdraw, transfer, interest calculation, etc.)
 ```
@@ -501,7 +501,7 @@ at the start of the session. Claude didn't remember it — or only vaguely did.
 
 Susan checked `/cost` out of curiosity:
 
-```
+```text
 Session tokens used:
   Input tokens: 89,000
   Output tokens: 72,000
@@ -512,7 +512,7 @@ She was at 80% of her context limit. Her session was suffocating.
 
 **Solution**: Susan used `/compact` immediately:
 
-```
+```text
 /compact
 ```
 

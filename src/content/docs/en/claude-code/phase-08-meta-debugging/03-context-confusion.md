@@ -72,7 +72,7 @@ Watch for these warning signs:
 
 ### When to Use /compact
 
-```
+```text
 Is Claude referencing outdated info? → /compact
 Switching to new major topic? → /compact first
 Session > 1 hour of dense work? → Proactive /compact
@@ -88,7 +88,7 @@ Severe confusion, nothing helps? → /clear + fresh start
 
 ### Step 1: Observe Confusion Symptoms
 
-```
+```text
 You: Let's implement the payment webhook handler.
 
 Claude: I'll create the payment webhook handler. Based on our earlier
@@ -101,7 +101,7 @@ discussion, I'll use the JWT validation middleware...
 
 ### Step 2: Confirm Confusion
 
-```
+```text
 You: Wait, payment webhooks don't use JWT. They use signature verification
 with the webhook secret. We discussed JWT for user authentication, not webhooks.
 
@@ -115,12 +115,12 @@ signature verification — a MIXED approach]
 
 ### Step 3: Use /compact to Clear Confusion
 
-```
+```text
 /compact
 ```
 
 Expected output:
-```
+```text
 Context compacted. Summary retained:
 - Working on payment system integration
 - Need webhook handler for payment notifications
@@ -129,7 +129,7 @@ Context compacted. Summary retained:
 
 ### Step 4: Re-ground After Compact
 
-```
+```text
 You: To be clear for the webhook handler:
 - This is for PAYMENT webhooks (Stripe, VNPay), NOT user auth
 - Use signature verification with webhook secret
@@ -200,7 +200,7 @@ Watch for: old patterns appearing in new implementation, mixed terminology.
 **Most effective re-grounding patterns**:
 
 After topic switch:
-```
+```text
 Previous topic (auth) is COMPLETE. Do not reference it.
 New topic: Payment processing.
 Key facts:
@@ -210,7 +210,7 @@ Key facts:
 ```
 
 After confusion detected:
-```
+```text
 STOP. Clear your assumptions about this file.
 Current truth:
 - File: paymentWebhook.ts
@@ -243,13 +243,13 @@ Start fresh with this understanding.
 ### Re-grounding Templates
 
 After `/compact`:
-```
+```text
 "Current state: We're implementing [X] using [Y approach].
 Previous discussion about [Z] is no longer relevant.
 Continue with [specific next step]."
 ```
 
-```
+```text
 "Forget [old topic]. New focus: [new topic].
 Key constraint: [most important requirement]."
 ```
@@ -291,12 +291,12 @@ Key constraint: [most important requirement]."
 
 **Fix applied**:
 
-```
+```text
 /compact
 ```
 
 Then:
-```
+```text
 New context: We're ONLY working on ORDER service now.
 - Product catalog is DONE, don't reference it
 - Order service handles: checkout, payment, fulfillment

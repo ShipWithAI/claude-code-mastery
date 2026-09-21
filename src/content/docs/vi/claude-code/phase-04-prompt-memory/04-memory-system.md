@@ -84,7 +84,7 @@ Hãy test ranh giới memory và verify cái gì persist.
 $ claude
 ```
 Tương tác mong đợi:
-```
+```text
 Claude: Hello! How can I help you today?
 
 Bạn: Bạn biết gì về project này?
@@ -93,7 +93,7 @@ Claude: I can see we're in /Users/you/myproject. [Có thể hoặc không nhắc
 ```
 
 **Bước 2: Build session memory qua công việc**
-```
+```text
 Bạn: Đọc src/auth.ts và nhớ: chúng ta dùng JWT với expiry 24 giờ
 
 Claude: [Đọc file, xác nhận pattern]
@@ -105,11 +105,11 @@ Claude: Noted. I'll use that URL for API-related code.
 Bây giờ session context của Claude bao gồm: nội dung file, JWT pattern, API URL.
 
 **Bước 3: Dùng /compact và quan sát**
-```
+```text
 Bạn: /compact
 ```
 Output mong đợi:
-```
+```text
 Context compacted. Reduced from 45,000 to 12,000 tokens.
 Preserved: Recent conversation, file contents, key facts.
 ```
@@ -121,7 +121,7 @@ $ exit
 $ claude
 ```
 Kết quả mong đợi:
-```
+```text
 Claude: Hello! How can I help you today?
 
 Bạn: JWT expiry time của chúng ta là bao lâu?
@@ -145,7 +145,7 @@ Start session mới:
 ```bash
 $ claude
 ```
-```
+```text
 Bạn: JWT expiry time của chúng ta là bao lâu?
 
 Claude: According to CLAUDE.md, your JWT tokens have a 24-hour expiry.
@@ -157,7 +157,7 @@ Claude: According to CLAUDE.md, your JWT tokens have a 24-hour expiry.
 $ ls -la ~/.claude/
 ```
 Output mong đợi:
-```
+```text
 # Output có thể khác — cách hoạt động chưa rõ
 drwxr-xr-x  5 you  staff   160 Jan 15 10:30 .
 -rw-r--r--  1 you  staff  1234 Jan 15 10:30 config.json
@@ -166,7 +166,7 @@ drwxr-xr-x  5 you  staff   160 Jan 15 10:30 .
 ```
 
 Trong một Claude session:
-```
+```text
 Bạn: Bạn có duy trì persistent memory nào về tôi hoặc project của tôi ngoài CLAUDE.md không?
 
 Claude: [Response sẽ làm rõ cách hoạt động — quan sát kỹ]
@@ -314,7 +314,7 @@ $ claude -p "Tôi thích màu gì?"
 
 ### Workflow Session → Permanent
 
-```
+```text
 1. Làm việc trong session → build context
 2. Dùng /compact → giữ lại phần quan trọng
 3. Xác định patterns đáng giữ

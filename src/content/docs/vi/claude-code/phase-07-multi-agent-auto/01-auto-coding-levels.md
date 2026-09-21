@@ -118,7 +118,7 @@ $ claude
 ```
 
 **Prompt 1**:
-```
+```text
 Read src/utils/helpers.ts and show me the 3 functions to extract
 ```
 
@@ -134,7 +134,7 @@ export function truncateText(text: string, max: number): string { ... }
 ```
 
 **Prompt 2**:
-```
+```text
 Extract formatDate and truncateText to src/utils/string.ts
 ```
 
@@ -148,7 +148,7 @@ Claude: "I'll add export statement..."
 → **Approve?** `y`
 
 **Prompt 3**:
-```
+```text
 Extract validateEmail to src/utils/validation.ts
 ```
 
@@ -159,7 +159,7 @@ Claude: "I'll update helpers.ts..."
 → **Approve?** `y`
 
 **Prompt 4**:
-```
+```text
 Update all imports across the codebase
 ```
 
@@ -183,7 +183,7 @@ $ claude
 ```
 
 **Prompt 1**:
-```
+```text
 Refactor src/utils/helpers.ts: extract formatDate + truncateText to src/utils/string.ts, validateEmail to src/utils/validation.ts, update all imports
 ```
 
@@ -198,7 +198,7 @@ May I proceed?"
 → **Approve?** `a` (allow for session)
 
 Claude executes tất cả actions tự động. Bạn thấy:
-```
+```text
 ✓ Read src/utils/helpers.ts
 ✓ Created src/utils/string.ts
 ✓ Created src/utils/validation.ts
@@ -244,7 +244,7 @@ $ claude --auto --plan refactor-helpers.md  # ⚠️ Cần xác minh
 ```
 
 Output:
-```
+```text
 Full Auto Mode enabled with plan: refactor-helpers.md
 Executing...
 
@@ -420,7 +420,7 @@ Dùng Risk Matrix ở phần CONCEPT. Cân nhắc:
 
 ### Quick Decision Guide
 
-```
+```text
 ┌─────────────────────────────────────────────────────────┐
 │  Task Type              →  Level khuyến nghị            │
 ├─────────────────────────────────────────────────────────┤

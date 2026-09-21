@@ -89,7 +89,7 @@ $ claude
 
 Expected output:
 
-```
+```text
 Starting Claude Code session...
 Context: /Users/you/my-ecommerce-api
 Type /help for commands
@@ -101,13 +101,13 @@ Type /help for commands
 
 **Bước 2: Tổng quan project (Lớp 1 bắt đầu)**
 
-```
+```text
 What does this project do? Explain the directory structure.
 ```
 
 Expected output:
 
-```
+```text
 This is a Node.js/Express REST API for managing e-commerce orders and inventory.
 
 Directory structure:
@@ -137,13 +137,13 @@ Tech stack:
 
 **Bước 3: Xác định entry point (Lớp 1 tiếp tục)**
 
-```
+```text
 Where is the main entry point? Trace the startup flow.
 ```
 
 Expected output:
 
-```
+```text
 Entry point: src/index.js
 
 Startup flow:
@@ -167,13 +167,13 @@ Key files in startup sequence:
 
 **Bước 4: Map dependencies chính (Lớp 1 kết thúc)**
 
-```
+```text
 What are the key dependencies and their roles?
 ```
 
 Expected output:
 
-```
+```text
 Production dependencies:
 - express: Web framework
 - mongoose: MongoDB ODM
@@ -194,13 +194,13 @@ Dev dependencies:
 
 **Bước 5: Nhận diện architecture pattern (Lớp 2 bắt đầu)**
 
-```
+```text
 What architecture pattern is used here? How is code organized?
 ```
 
 Expected output:
 
-```
+```text
 Architecture: Layered/MVC variant with service layer
 
 Layers:
@@ -226,13 +226,13 @@ This pattern separates concerns: controllers handle HTTP, services handle busine
 
 **Bước 6: Trace một feature cụ thể (Lớp 2 tiếp tục)**
 
-```
+```text
 Trace the data flow for "User Login". Show all files involved.
 ```
 
 Expected output:
 
-```
+```text
 Login flow:
 
 1. POST /api/auth/login
@@ -272,13 +272,13 @@ Files involved (in order):
 
 **Bước 7: Đào sâu vào module cụ thể (Lớp 3 — khi cần thiết)**
 
-```
+```text
 Explain the authService module end to end. Show the key functions.
 ```
 
 Expected output:
 
-```
+```text
 File: src/services/authService.js
 
 Key functions:
@@ -322,7 +322,7 @@ Security notes:
 
 Sau khi đã đi qua 3 lớp, bạn có thể yêu cầu Claude tạo documentation để ghi nhớ:
 
-```
+```text
 Generate a concise onboarding doc for this codebase covering architecture, key modules, and data flows.
 ```
 
@@ -361,7 +361,7 @@ Claude sẽ tạo ra document markdown bạn có thể lưu vào `docs/ONBOARDIN
 
 Bắt đầu từ Lớp 1. Hỏi tổng quan và cấu trúc thư mục trước, đừng vội đào vào code. Dùng prompt như:
 
-```
+```text
 What does this project do? Explain the directory structure.
 ```
 
@@ -374,7 +374,7 @@ Sau đó mới hỏi pattern và flow.
 
 **Prompt sequence gợi ý**:
 
-```
+```text
 1. What does this project do? Explain the directory structure.
 2. What architecture pattern is used?
 3. How do I add a new plugin? Show the process.
@@ -423,7 +423,7 @@ Sau đó mới hỏi pattern và flow.
 
 Prompt gợi ý:
 
-```
+```text
 Generate a comprehensive onboarding document for this codebase. Include:
 - Project overview and tech stack
 - Architecture pattern and layers
@@ -449,7 +449,7 @@ Make it concise, suitable for a new developer joining the team.
    ```
 
 2. Request documentation:
-   ```
+   ```text
    Generate a comprehensive onboarding document for this codebase. Include:
    - Project overview and tech stack
    - Architecture pattern and layers
@@ -462,12 +462,12 @@ Make it concise, suitable for a new developer joining the team.
    ```
 
 3. Review output, refine if needed:
-   ```
+   ```text
    Add a "Troubleshooting" section covering common setup issues.
    ```
 
 4. Save to file:
-   ```
+   ```text
    Save this to docs/ONBOARDING.md
    ```
 
@@ -531,7 +531,7 @@ Make it concise, suitable for a new developer joining the team.
 
 Nam mở Claude Code:
 
-```
+```text
 What does this project do? Explain the module structure of this KMP project.
 ```
 
@@ -539,7 +539,7 @@ Claude trả lời: Project có 47 module được tổ chức theo feature (pay
 
 Nam tiếp tục:
 
-```
+```text
 Where is the payment feature? Show directory structure.
 ```
 
@@ -547,14 +547,14 @@ Claude chỉ ra: `shared/src/commonMain/kotlin/payments/` chứa core payment lo
 
 **Ngày 1 — Lớp 2 (Pattern)**:
 
-```
+```text
 What architecture pattern is used? How does data flow in this app?
 ```
 
 Claude: Clean Architecture + MVVM. Flow tiêu biểu:
 UI Layer (Activity/ViewController) → ViewModel → UseCase → Repository → Network/Database.
 
-```
+```text
 Trace the payment flow from user tapping 'Pay Now' button to transaction completion.
 ```
 
@@ -564,13 +564,13 @@ Claude map toàn bộ flow qua 12 file: `PayButton.kt` → `PaymentViewModel.kt`
 
 Bug report nói: "Payment sometimes fails silently without error message." Nam deep-dive:
 
-```
+```text
 Explain PaymentRepository class. What does processPayment() function do?
 ```
 
 Claude show code chi tiết. Nam thấy logic error handling.
 
-```
+```text
 What are potential race conditions in the payment queue?
 ```
 
@@ -578,7 +578,7 @@ Claude phát hiện: `PaymentQueue.enqueue()` không có synchronization — n�
 
 **Ngày 3 — Fix Bug**:
 
-```
+```text
 Add thread-safe queueing to PaymentQueue using Kotlin coroutines and Mutex. Show the fix.
 ```
 
@@ -586,7 +586,7 @@ Claude generate code fix. Nam review, test trên local simulator. Bug biến m�
 
 **Ngày 4 — Documentation**:
 
-```
+```text
 Generate comprehensive architecture document for the payment module, including class diagram and data flow.
 ```
 

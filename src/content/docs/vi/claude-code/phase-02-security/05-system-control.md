@@ -356,7 +356,7 @@ EOF
 ```
 
 **Expected result:**
-```
+```bash
 $ git status
 On branch main
 
@@ -414,7 +414,7 @@ $ git commit -m "test"
 ```
 
 **Expected output:**
-```
+```text
 🔍 Đang chạy gitleaks secret scan...
 
     ○
@@ -631,7 +631,7 @@ $ claude config set log-level info
 ```
 
 **Expected output:**
-```
+```text
 Configuration updated:
   model: claude-3-5-sonnet-20241022
   auto-compact: true
@@ -682,7 +682,7 @@ $ claude
 
 **Trong session:** Đọc MỌI permission prompt. Ví dụ:
 
-```
+```text
 Claude Code wants to:
   Read file: .env
 
@@ -693,7 +693,7 @@ Allow? [y/N]
 "Không, hãy reference .env.example thay vì .env"
 
 **End session:**
-```
+```text
 /exit
 ```
 

@@ -25,7 +25,7 @@ MCP (Model Context Protocol) changes everything. It's a standardized protocol th
 
 ### MCP Architecture
 
-```
+```text
 Claude Code (Client) ←→ MCP Server ←→ External System
 ```
 
@@ -150,7 +150,7 @@ $ npm install -g @modelcontextprotocol/server-sqlite
 ```
 
 Expected output:
-```
+```text
 added 42 packages in 3s
 ```
 
@@ -186,7 +186,7 @@ The MCP server initializes on startup. Close and reopen Claude Code.
 
 ### Step 4: Verify MCP connection
 
-```
+```text
 You: What MCP servers are available?
 
 Claude: I have access to the following MCP servers:
@@ -196,7 +196,7 @@ Claude: I have access to the following MCP servers:
 
 ### Step 5: Explore database schema
 
-```
+```text
 You: List all tables in the database
 
 Claude: [calls sqlite.list_tables tool]
@@ -211,7 +211,7 @@ The database contains 5 tables:
 
 ### Step 6: Query and analyze
 
-```
+```text
 You: What percentage of orders are abandoned?
 
 Claude: [calls sqlite.query tool]
@@ -339,7 +339,7 @@ Frame questions so Claude needs both sources. Example: "What issues relate to pr
 
 ### MCP Architecture
 
-```
+```text
 ┌─────────────┐           ┌─────────────┐           ┌──────────────┐
 │ Claude Code │  Request  │ MCP Server  │  Execute  │ External Sys │
 │  (Client)   │ ────────> │  (Adapter)  │ ────────> │ (DB/API/etc) │

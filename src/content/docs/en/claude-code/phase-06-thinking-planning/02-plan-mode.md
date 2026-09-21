@@ -60,7 +60,7 @@ graph TD
 
 ### The Planning Prompt Template
 
-```
+```text
 I need to [specific goal].
 Current state: [what exists]
 Constraints: [what can't change]
@@ -101,7 +101,7 @@ $ claude
 ```
 
 Prompt:
-```
+```text
 I need to add a notification system supporting email (SendGrid) and push
 (Firebase). Include template system and rate limiting.
 
@@ -118,7 +118,7 @@ Do NOT write code. ONLY give me the plan.
 ```
 
 Expected output:
-```
+```text
 ## Execution Plan: Notification System
 
 ### Files Affected (12 files)
@@ -155,7 +155,7 @@ Expected output:
 ### Step 2: CONFIRM — Challenge and Adjust
 
 Prompt:
-```
+```text
 Good plan. Three adjustments:
 1. Add SMS via Twilio as third channel
 2. Move template system to step 2 (providers depend on it)
@@ -169,7 +169,7 @@ Claude revises — issues caught BEFORE any code exists.
 ### Step 3: EXECUTE Step 1
 
 Prompt:
-```
+```text
 Plan approved. Implement step 1: notification interfaces and types.
 ```
 
@@ -188,12 +188,12 @@ export interface NotificationPayload {
 
 After completing steps 1-4:
 
-```
+```text
 /compact
 ```
 
 Then:
-```
+```text
 We're at step 5 of 12. Review progress against plan. On track?
 Any adjustments needed before continuing?
 ```
@@ -240,7 +240,7 @@ For the challenge phase, good questions include:
 <summary>✅ Solution</summary>
 
 **Planning prompt**:
-```
+```text
 I need to add CSV export for user data. Should support filtering by date
 range and user status. Current: Express API with Prisma ORM.
 
@@ -305,7 +305,7 @@ Ask yourself:
 
 ### Planning Prompt Template
 
-```
+```text
 I need to [goal].
 Current state: [what exists]
 Constraints: [what can't change]
@@ -321,7 +321,7 @@ Do NOT write code. ONLY give me the plan.
 
 ### Checkpoint Template
 
-```
+```text
 We're at step X of Y. /compact then review:
 - Progress vs plan?
 - Any adjustments needed?
@@ -330,7 +330,7 @@ We're at step X of Y. /compact then review:
 
 ### Plan Revision Template
 
-```
+```text
 Good plan. Adjustments needed:
 1. [Add/remove/reorder]
 2. [New constraint]

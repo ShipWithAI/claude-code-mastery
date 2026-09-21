@@ -87,7 +87,7 @@ $ git status
 ```
 
 Expected output:
-```
+```text
 On branch auto/generate-service-tests
 nothing to commit, working tree clean
 ```
@@ -98,7 +98,7 @@ Now start Claude and run Think+Plan first:
 $ claude
 ```
 
-```
+```text
 Think carefully about generating unit tests for all services in src/services/.
 Consider: test framework (Jest), mocking strategy for dependencies,
 edge cases, error conditions.
@@ -107,7 +107,7 @@ Create a detailed execution plan. Don't write any code yet.
 
 Claude outputs a plan covering test structure, mocking approach, coverage goals, and file organization. Review it, then compact:
 
-```
+```text
 /compact
 ```
 
@@ -115,7 +115,7 @@ Claude outputs a plan covering test structure, mocking approach, coverage goals,
 
 Now activate Full Auto mode. ⚠️ Needs verification on exact flag syntax:
 
-```
+```text
 Execute the test generation plan you created.
 
 Boundaries:
@@ -218,7 +218,7 @@ Before starting Full Auto, check ALL items:
 
 ### Full Auto Prompt Template
 
-```
+```text
 Execute [reference to plan].
 
 Boundaries:

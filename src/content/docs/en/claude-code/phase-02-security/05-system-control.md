@@ -344,7 +344,7 @@ EOF
 ```
 
 **Expected result:**
-```
+```bash
 $ git status
 On branch main
 
@@ -402,7 +402,7 @@ $ git commit -m "test"
 ```
 
 **Expected output:**
-```
+```text
 🔍 Running gitleaks secret scan...
 
     ○
@@ -619,7 +619,7 @@ $ claude config set log-level info
 ```
 
 **Expected output:**
-```
+```text
 Configuration updated:
   model: claude-3-5-sonnet-20241022
   auto-compact: true
@@ -670,7 +670,7 @@ $ claude
 
 **During session:** Read EVERY permission prompt. Example:
 
-```
+```text
 Claude Code wants to:
   Read file: .env
 
@@ -681,7 +681,7 @@ Allow? [y/N]
 "No, please reference .env.example instead, not .env"
 
 **End session:**
-```
+```text
 /exit
 ```
 

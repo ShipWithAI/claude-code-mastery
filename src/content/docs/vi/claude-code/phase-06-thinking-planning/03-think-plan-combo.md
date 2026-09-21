@@ -68,7 +68,7 @@ graph TD
 ### Pattern Prompt Combo
 
 **Giai đoạn 1 — THINK:**
-```
+```text
 Think carefully về [vấn đề].
 Xem xét: [trade-offs cụ thể cần đánh giá]
 Ưu/nhược điểm của mỗi approach là gì?
@@ -76,14 +76,14 @@ Chưa plan hay code — chỉ phân tích.
 ```
 
 **Giai đoạn 2 — PLAN:**
-```
+```text
 Dựa trên analysis, [approach đã chọn] là phù hợp nhất.
 Tạo detailed execution plan. List tất cả files, steps, risks.
 Chưa code.
 ```
 
 **Giai đoạn 3 — EXECUTE:**
-```
+```text
 Plan approved. Implement bước 1.
 ```
 
@@ -106,7 +106,7 @@ $ claude
 ```
 
 Prompt:
-```
+```text
 Think carefully về việc extract User Service từ monolith của chúng ta.
 Xem xét:
 1. Sync vs async communication giữa các services
@@ -119,7 +119,7 @@ Phân tích trade-offs của từng cái. Chưa plan hay code.
 ```
 
 Expected output:
-```
+```text
 ## Analysis: User Service Extraction
 
 ### 1. Communication Pattern
@@ -153,7 +153,7 @@ Expected output:
 ### Bước 2: Đánh Giá Think Output
 
 Prompt:
-```
+```text
 Good analysis. Tôi đồng ý với separate DB + async events.
 Câu hỏi: còn JOIN queries hiện đang span user và order tables thì sao?
 ```
@@ -163,7 +163,7 @@ Claude sẽ think deeper, suggest API composition pattern với caching.
 ### Bước 3: PLAN — Dựa Trên Think Analysis
 
 Prompt:
-```
+```text
 Dựa trên analysis: separate DB, async events, API composition.
 Tạo detailed execution plan để extract User Service.
 List tất cả files, files mới, migration steps, risks, checkpoints.
@@ -171,7 +171,7 @@ Chưa code.
 ```
 
 Expected output:
-```
+```text
 ## Execution Plan: User Service Extraction
 
 ### Files Bị Ảnh Hưởng (23 files)
@@ -209,7 +209,7 @@ Expected output:
 ### Bước 4: XÁC NHẬN — Validate Với Think Insights
 
 Prompt:
-```
+```text
 Cross-check: plan này đã address hết risks từ Think phase chưa?
 Cụ thể: backward compatibility, data ownership, JOIN query issue.
 ```
@@ -219,7 +219,7 @@ Claude validates plan completeness dựa trên Think analysis.
 ### Bước 5: THỰC HIỆN — Implement Với Confidence
 
 Prompt:
-```
+```text
 Plan approved. Implement bước 1: Tạo User Service project structure.
 ```
 
@@ -324,19 +324,19 @@ Think đã catch được: distributed system implications, user tier requiremen
 ### TPE Workflow Template
 
 **Giai đoạn 1 — THINK:**
-```
+```text
 Think carefully về [vấn đề]. Xem xét [trade-offs].
 Chưa plan hay code.
 ```
 
 **Giai đoạn 2 — PLAN:**
-```
+```text
 Dựa trên analysis, tạo execution plan.
 List files, steps, risks. Chưa code.
 ```
 
 **Giai đoạn 3 — EXECUTE:**
-```
+```text
 Plan approved. Implement bước 1.
 ```
 

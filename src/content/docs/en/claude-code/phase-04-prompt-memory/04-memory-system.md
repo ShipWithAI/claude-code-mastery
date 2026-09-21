@@ -74,7 +74,7 @@ Let's test the memory boundaries and verify what persists.
 $ claude
 ```
 Expected interaction:
-```
+```text
 Claude: Hello! How can I help you today?
 
 You: What do you know about this project?
@@ -83,7 +83,7 @@ Claude: I can see we're in /Users/you/myproject. [May or may not mention CLAUDE.
 ```
 
 **Step 2: Build session memory through work**
-```
+```text
 You: Read src/auth.ts and remember: we use JWT with 24-hour expiry
 
 Claude: [Reads file, acknowledges the pattern]
@@ -95,11 +95,11 @@ Claude: Noted. I'll use that URL for API-related code.
 Now Claude's session context includes: file contents, JWT pattern, API URL.
 
 **Step 3: Use /compact and observe**
-```
+```text
 You: /compact
 ```
 Expected output:
-```
+```text
 Context compacted. Reduced from 45,000 to 12,000 tokens.
 Preserved: Recent conversation, file contents, key facts.
 ```
@@ -111,7 +111,7 @@ $ exit
 $ claude
 ```
 Expected result:
-```
+```text
 Claude: Hello! How can I help you today?
 
 You: What's our JWT expiry time?
@@ -135,7 +135,7 @@ Start a new session:
 ```bash
 $ claude
 ```
-```
+```text
 You: What's our JWT expiry time?
 
 Claude: According to CLAUDE.md, your JWT tokens have a 24-hour expiry.
@@ -147,7 +147,7 @@ Claude: According to CLAUDE.md, your JWT tokens have a 24-hour expiry.
 $ ls -la ~/.claude/
 ```
 Expected output:
-```
+```text
 # Output may vary — implementation unclear
 drwxr-xr-x  5 you  staff   160 Jan 15 10:30 .
 -rw-r--r--  1 you  staff  1234 Jan 15 10:30 config.json
@@ -156,7 +156,7 @@ drwxr-xr-x  5 you  staff   160 Jan 15 10:30 .
 ```
 
 Inside a Claude session:
-```
+```text
 You: Do you maintain any persistent memory about me or my projects beyond CLAUDE.md?
 
 Claude: [Response will clarify implementation — observe carefully]
@@ -304,7 +304,7 @@ $ claude -p "What color do I prefer?"
 
 ### Session → Permanent Workflow
 
-```
+```text
 1. Work in session → build context
 2. Use /compact → preserve important parts
 3. Identify patterns worth keeping

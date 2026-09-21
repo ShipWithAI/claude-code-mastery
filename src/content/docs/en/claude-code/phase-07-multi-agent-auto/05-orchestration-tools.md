@@ -205,7 +205,7 @@ $ ./code-review-pipeline.sh src/services/userService.ts
 ```
 
 Expected output:
-```
+```text
 === Code Review Pipeline ===
 Target: src/services/userService.ts
 

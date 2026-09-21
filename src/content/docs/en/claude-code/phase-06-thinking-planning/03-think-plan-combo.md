@@ -66,7 +66,7 @@ This is a SUPERSET of PCE from Module 6.2 — adding a Think phase before Planni
 ### The Combo Prompt Pattern
 
 **Phase 1 — THINK:**
-```
+```text
 Think carefully about [problem].
 Consider: [specific trade-offs to evaluate]
 What are the pros/cons of each approach?
@@ -74,14 +74,14 @@ Don't plan or code yet — just analyze.
 ```
 
 **Phase 2 — PLAN:**
-```
+```text
 Based on your analysis, [chosen approach] is the best fit.
 Create a detailed execution plan. List all files, steps, risks.
 Don't code yet.
 ```
 
 **Phase 3 — EXECUTE:**
-```
+```text
 Plan approved. Implement step 1.
 ```
 
@@ -104,7 +104,7 @@ $ claude
 ```
 
 Prompt:
-```
+```text
 Think carefully about extracting the User Service from our monolith.
 Consider:
 1. Sync vs async communication between services
@@ -117,7 +117,7 @@ Analyze trade-offs for each. Don't plan or code yet.
 ```
 
 Expected output:
-```
+```text
 ## Analysis: User Service Extraction
 
 ### 1. Communication Pattern
@@ -140,7 +140,7 @@ Expected output:
 ### Step 2: Evaluate Think Output
 
 Prompt:
-```
+```text
 Good analysis. I agree with separate DB + async events.
 One question: what about JOIN queries that currently span user and order tables?
 ```
@@ -150,7 +150,7 @@ Claude thinks deeper, suggests API composition pattern with caching.
 ### Step 3: PLAN — Based on Think Analysis
 
 Prompt:
-```
+```text
 Based on your analysis: separate DB, async events, API composition.
 Create a detailed execution plan for extracting User Service.
 List all files, new files, migration steps, risks, checkpoints.
@@ -158,7 +158,7 @@ Don't code yet.
 ```
 
 Expected output:
-```
+```text
 ## Execution Plan: User Service Extraction
 
 ### Files Affected (23 files)
@@ -186,7 +186,7 @@ Expected output:
 ### Step 4: CONFIRM — Validate Against Think Insights
 
 Prompt:
-```
+```text
 Cross-check: does this plan address all risks from Think phase?
 Specifically: backward compatibility, data ownership, JOIN query issue.
 ```
@@ -196,7 +196,7 @@ Claude validates completeness.
 ### Step 5: EXECUTE — Implement with Confidence
 
 Prompt:
-```
+```text
 Plan approved. Implement step 1: Create User Service project structure.
 ```
 
@@ -301,19 +301,19 @@ Think caught: distributed system implications, user tier requirements, storage c
 ### TPE Workflow Template
 
 **Phase 1 — THINK:**
-```
+```text
 Think carefully about [problem]. Consider [trade-offs].
 Don't plan or code yet.
 ```
 
 **Phase 2 — PLAN:**
-```
+```text
 Based on analysis, create execution plan.
 List files, steps, risks. Don't code yet.
 ```
 
 **Phase 3 — EXECUTE:**
-```
+```text
 Plan approved. Implement step 1.
 ```
 

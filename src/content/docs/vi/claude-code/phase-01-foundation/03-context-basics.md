@@ -117,7 +117,7 @@ Bạn đang trong interactive session. Hãy xem context tăng với mỗi turn.
 
 **Bước 2: Hỏi câu hỏi và kiểm tra token cost**
 
-```
+```text
 > Observer pattern trong software design là gì?
 ```
 
@@ -125,13 +125,13 @@ Claude response với giải thích chi tiết (có thể 300–400 từ).
 
 **Bước 3: Xem token usage**
 
-```
+```text
 /cost
 ```
 
 Output mong đợi (output có thể khác):
 
-```
+```text
 # Output có thể khác
 Session tokens used:
   Input tokens: 45
@@ -144,7 +144,7 @@ Ghi nhận tổng số. Đây là lượng context session đã tiêu tốn đ�
 
 **Bước 4: Hỏi câu follow-up**
 
-```
+```text
 > Cho mình ví dụ cụ thể bằng Python được không?
 ```
 
@@ -152,13 +152,13 @@ Claude response với Python code implement Observer pattern.
 
 **Bước 5: Kiểm tra cost lại**
 
-```
+```text
 /cost
 ```
 
 Output mong đợi:
 
-```
+```text
 # Output có thể khác
 Session tokens used:
   Input tokens: 120
@@ -174,7 +174,7 @@ Session tokens used:
 
 Hỏi thêm vài câu về topic khác:
 
-```
+```text
 > Khác biệt giữa design pattern và architectural pattern là gì?
 > Làm sao để chọn pattern nào để dùng?
 > Giải thích Strategy pattern so với Observer?
@@ -186,13 +186,13 @@ Chạy `/cost` sau mỗi câu để thấy sự tăng tích lũy.
 
 Khi conversation đã đủ nhiều mà context chiếm dung lượng đáng kể, nén lại:
 
-```
+```text
 /compact
 ```
 
 Output mong đợi:
 
-```
+```text
 # Output có thể khác
 Compacting context...
 Old context: 15,400 tokens
@@ -206,13 +206,13 @@ answer.
 
 **Bước 8: Xác minh dung lượng đã giải phóng**
 
-```
+```text
 /cost
 ```
 
 Output mong đợi:
 
-```
+```text
 # Output có thể khác
 Session tokens used:
   Input tokens: 45
@@ -226,7 +226,7 @@ có thể tiếp tục session mượt mà.
 
 **Bước 9: Thoát**
 
-```
+```text
 /exit
 ```
 
@@ -327,7 +327,7 @@ trong khi bạn vẫn có thể hỏi follow-up.
 
 Nếu không có file lớn sẵn, Claude có thể generate cho bạn:
 
-```
+```text
 > Tạo file Python với class BankAccount có 15 method (deposit, withdraw,
 > transfer, tính lãi, v.v.)
 ```
@@ -513,7 +513,7 @@ decision đã discuss ở đầu session. Claude không nhớ — hoặc chỉ n
 
 Nam check `/cost` vì tò mò:
 
-```
+```text
 Session tokens used:
   Input tokens: 89,000
   Output tokens: 72,000
@@ -526,7 +526,7 @@ thêm ~40% so với nếu comment bằng tiếng Anh. Session của anh đang ng
 
 **Giải pháp**: Nam dùng `/compact` ngay lập tức:
 
-```
+```text
 /compact
 ```
 

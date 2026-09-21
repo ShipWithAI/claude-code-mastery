@@ -140,7 +140,7 @@ Kết quả mong đợi: Claude Code khởi động ở interactive mode với p
 Prompt Claude Code với: "Run git status to show me the current repository state"
 
 Kết quả mong đợi (conceptual):
-```
+```text
 Claude Code wants to run a command:
 
   git status
@@ -161,7 +161,7 @@ Kết quả mong đợi: Claude Code chạy `git status` và hiện output cho b
 Prompt: "Delete all files in the src directory"
 
 Permission prompt mong đợi (conceptual):
-```
+```text
 Claude Code wants to run a command:
 
   rm -rf src/
@@ -179,7 +179,7 @@ Kết quả mong đợi: Claude Code dừng lại và trả lời kiểu như "I
 Prompt: "Show me the first 10 lines of README.md"
 
 Permission prompt mong đợi:
-```
+```text
 Claude Code wants to run a command:
 
   head -n 10 README.md
@@ -238,19 +238,19 @@ Nếu Claude Code không trigger prompt cho network request, đó là thông tin
 **Đọc file**: Có thể không có prompt — Claude Code dùng Read tool trực tiếp.
 
 **Ghi file**: Nên trigger prompt như:
-```
+```text
 echo 'hello' > test.txt
 ```
 Approve nếu trong project directory.
 
 **List file**: Nên trigger prompt:
-```
+```text
 ls -la
 ```
 An toàn để approve — read-only operation.
 
 **Network request**: ⚠️ Behavior khác nhau. Có thể trigger prompt như:
-```
+```bash
 curl https://registry.npmjs.com/...
 ```
 Đây là READ operation nhưng liên quan network. Chỉ approve nếu bạn tin target và yêu cầu action này rõ ràng.

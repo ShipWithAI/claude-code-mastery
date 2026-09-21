@@ -75,7 +75,7 @@ $ git status
 ```
 
 Output:
-```
+```text
 Changes not staged for commit:
   deleted:    .env
   deleted:    config/production.json
@@ -88,7 +88,7 @@ $ git stash
 ```
 
 Output:
-```
+```text
 Saved working directory and index state WIP on main: abc1234 Last commit
 ```
 
@@ -98,7 +98,7 @@ $ git checkout .
 ```
 
 Output:
-```
+```text
 Updated 3 paths from the index
 ```
 
@@ -108,7 +108,7 @@ $ ls .env config/production.json
 ```
 
 Output:
-```
+```text
 .env  config/production.json
 ```
 
@@ -124,7 +124,7 @@ $ git diff --stat
 ```
 
 Output:
-```
+```text
  50 files changed, 2000 insertions(+), 500 deletions(-)
 ```
 
@@ -133,7 +133,7 @@ $ git diff --name-only
 ```
 
 Output:
-```
+```text
 src/api/users.ts
 src/api/products.ts
 ... (48 file nữa)
@@ -164,7 +164,7 @@ $ git reflog
 ```
 
 Output:
-```
+```text
 abc1234 HEAD@{0}: reset: moving to HEAD
 def5678 HEAD@{1}: commit: My work before disaster
 ghi9012 HEAD@{2}: commit: Earlier work
@@ -247,7 +247,7 @@ Example post-mortem:
 **Tại sao**: Vague prompt ("clean up") + approve không review
 
 **Prevention**: Add vào CLAUDE.md:
-```
+```text
 ## Dangerous Operation
 NEVER delete không có explicit approval:
 - .env file

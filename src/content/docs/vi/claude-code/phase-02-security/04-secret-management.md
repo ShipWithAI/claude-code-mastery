@@ -123,7 +123,7 @@ git init
 ```
 
 Kết quả mong đợi:
-```
+```text
 Initialized empty Git repository in /path/to/payment-demo/.git/
 ```
 
@@ -214,7 +214,7 @@ gitleaks version
 ```
 
 Kết quả mong đợi:
-```
+```text
 v8.18.1
 ```
 
@@ -250,7 +250,7 @@ git commit -m "test commit with secret"
 ```
 
 Kết quả mong đợi:
-```
+```text
 Đang chạy gitleaks scan trên staged files...
 
     ○
@@ -283,7 +283,7 @@ claude
 ```
 
 Dùng prompt AN TOÀN này:
-```
+```text
 Đọc .env.example và generate TypeScript config loader có các tính năng:
 1. Load tất cả environment variables trong .env.example
 2. Validate các variables bắt buộc phải tồn tại
@@ -302,7 +302,7 @@ grep -r "FAKE" . --include="*.js" --include="*.ts" --include="*.json"
 ```
 
 Kết quả mong đợi:
-```
+```text
 # Phải KHÔNG trả về gì nếu Claude làm đúng
 # Bất kỳ kết quả nào nghĩa là secrets leak vào generated code
 ```
@@ -315,7 +315,7 @@ gitleaks detect --verbose
 ```
 
 Kết quả mong đợi:
-```
+```text
 ○
 │╲
 │ ○
@@ -767,7 +767,7 @@ gitleaks protect --staged --verbose
 
 **Lớp 4 - Prompt An toàn:**
 Prompt Claude Code mới:
-```
+```text
 Đọc .env.example và generate PaymentConfigLoader.kt với các tính năng:
 1. Load mỗi environment variable dùng System.getenv()
 2. Throw descriptive error nếu required variable missing

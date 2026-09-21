@@ -111,7 +111,7 @@ session.
 
 **Step 2: Have a multi-turn conversation**
 
-```
+```text
 > What's the best way to handle errors in TypeScript?
 
 Claude explains try/catch, Result types, error boundaries, etc.
@@ -127,12 +127,12 @@ Claude refactors the previous example, maintaining context.
 
 **Step 3: Use slash commands**
 
-```
+```text
 /help
 ```
 
 Output shows available commands:
-```
+```text
 # Output may vary
 Available commands:
   /help     - Show this help
@@ -175,7 +175,7 @@ $ claude -p "What is the difference between let and const in JavaScript?"
 ```
 
 Expected output:
-```
+```text
 # Output may vary
 In JavaScript, `let` and `const` both declare block-scoped variables, but:
 
@@ -234,7 +234,7 @@ $ git diff HEAD~1 | claude -p "Summarize these changes"
 ```
 
 Expected output:
-```
+```text
 # Output may vary
 This diff shows:
 1. Added error handling to the fetchUser function

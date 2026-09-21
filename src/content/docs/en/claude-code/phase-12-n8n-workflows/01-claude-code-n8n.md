@@ -39,7 +39,7 @@ Key features:
 
 ### n8n + Claude Code Architecture
 
-```
+```text
 [Trigger] → [n8n Workflow] → [Execute Claude Code] → [Process Output] → [Action]
     │             │                  │                     │              │
   Email      Visual Editor        claude -p            Parse JSON      Slack
@@ -85,7 +85,7 @@ $ n8n start
 ```
 
 Expected output:
-```
+```text
 n8n ready on port 5678
 Editor is now accessible via: http://localhost:5678
 ```
@@ -393,7 +393,7 @@ return [{ json: { result: output } }];
 
 **n8n + Claude Solution**:
 
-```
+```text
 [Email Trigger] → [Claude: Extract] → [Claude: Suggest] → [Google Sheets]
                                                               ↓
                                           [Slack] ← [Trello: Create Card]

@@ -25,7 +25,7 @@ Workflow pattern là "công thức" của automation. Giống như software desi
 
 ### Pattern 1: Sequential Pipeline
 
-```
+```text
 [Input] → [Claude: Step 1] → [Claude: Step 2] → [Claude: Step 3] → [Output]
 ```
 
@@ -34,7 +34,7 @@ Workflow pattern là "công thức" của automation. Giống như software desi
 
 ### Pattern 2: Parallel Fan-Out/Fan-In
 
-```
+```text
          ┌→ [Claude: Task A] →┐
 [Input] ─┼→ [Claude: Task B] →┼→ [Merge] → [Output]
          └→ [Claude: Task C] →┘
@@ -45,7 +45,7 @@ Workflow pattern là "công thức" của automation. Giống như software desi
 
 ### Pattern 3: Classification Router
 
-```
+```text
 [Input] → [Claude: Classify] → [Switch] ─→ [Handler A]
                                       ├→ [Handler B]
                                       └→ [Handler C]
@@ -56,7 +56,7 @@ Workflow pattern là "công thức" của automation. Giống như software desi
 
 ### Pattern 4: Human-in-the-Loop
 
-```
+```text
 [Input] → [Claude: Draft] → [Wait for Approval] → [IF Approved] → [Execute]
                                                         ↓ No
                                                [Claude: Revise] → [Back to Wait]
@@ -67,7 +67,7 @@ Workflow pattern là "công thức" của automation. Giống như software desi
 
 ### Pattern 5: Batch Processing
 
-```
+```text
 [Input List] → [Split In Batches] → [Claude: Process Each] → [Aggregate] → [Output]
 ```
 
@@ -76,7 +76,7 @@ Workflow pattern là "công thức" của automation. Giống như software desi
 
 ### Pattern 6: Error Recovery Loop
 
-```
+```text
 [Input] → [Claude: Try] → [IF Error] → [Claude: Fix] → [Retry]
                               ↓ Success
                           [Output]
@@ -275,7 +275,7 @@ Sau Split In Batches, workflow chạy 4 lần (20/5). Dùng Merge node cuối đ
 
 **Multi-Pattern Solution**:
 
-```
+```text
 Pattern 1: Batch Processing
 └─ 200 review → batch 20
 

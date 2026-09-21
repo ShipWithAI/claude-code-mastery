@@ -76,12 +76,12 @@ $ claude
 
 Trong session:
 
-```
+```text
 /init
 ```
 
 **Output**:
-```
+```text
 Created CLAUDE.md with basic template.
 ```
 
@@ -220,7 +220,7 @@ $ claude
 
 Prompt:
 
-```
+```text
 Add validation for phone number in UserService
 ```
 
@@ -352,7 +352,7 @@ Thường thiếu: **Constraints** (cái KHÔNG được làm) và **Context** (
 
 ### Hierarchy Ưu Tiên
 
-```
+```text
 ~/.claude/CLAUDE.md        # Global (1 lần setup)
        ↓
 ./CLAUDE.md                # Project — 90% context ở đây

@@ -72,7 +72,7 @@ Chúng ta sẽ đi qua một tình huống thực tế: setup và test một mic
 **Bước 1: Tạo cấu trúc project**
 
 Hỏi Claude:
-```
+```text
 "Tạo một Express API project mới tên user-service với TypeScript,
 cài dependencies, và show package.json cho tôi"
 ```
@@ -83,7 +83,7 @@ mkdir -p user-service && cd user-service && npm init -y
 ```
 
 Output mong đợi:
-```
+```text
 Wrote to /Users/you/projects/user-service/package.json:
 {
   "name": "user-service",
@@ -104,7 +104,7 @@ npm install express typescript @types/express @types/node ts-node
 ```
 
 Lệnh này chạy ở **chế độ background**. Claude tiếp tục conversation trong khi npm đang download package. Bạn sẽ thấy:
-```
+```text
 ⏳ Running in background: npm install...
 ```
 
@@ -115,7 +115,7 @@ Tại sao quan trọng: Bạn không cần đợi npm. Claude có thể tiếp t
 **Bước 3: Check trạng thái installation**
 
 Trong khi install đang chạy, hỏi Claude:
-```
+```text
 "Installation đã xong chưa? Show tôi các package đã cài."
 ```
 
@@ -125,7 +125,7 @@ npm list --depth=0
 ```
 
 Output mong đợi:
-```
+```text
 user-service@1.0.0
 ├── express@4.18.2
 ├── typescript@5.3.3
@@ -141,7 +141,7 @@ Tại sao quan trọng: Claude có thể query trạng thái trung gian mà khô
 **Bước 4: Tạo và chạy test**
 
 Hỏi Claude:
-```
+```text
 "Tạo một test đơn giản cho endpoint /health và chạy nó với jest"
 ```
 
@@ -153,7 +153,7 @@ npm test
 ```
 
 Output mong đợi:
-```
+```text
 > user-service@1.0.0 test
 > jest
 
@@ -171,7 +171,7 @@ Tại sao quan trọng: Các operation tuần tự với `&&` đảm bảo mỗi
 **Bước 5: Chạy development server ở background**
 
 Hỏi Claude:
-```
+```text
 "Start dev server và verify nó đang respond"
 ```
 
@@ -186,7 +186,7 @@ sleep 2 && curl http://localhost:3000/health
 ```
 
 Output mong đợi:
-```
+```json
 {"status":"ok","timestamp":"2026-02-02T10:30:00.000Z"}
 ```
 
@@ -197,7 +197,7 @@ Tại sao quan trọng: Background process (`&`) + lệnh verification. Claude c
 **Bước 6: Parse log để tìm lỗi**
 
 Hỏi Claude:
-```
+```text
 "Check 20 dòng cuối của application log xem có lỗi không"
 ```
 
@@ -207,7 +207,7 @@ tail -n 20 logs/app.log | grep -i error
 ```
 
 Output mong đợi (nếu clean):
-```
+```text
 (không có output = không có lỗi)
 ```
 
@@ -218,7 +218,7 @@ Tại sao quan trọng: Claude có thể parse structured output, trích xuất 
 **Bước 7: Các lệnh nhận biết môi trường**
 
 Hỏi Claude:
-```
+```text
 "Build Docker image cho production"
 ```
 
@@ -231,7 +231,7 @@ docker build -t user-service:latest \
 ```
 
 Output mong đợi:
-```
+```text
 [+] Building 45.2s (12/12) FINISHED
  => [internal] load build definition from Dockerfile
  => => transferring dockerfile: 432B
@@ -248,7 +248,7 @@ Tại sao quan trọng: Claude xây dựng lệnh với các flag và argument p
 **Bước 8: Pipeline nhiều giai đoạn**
 
 Hỏi Claude:
-```
+```text
 "Chạy toàn bộ CI pipeline: lint, test, build, và verify Docker image có chạy được không"
 ```
 
@@ -264,7 +264,7 @@ docker stop user-service-test
 ```
 
 Output mong đợi (rút gọn):
-```
+```text
 > eslint . --ext .ts
 ✓ No linting errors
 
@@ -286,7 +286,7 @@ Tại sao quan trọng: Điều này thể hiện **chained command với error 
 **Bước 9: Phục hồi lỗi**
 
 Giả sử test fail ở bước 8. Claude thấy:
-```
+```text
 FAIL src/__tests__/auth.test.ts
   ✕ POST /login validates credentials (23 ms)
 
@@ -308,7 +308,7 @@ Tại sao quan trọng: Claude không chỉ execute — nó **giám sát, phát 
 **Bước 10: Cleanup và verification**
 
 Hỏi Claude:
-```
+```text
 "Dọn dẹp tất cả test container và verify không còn cái gì đang chạy"
 ```
 
@@ -320,7 +320,7 @@ docker ps --filter "name=user-service"
 ```
 
 Output mong đợi:
-```
+```text
 user-service-test
 CONTAINER ID   IMAGE   COMMAND   CREATED   STATUS   PORTS   NAMES
 (empty = cleanup thành công)
@@ -435,7 +435,7 @@ docker build -t test-app .
 ```
 
 Output:
-```
+```text
 Error response from daemon: Dockerfile parse error line 1: unknown instruction: FRON
 ```
 
@@ -450,7 +450,7 @@ docker build -t test-app .
 ```
 
 Output:
-```
+```text
 [+] Building 8.2s (8/8) FINISHED
 => exporting to image
 ```
@@ -500,7 +500,7 @@ npm run coverage
 ```
 
 Nếu branch không tồn tại, output hiển thị:
-```
+```text
 Cloning into 'demo-api'...
 error: pathspec 'feature/auth' did not match any file(s) known to git
 ```
@@ -514,7 +514,7 @@ cd demo-api && git branch -r
 ```
 
 Output:
-```
+```text
 origin/main
 origin/develop
 origin/feature/authentication
@@ -618,7 +618,7 @@ curl http://localhost:3000  # Verify đang chạy
 **Tình huống**: Deploy một bản cập nhật microservice lên Kubernetes staging cluster lúc 2 giờ sáng (cửa sổ deploy production). Deployment yêu cầu build Docker image mới, chạy smoke test trong temp container, push lên registry, update K8s deployment, và verify pod health. Bình thường việc này mất 15 phút làm thủ công trên terminal.
 
 **Vấn đề**: Trong quá trình deploy, smoke test thất bại với một lỗi khó hiểu:
-```
+```text
 Error: connect ECONNREFUSED 10.0.0.45:5432
 ```
 
@@ -657,7 +657,7 @@ kubectl rollout history deployment/user-service -n staging
 ```
 
 Output tiết lộ:
-```
+```text
 NAME                        READY   STATUS    RESTARTS   AGE
 postgres-6d8f9c4b5b-7x2n4   0/1     Pending   0          45s
 ```
@@ -669,7 +669,7 @@ kubectl describe pod postgres-6d8f9c4b5b-7x2n4 -n staging | grep -A 5 Events
 ```
 
 Output:
-```
+```text
 Events:
   Warning  FailedScheduling  30s   default-scheduler  0/3 nodes available:
   insufficient memory.

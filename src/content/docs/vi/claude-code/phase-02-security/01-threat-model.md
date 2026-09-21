@@ -169,7 +169,7 @@ $ claude
 
 Trong session, yêu cầu Claude liệt kê home directory:
 
-```
+```text
 > Run: ls -la ~
 ```
 
@@ -180,12 +180,12 @@ mà không hỏi, đó là thông tin quan trọng về configuration của bạ
 
 Yêu cầu Claude kiểm tra xem nó có thể thấy SSH key không:
 
-```
+```text
 > Run: ls ~/.ssh/
 ```
 
 Kết quả mong đợi (nếu bạn có SSH key):
-```
+```text
 # Output có thể khác
 id_rsa
 id_rsa.pub
@@ -198,7 +198,7 @@ CÓ THỂ thấy các file này nếu user của bạn có thể.
 
 **Bước 3: Kiểm tra access đến credential**
 
-```
+```text
 > Run: cat ~/.aws/credentials 2>/dev/null || echo "No AWS credentials file"
 ```
 
@@ -209,7 +209,7 @@ access key của bạn trong context window.
 
 Yêu cầu Claude chạy gì đó bạn sẽ deny:
 
-```
+```text
 > Run: rm -rf ~/Desktop/test-delete-me
 ```
 
@@ -222,13 +222,13 @@ Nếu không có permission prompt, bạn KHÔNG CÓ protection dựa trên perm
 
 **Bước 5: Kiểm tra gì có thể vô tình bị commit**
 
-```
+```text
 > Run: git status --porcelain
 ```
 
 Sau đó kiểm tra .gitignore:
 
-```
+```text
 > Run: cat .gitignore
 ```
 
@@ -237,7 +237,7 @@ So sánh: Có file nhạy cảm nào (`.env`, `credentials.json`, etc.) KHÔNG c
 
 **Bước 6: Thoát và suy ngẫm**
 
-```
+```text
 /exit
 ```
 
@@ -288,7 +288,7 @@ MoMo, VNPay, ZaloPay, Shopee API — đây là target giá trị cao.
 <summary>✅ Đáp án</summary>
 
 Ví dụ audit output:
-```
+```text
 CRITICAL:
 - ~/.ssh/id_rsa (SSH private key)
 - ~/.aws/credentials (AWS access key)
@@ -345,7 +345,7 @@ Claude đề xuất trước khi nó hành động.
 
 Document finding của bạn:
 
-```
+```text
 Permission behavior của Claude Code của tôi:
 - Nó có hỏi trước khi chạy shell command? [CÓ/KHÔNG]
 - Tôi có thể deny command? [CÓ/KHÔNG]
@@ -499,7 +499,7 @@ với environment variable cho database và API connection.
 
 Nam có file `.env` trong project với credential thật:
 
-```
+```text
 # .env (ĐÂY LÀ VÍ DỤ — không bao giờ dùng credential thật như thế này)
 DATABASE_URL=postgres://admin:FAKE-PASSWORD-123@db.example.com:5432/prod
 STRIPE_SECRET_KEY=sk-FAKE-DO-NOT-USE-xxxxxxxxxxxx
@@ -569,7 +569,7 @@ Nam. May mắn là họ chỉ đào crypto thay vì xóa database production.
    **Verify**: `git status` KHÔNG nên hiển thị .env
 
 2. **Không bao giờ để Claude đọc .env trực tiếp** — thay vào đó, mô tả variable:
-   ```
+   ```text
    > Tạo docker-compose.yml với các environment variable sau:
    > DATABASE_URL, STRIPE_SECRET_KEY, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
    > Dùng syntax ${VARIABLE_NAME} để đọc từ environment

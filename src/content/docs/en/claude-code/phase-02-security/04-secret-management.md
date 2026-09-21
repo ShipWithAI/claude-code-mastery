@@ -123,7 +123,7 @@ git init
 ```
 
 Expected output:
-```
+```text
 Initialized empty Git repository in /path/to/payment-demo/.git/
 ```
 
@@ -208,7 +208,7 @@ gitleaks version
 ```
 
 Expected output:
-```
+```text
 v8.18.1
 ```
 
@@ -244,7 +244,7 @@ git commit -m "test commit with secret"
 ```
 
 Expected output:
-```
+```text
 Running gitleaks scan on staged files...
 
     ○
@@ -277,7 +277,7 @@ claude
 ```
 
 Use this SAFE prompt:
-```
+```text
 Read .env.example and generate a TypeScript config loader that:
 1. Loads all environment variables shown in .env.example
 2. Validates required variables exist
@@ -296,7 +296,7 @@ grep -r "FAKE" . --include="*.js" --include="*.ts" --include="*.json"
 ```
 
 Expected output:
-```
+```text
 # Should return NOTHING if Claude followed instructions correctly
 # Any matches mean secrets leaked into generated code
 ```
@@ -309,7 +309,7 @@ gitleaks detect --verbose
 ```
 
 Expected output:
-```
+```text
 ○
 │╲
 │ ○
@@ -743,7 +743,7 @@ gitleaks protect --staged --verbose
 
 **Layer 4 - Safe Prompt:**
 New Claude Code prompt:
-```
+```text
 Read .env.example and generate PaymentConfigLoader.kt that:
 1. Loads each environment variable using System.getenv()
 2. Throws descriptive error if required variable is missing

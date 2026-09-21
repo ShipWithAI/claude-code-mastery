@@ -162,7 +162,7 @@ $ claude
 
 Inside the session, ask Claude to list your home directory:
 
-```
+```text
 > Run: ls -la ~
 ```
 
@@ -173,12 +173,12 @@ without asking, that's important information about your configuration.
 
 Ask Claude to check if it can see your SSH keys:
 
-```
+```text
 > Run: ls ~/.ssh/
 ```
 
 Expected result (if you have SSH keys):
-```
+```text
 # Output may vary
 id_rsa
 id_rsa.pub
@@ -191,7 +191,7 @@ Claude Code CAN see these files if your user can.
 
 **Step 3: Check access to credentials**
 
-```
+```text
 > Run: cat ~/.aws/credentials 2>/dev/null || echo "No AWS credentials file"
 ```
 
@@ -202,7 +202,7 @@ access keys in its context window.
 
 Ask Claude to run something you'll deny:
 
-```
+```text
 > Run: rm -rf ~/Desktop/test-delete-me
 ```
 
@@ -215,13 +215,13 @@ If no permission prompt appears, you have no permission-based protection.
 
 **Step 5: Check what might accidentally get committed**
 
-```
+```text
 > Run: git status --porcelain
 ```
 
 Then check your .gitignore:
 
-```
+```text
 > Run: cat .gitignore
 ```
 
@@ -230,7 +230,7 @@ are NOT in .gitignore but ARE in your project?
 
 **Step 6: Exit and reflect**
 
-```
+```text
 /exit
 ```
 
@@ -279,7 +279,7 @@ tokens, etc.
 <summary>✅ Solution</summary>
 
 Example audit output:
-```
+```text
 CRITICAL:
 - ~/.ssh/id_rsa (SSH private key)
 - ~/.aws/credentials (AWS access keys)
@@ -335,7 +335,7 @@ proposed actions before it acts.
 
 Document your findings:
 
-```
+```text
 My Claude Code permission behavior:
 - Does it ask before running shell commands? [YES/NO]
 - Can I deny commands? [YES/NO]
@@ -490,7 +490,7 @@ connections.
 
 Susan had a `.env` file in her project with real credentials:
 
-```
+```text
 # .env (THESE ARE EXAMPLES — never use real credentials like this)
 DATABASE_URL=postgres://admin:FAKE-PASSWORD-123@db.example.com:5432/prod
 STRIPE_SECRET_KEY=sk-FAKE-DO-NOT-USE-xxxxxxxxxxxx
@@ -553,7 +553,7 @@ damage was done: **$2,847 in charges** from EC2 instances mining cryptocurrency.
    **Verify**: `git status` should NOT show .env
 
 2. **Never let Claude read .env directly** — instead, describe the variables:
-   ```
+   ```text
    > Create docker-compose.yml with these environment variables:
    > DATABASE_URL, STRIPE_SECRET_KEY, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
    > Use ${VARIABLE_NAME} syntax to read from environment
