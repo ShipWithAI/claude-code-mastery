@@ -10,7 +10,7 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "test": "node --test src/lib/*.test.mjs",
+    "test": "node --test src/lib/*.test.mjs scripts/lint-course/*.test.mjs",
     "check:design": "./scripts/check-design-tokens.sh"
   },
   "dependencies": {
