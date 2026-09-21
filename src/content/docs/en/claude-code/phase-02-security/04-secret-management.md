@@ -519,7 +519,7 @@ gitleaks detect --verbose --no-git
 
 Complete audit workflow:
 
-```bash
+````bash
 # Navigate to project
 cd ~/projects/production-app
 
@@ -596,7 +596,7 @@ cat > SECURITY_AUDIT_CLEAN.md << 'EOF'
 
 Next audit: 2024-04-15 (quarterly schedule)
 EOF
-```
+````
 
 This creates a documented audit trail for compliance and security reviews.
 </details>

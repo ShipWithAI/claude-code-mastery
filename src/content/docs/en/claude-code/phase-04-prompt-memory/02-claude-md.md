@@ -170,7 +170,7 @@ This is where you encode your team's style — naming, patterns, error handling:
 
 List the commands Claude will run — build, test, lint, deploy:
 
-```markdown
+````markdown
 ## Commands
 
 ```bash
@@ -185,7 +185,7 @@ docker-compose up    # Start PostgreSQL + Redis locally
 ```
 
 **Deploy:** `git push` triggers Railway deploy (main branch only)
-```
+````
 
 ### Step 6: Add Constraints (DON'T Section)
 
@@ -262,7 +262,7 @@ If CLAUDE.md is working, Claude should:
 
 Here's the full file (~650 words):
 
-```markdown
+````markdown
 # CLAUDE.md — Task Manager API
 
 ## Project Overview
@@ -281,7 +281,7 @@ Node.js REST API for task management with real-time notifications.
 ## Architecture Rules
 
 **Directory structure:**
-```
+```text
 src/
 ├── routes/          ← Express route handlers (thin, delegate to services)
 ├── services/        ← Business logic (fat, testable)
@@ -371,7 +371,7 @@ Result types force explicit error handling at call sites.
 - Tasks can only be assigned to users in the same workspace
 - Free tier limited to 50 tasks per workspace (enforced at service layer)
 - Task titles must be unique within a project (database constraint)
-```
+````
 
 ---
 
@@ -404,7 +404,7 @@ Think about the questions you answer most often in Claude sessions. Those answer
 
 Here's a minimal but complete CLAUDE.md for a Python/FastAPI project:
 
-```markdown
+````markdown
 # CLAUDE.md — Analytics API
 
 ## Project Overview
@@ -413,7 +413,7 @@ Python REST API for analytics dashboard.
 **Tech Stack:** Python 3.11, FastAPI, PostgreSQL (SQLAlchemy), Redis, Pytest
 
 ## Architecture Rules
-```
+```text
 src/
 ├── api/        ← FastAPI routers (thin)
 ├── services/   ← Business logic
@@ -448,7 +448,7 @@ alembic upgrade head            # Apply migrations
 - All dates stored in UTC (convert to user timezone in frontend)
 - Pagination default: 20 items, max 100
 - Cache TTL: 5 minutes (analytics data updates every 5 min)
-```
+````
 
 This is 200 words — minimal but effective. Expand as you discover what Claude needs to know.
 
@@ -492,11 +492,11 @@ We use clean architecture. Keep concerns separated.
 ```
 
 **After (specific):**
-```markdown
+````markdown
 ## Architecture Rules
 
 **Directory structure:**
-```
+```text
 src/
 ├── domain/     ← Business entities (no dependencies)
 ├── usecases/   ← Application logic (orchestrates domain + repos)
@@ -505,7 +505,7 @@ src/
 
 **Dependency rule:** domain ← usecases ← adapters (arrows point inward)
 NEVER import adapters from domain or usecases.
-```
+````
 
 The "after" version gives Claude actionable rules. The "before" version is too vague to enforce.
 

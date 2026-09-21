@@ -473,7 +473,7 @@ $ chmod +x sandbox.sh
 
 ### Step 5: Tạo Team Onboarding Document
 
-```bash
+````bash
 $ cat > SECURITY_ONBOARDING.md << 'EOF'
 # Banking API — Security Onboarding cho Claude Code
 
@@ -617,7 +617,7 @@ Bằng cách hoàn thành onboarding này, bạn không chỉ học tools — b�
 security culture của chúng ta. Mọi engineer đều là security engineer.
 
 EOF
-```
+````
 
 **Expected result:** Team members mới có clear, checkable path đến safe Claude Code usage.
 
@@ -864,7 +864,7 @@ Onboarding docs tốt nhất được viết bởi người vừa mới đi qua 
 <details>
 <summary>✅ Solution Template</summary>
 
-```markdown
+````markdown
 # [Project Name] — Claude Code Security Onboarding
 
 Chào mừng! Guide này sẽ setup bạn cho safe AI-assisted development.
@@ -947,7 +947,7 @@ Nếu có gì sai:
 - Questions: [Slack channel]
 
 **Estimated time**: [Your estimate]
-```
+````
 
 **Validation**:
 - [ ] New hire có thể complete mà không cần hỏi questions

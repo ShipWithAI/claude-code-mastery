@@ -525,7 +525,7 @@ gitleaks detect --verbose --no-git
 
 Workflow audit hoàn chỉnh:
 
-```bash
+````bash
 # Di chuyển đến project
 cd ~/projects/production-app
 
@@ -602,7 +602,7 @@ cat > SECURITY_AUDIT_CLEAN.md << 'EOF'
 
 Audit tiếp theo: 2024-04-15 (theo lịch hàng quý)
 EOF
-```
+````
 
 Điều này tạo audit trail có document cho compliance và security reviews.
 </details>
