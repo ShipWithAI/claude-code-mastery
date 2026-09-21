@@ -3,6 +3,11 @@
 Source: Module 2.5 — System Control & Monitoring
 Date: 2026-09-21
 
+> ⚠️ Extracted verbatim from Module 2.5 before the Wave 1/2 rewrite. Step 5 ("Test Sandbox")
+> relies on the module's `sandbox.sh`, which sets Docker `--network` to `none`; Claude Code
+> needs network access to api.anthropic.com, so that recipe is being replaced — treat Step 5 as
+> a placeholder until Module 2.3/2.5 are rewritten.
+
 # Banking API — Security Onboarding for Claude Code
 
 Welcome to the team! Before you start using Claude Code on this project,

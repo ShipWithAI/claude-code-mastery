@@ -9,18 +9,22 @@ export function loadConfig(path) {
   return cfg;
 }
 
-export function checkDoc(doc, { relPath, config, isModule }) {
+// checkFrontmatter: false for files outside src/content/docs (e.g. templates/), which are
+// plain markdown with no Starlight frontmatter but must still pass fence/blacklist checks.
+export function checkDoc(doc, { relPath, config, isModule, checkFrontmatter = true }) {
   const issues = [];
   const push = (level, rule, line, message) => issues.push({ level, rule, line, message });
   const mdLangs = new Set(config.markdownLangs);
 
   // frontmatter
-  for (const k of config.frontmatter.required) {
-    if (!(k in doc.frontmatter.fields)) push('error', 'frontmatter-required', 1, `thiếu frontmatter \`${k}\``);
-  }
-  for (const k of config.frontmatter.recommended) {
-    if (!(k in doc.frontmatter.fields))
-      push(config.frontmatter.recommendedLevel, 'frontmatter-recommended', 1, `thiếu frontmatter \`${k}\``);
+  if (checkFrontmatter) {
+    for (const k of config.frontmatter.required) {
+      if (!(k in doc.frontmatter.fields)) push('error', 'frontmatter-required', 1, `thiếu frontmatter \`${k}\``);
+    }
+    for (const k of config.frontmatter.recommended) {
+      if (!(k in doc.frontmatter.fields))
+        push(config.frontmatter.recommendedLevel, 'frontmatter-recommended', 1, `thiếu frontmatter \`${k}\``);
+    }
   }
 
   let h2 = 0;

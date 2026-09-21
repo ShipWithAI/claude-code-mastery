@@ -465,8 +465,12 @@ Khi làm việc trên dự án này, dùng các quy ước sau:
 npm run dev            # local site
 npm run build          # must pass before PR
 npm run lint:course    # must pass (errors) before PR; warnings tracked per wave
+npm run lint:course:baseline   # sau khi PR rewrite giảm số error, ghi lại baseline mới theo từng file
 npm test               # unit tests (lint parser + mermaid styles)
 ```
+
+CI so sánh số error của từng file với `scripts/lint-course.baseline.json`; PR chỉ fail khi có
+file tăng số error so với baseline.
 
 ---
 

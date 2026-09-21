@@ -466,8 +466,12 @@ When working on this project, use these conventions:
 npm run dev            # local site
 npm run build          # must pass before PR
 npm run lint:course    # must pass (errors) before PR; warnings tracked per wave
+npm run lint:course:baseline   # after a rewrite PR lowers errors, record the new per-file baseline
 npm test               # unit tests (lint parser + mermaid styles)
 ```
+
+CI compares per-file error counts to `scripts/lint-course.baseline.json`; a PR fails only if a
+file regresses.
 
 ---
 

@@ -68,6 +68,13 @@ test('frontmatter: missing description is error, missing verified is warn', () =
   assert.ok(issues.some((i) => i.rule === 'frontmatter-recommended' && i.level === 'warn'));
 });
 
+test('frontmatter checks are skipped when checkFrontmatter is false (templates/)', () => {
+  const doc = parseDoc(`# T\n\nuse \`.claudeignore\`\n`);
+  const issues = checkDoc(doc, { relPath: 'templates/x.md', config, isModule: false, checkFrontmatter: false });
+  assert.ok(!issues.some((i) => i.rule.startsWith('frontmatter-')));
+  assert.ok(issues.some((i) => i.rule === 'blacklist' && i.level === 'error'));
+});
+
 test('line-width warns on long prose lines but ignores fences, tables and URLs', () => {
   const long = 'x'.repeat(120);
   const issues = run(`# T\n\n${seven}\n\n${long}\n| ${long} |\nhttps://example.com/${long}\n\`\`\`text\n${long}\n\`\`\`\n`);
