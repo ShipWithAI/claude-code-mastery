@@ -11,7 +11,9 @@
     "preview": "astro preview",
     "astro": "astro",
     "test": "node --test src/lib/*.test.mjs scripts/lint-course/*.test.mjs",
-    "check:design": "./scripts/check-design-tokens.sh"
+    "check:design": "./scripts/check-design-tokens.sh",
+    "lint:course": "node scripts/lint-course.mjs",
+    "lint:course:strict": "node scripts/lint-course.mjs --strict"
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.7.0",
