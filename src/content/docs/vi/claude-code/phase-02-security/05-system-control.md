@@ -618,26 +618,30 @@ EOF
 
 **Expected result:** Team members mới có clear, checkable path đến safe Claude Code usage.
 
-### Step 6: Configure Claude Code (⚠️ Cần verification)
+### Step 6: Configure Claude Code
+
+Settings cấp project nằm trong `.claude/settings.json` (commit vào git, chia sẻ với team):
+
+```json
+{
+  "model": "sonnet"
+}
+```
+
+Verify:
 
 ```bash
-# Set project-level configuration
-$ claude config set model sonnet
-$ claude config set auto-compact true
-$ claude config set log-level info
+$ cat .claude/settings.json
 ```
 
 **Expected output:**
 ```text
-Configuration updated:
-  model: sonnet
-  auto-compact: true
-  log-level: info
-
-Config saved to: .claude/config
+{
+  "model": "sonnet"
+}
 ```
 
-**Tại sao quan trọng:** Project-specific settings đảm bảo consistency across team members.
+**Vì sao quan trọng:** Settings cấp project là plain JSON trong git, nên mọi teammate chạy cùng model — và thay đổi có thể review trong PR. Full key list: https://code.claude.com/docs/en/settings
 
 ### Step 7: Run Secure Claude Code Session
 
