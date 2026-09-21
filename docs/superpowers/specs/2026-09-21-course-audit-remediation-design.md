@@ -4,7 +4,8 @@
 > chính thức, Claude Code v2.1.278).
 > **Trạng thái**: Design đã chốt với tác giả ngày 21/09/2026.
 > **Baseline**: Claude Code **v2.1.278** (đã xác nhận `claude --version` trên máy dev).
-> **Plan thực thi**: `docs/superpowers/plans/2026-09-21-course-audit-remediation.md`.
+> **Plan thực thi**: Wave 0 → `docs/superpowers/plans/2026-09-21-audit-wave0-infra.md`; Wave 1 →
+> `docs/superpowers/plans/2026-09-21-audit-wave1-tier1-rewrite.md`; Wave 2–3 viết khi đến lượt.
 
 ---
 
@@ -67,23 +68,26 @@ giữ cho số dòng trích dẫn trong audit còn dùng được (±3 dòng).
 
 ### 3.1 Wave 0 — Hạ tầng (v1.1.1)
 
-**W0-A. Lint script** — `scripts/lint-course.mjs`, chạy bằng `npm run lint:course`, test bằng
-`node --test` (theo pattern `src/lib/*.test.mjs` sẵn có). Quét mọi `.md`/`.mdx` trong
-`src/content/docs/{en,vi}/claude-code/phase-*/`.
+**W0-A. Lint script** — `scripts/lint-course.mjs` (+ `scripts/lint-course/{parse,checks,pairs,fix}.mjs`,
+config `scripts/lint-course.config.json`), chạy bằng `npm run lint:course`, test bằng `node --test`
+(theo pattern `src/lib/*.test.mjs` sẵn có). Quét mọi `.md`/`.mdx` trong
+`src/content/docs/{en,vi}/claude-code/phase-*/` + cheat-sheet/tips. Kèm `scripts/fix-course.mjs`
+(fence-lang, fence-nest, replace theo `scripts/course-replacements.json`). Baseline đo 21/09/2026:
+132 file, ~1051 error, ~1913 warning.
 
 | Check | Mức | Ghi chú |
 |---|---|---|
 | Số H2 (`^## `) ngoài code block = 7 | fail | Bỏ qua `index.mdx`, `cheat-sheet.mdx`, `tips-tricks.mdx` |
-| Fence cân (số ```` ``` ```` chẵn, không fence mở trong fence) | fail | Bắt lỗi fence lồng nhau audit X10 |
-| Fence có language | fail | ```` ``` ```` trống |
-| `##` xuất hiện bên trong code block | fail | Audit §4D "`##` trong code block" |
-| Blacklist pattern (bảng dưới) | fail | Regex, case-sensitive |
-| Word count > 2200 | fail | Đếm sau khi bỏ frontmatter và code block |
+| Fence theo CommonMark: fence mở có info string nằm trong fence đang mở **cùng độ dài** = lồng nhau vỡ; fence không đóng | fail | Outer 4-backtick chứa inner 3-backtick là hợp lệ (11.2, 14.3 đang dùng). Cách sửa: nâng fence ngoài lên 4 backtick |
+| Fence có language | fail | ```` ``` ```` trống → `text` (đo thật: 733 block / 78 file, không phải ~50 như audit) |
+| `##` bên trong code block **không phải** `markdown`/`md`/`mdx`, ngoài heredoc bash | fail | `## Section` trong ```` ```markdown ```` (CLAUDE.md mẫu) và trong `cat > FILE <<'EOF'` là hợp lệ; block `text` chứa markdown → relabel `markdown` |
+| Blacklist pattern (bảng dưới) | fail (Ctrl+C: warn) | Regex, case-sensitive |
+| Word count > 2200 | **warn** tới hết Wave 2, sau đó fail | 16 file đang vượt (Phase 2 EN/VI, 3.4, 7.3/7.4 VI…); config `words.maxLevel` |
 | Word count > 1500 | warn | Target CLAUDE.md 800-1500 |
 | Dòng > 100 ký tự (ngoài code block, table, URL) | warn | Hiện mọi file đều vi phạm; không block |
 | Frontmatter thiếu `verified` / `claude_version` | warn | Chuyển thành fail khi Wave 2 xong |
 | Frontmatter thiếu `description` | fail | 12.3 hiện thiếu |
-| Module EN có file VI cùng tên (và ngược lại), cùng extension | fail | 6.1, 11.2 hiện lệch `.md`/`.mdx` |
+| Module EN có file VI cùng basename (và ngược lại) | fail (thiếu) / warn (khác extension) | 6.1, 11.2 lệch `.md`/`.mdx` → thống nhất khi rewrite ở Wave 1 |
 
 Blacklist tối thiểu (mở rộng khi phát hiện thêm):
 
@@ -138,7 +142,7 @@ lint:course && npm run build` trên PR vào `develop`/`main`. Repo hiện chưa 
 7. "55" → "64 modules" trong 16.1, 16.3 (README/CLAUDE.md thuộc W0-B/W0-E).
 8. Thay `houston.webp` trong `index.mdx` EN+VI bằng ảnh của course (hoặc bỏ `hero.image`).
 9. `description:` cho 12.3.
-10. Extension VI 6.1, 11.2 → `.mdx` khớp EN.
+10. Extension VI 6.1, 11.2: để Wave 1 (W1-2, W1-5) thống nhất khi rewrite; Wave 0 chỉ warn.
 11. Xóa VI 7.1 flags `--plan`, `--auto`.
 12. Thêm solution còn thiếu: VI 4.2 Ex 2; EN 8.1 Ex 3; EN 8.3 Ex 1-2; VI 8.1 Ex 2-3.
 
