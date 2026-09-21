@@ -277,7 +277,7 @@ Trước khi viết bất kỳ phần DEMO hoặc CHEAT SHEET nào:
 - Docs chính thức: https://code.claude.com/docs (fetch trang thật; không dựa vào trí nhớ).
 - Snapshot inventory dùng cho đợt audit 2026-09: `docs/audit/2026-09-21-course-audit.md` Appendix A.
 - Mọi lệnh/flag/setting key trong module phải truy được về một trang docs được nêu tên trong PR.
-  Nếu không, đánh dấu `⚠️ Needs verification`.
+  Nếu không, đánh dấu `⚠️ Cần xác minh`.
 - Mọi `claude -p` có ghi file hoặc chạy lệnh phải kèm `--permission-mode` hoặc
   `--allowedTools`; nếu không, headless run sẽ bị từ chối.
 - `Esc` ngắt turn hiện tại (giữ session). `Ctrl+C` hai lần để thoát. `/context` xem mức
@@ -441,7 +441,7 @@ Trước khi coi module là hoàn thành, kiểm tra TẤT CẢ mục:
 - Mọi lệnh/flag/setting key/hook event/frontmatter field truy được về một trang docs nêu tên
   trong PR; không còn pattern nào trong blacklist
 - Mọi "Expected output" đã thực sự chạy và có `# Output may vary`; giá model giữ
-  `⚠️ Needs verification` trừ khi đã đối chiếu trang pricing
+  `⚠️ Cần xác minh` trừ khi đã đối chiếu trang pricing
 - Mọi `claude -p` ghi file hoặc chạy lệnh đều có permission flag
 - Ít nhất một bài tập có `<details>` ✅ Đáp án
 - Không có số liệu hiệu suất không nguồn; không lặp nhân vật "Susan" ngoài một case giữ lại

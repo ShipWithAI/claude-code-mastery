@@ -9,10 +9,12 @@ Not another Getting Started guide — this is a structured, senior-level curricu
 [![Stars](https://img.shields.io/github/stars/ShipWithAI/claude-code-mastery?style=social)](https://github.com/ShipWithAI/claude-code-mastery/stargazers)
 [![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/ShipWithAI/claude-code-mastery/pulls)
-![Version](https://img.shields.io/badge/version-1.0-blue)
+![Version](https://img.shields.io/badge/version-1.1.1-blue)
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-2.1%2B-green)
 
-**16 Phases · 55 Modules · 136 Lessons · English + Tiếng Việt**
+> Verified against **Claude Code v2.1.278** (2026-09). Mechanics (commands, flags, config files) are checked against https://code.claude.com/docs; see docs/audit/ for the latest audit.
+
+**16 Phases · 64 Modules · English + Tiếng Việt**
 
 [Live Course](https://course.shipwithai.io) · [Twitter](https://x.com/shipwithaiio) · [Telegram](https://t.me/ShipWithAI)
 
@@ -77,7 +79,7 @@ Most Claude Code tutorials teach individual features in isolation. But real prod
 | | Claude Code Mastery | Official Docs | YouTube Tutorials |
 |---|:---:|:---:|:---:|
 | Structured curriculum | ✅ 16 phases, progressive | ❌ Reference only | ❌ Random topics |
-| 55+ in-depth modules | ✅ | ❌ | ❌ |
+| 64 in-depth modules | ✅ | ❌ | ❌ |
 | Vietnamese (Tiếng Việt) | ✅ | ❌ | ❌ |
 | Production patterns & real cases | ✅ | ❌ | ⚠️ Some |
 | Hands-on exercises with solutions | ✅ | ❌ | ⚠️ Varies |
