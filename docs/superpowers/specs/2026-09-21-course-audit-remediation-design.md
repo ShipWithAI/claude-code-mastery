@@ -30,7 +30,7 @@
 
 ---
 
-## 2. Sáu nguyên tắc xuyên suốt
+## 2. Bảy nguyên tắc xuyên suốt
 
 Ghi vào `CLAUDE.md` của course, áp cho mọi module từ đây về sau:
 
@@ -47,6 +47,9 @@ Ghi vào `CLAUDE.md` của course, áp cho mọi module từ đây về sau:
 5. **Không fake.** Không output viết tay, không số liệu hiệu suất không nguồn, không repo/star
    count bịa, không nhân vật lặp ("Susan" ×9).
 6. **EN + VI cùng task, cùng PR.** Không merge EN khi VI tương ứng còn lỗi cũ.
+7. **Dạy theo cách Anthropic tự làm.** Mỗi practice lớn trong course neo vào một nguồn chính
+   thức của Anthropic (docs best-practices, engineering blog, AI-native SDLC playbook) kèm URL +
+   ngày; chỉ dùng số liệu Anthropic công bố, không dùng số bịa hay third-party. Chi tiết §9.
 
 ---
 
@@ -114,7 +117,7 @@ lint:course && npm run build` trên PR vào `develop`/`main`. Repo hiện chưa 
 - "55 Modules" → "64 Modules" (68 sau Wave 3).
 - Thay "Commands Known to Exist" / "Need Verification" bằng pointer tới audit Phụ lục A và
   rule: *"Mọi lệnh phải trích được docs page; nếu không, ⚠️ Needs verification"*.
-- Thêm 6 nguyên tắc §2 vào WRITING RULES.
+- Thêm 7 nguyên tắc §2 vào WRITING RULES.
 - Thêm frontmatter bắt buộc: `verified: YYYY-MM-DD`, `claude_version: X.Y.Z`.
 - Thêm mục "Definition of Done" (§4 dưới).
 - Sửa `CLAUDE.vi.md` song song.
@@ -147,6 +150,10 @@ tới GitHub path. (2.5 sẽ được cắt ở Wave 1; Wave 0 chỉ tách file,
 
 **W0-E. Baseline** — README thêm dòng *"Verified against Claude Code v2.1.278 (2026-09)"*;
 `package.json` version → `1.1.1`.
+
+**W0-F. Registry nguồn Anthropic** — tạo `docs/references/anthropic-sources.md`: bảng URL +
+ngày + 3-5 quote ngắn cho mỗi nguồn ở §9.1. Module trích dẫn theo registry, không tự chép URL.
+CLAUDE.md course thêm rule: *"Khi nói 'Anthropic khuyên/làm X', phải link registry entry."*
 
 ### 3.2 Wave 1 — Tier 1 rewrite (v1.2)
 
@@ -212,6 +219,8 @@ Mỗi module mới viết theo template 7-block, EN + VI, cùng contract §4.
 - [ ] Ít nhất 1 exercise có `<details>` ✅ Solution
 - [ ] Không số liệu hiệu suất không nguồn; không nhân vật "Susan" trừ khi giữ 1 case
 - [ ] Cross-reference tới module khác dùng số/slug đúng; "Next" link đúng
+- [ ] Nếu §9.3 có dòng cho module này: practice đó đã lồng vào đúng block, có link registry;
+      số liệu Anthropic (nếu dùng) đúng nguyên văn nguồn
 - [ ] VI là parallel authoring cùng PR; thuật ngữ giữ English
 - [ ] `npm run lint:course` và `npm run build` xanh
 
@@ -289,3 +298,110 @@ graph LR
 - [ ] Audit §5 gap matrix: không còn 🔴; ❌ chỉ còn ở mục đã ghi rõ "ngoài scope"
 - [ ] README/CLAUDE.md/index/SUMMARY/COURSE-INDEX cùng một con số module
 - [ ] Site EN và VI build xanh, sidebar khớp
+
+---
+
+## 9. Lồng ghép AI-native SDLC của Anthropic
+
+Course hiện có **0** tham chiếu tới bất kỳ tài liệu process nào của Anthropic (grep
+`best-practices`, `anthropic.com/engineering`, "Explore → Plan", worktree, multi-Claude,
+"give Claude a way to verify" đều = 0 file). Đây là cơ hội lớn: course đang dạy mental model
+tự nghĩ, trong khi Anthropic đã công bố process họ dùng nội bộ với số liệu thật. Nguyên tắc
+lồng ghép: **không thêm module "Anthropic làm gì"** — đưa vào WHY / CONCEPT / PITFALLS /
+REAL CASE của module sẵn có, để người học thấy "đây là cách chính chủ làm", không phải lý thuyết.
+
+### 9.1 Nguồn chính thức (đã fetch 21/09/2026)
+
+| # | Nguồn | Ngày | Dùng cho |
+|---|---|---|---|
+| S1 | `code.claude.com/docs/en/best-practices` — "patterns that have proven effective across Anthropic's internal teams" | living | Explore→Plan→Implement→Commit; "give Claude a check it can run"; CLAUDE.md prune test; writer/reviewer; 5 failure pattern; "let Claude interview you → SPEC.md → fresh session"; fan-out `-p` |
+| S2 | `claude.com/blog/how-anthropic-teams-use-claude-code` | 24/07/2025 | Per-team story: Security (TDD, stack-trace ~3× nhanh hơn), Data Infra (screenshot dashboard lúc outage, ~20 phút), Inference (~80% giảm research time), Product Design (Figma → code), Data Science (React app không biết TS), Legal (non-eng build tool) |
+| S3 | `claude.com/blog/the-ai-native-sdlc-playbook` | 21/08/2026 | 6 stage Plan→`intent.md`, Design→`spec.md`, Build→`plan.md`+diff, Test, Deploy (PR + governance), Maintain (incident → `intent.md`); "Code is no longer the bottleneck — the human-speed steps around it are"; "A skill is a control, though an advisory one… A hook is the deterministic layer behind it"; "The agent that wrote the code has no way to approve it" |
+| S4 | `claude.com/blog/how-anthropic-secures-its-ai-native-software-development-lifecycle` | 21/07/2026 | "Claude authors about 80% of the code merged into our codebase today"; "ship 8x as much code per quarter as… 2021 to 2025"; review agent scoped hẹp; risk-tier codebase + sampled auto-merge; "single-purpose identity with the minimum permissions"; mọi tool call log vào SIEM; security guideline nằm trong CLAUDE.md + org skills |
+| S5 | `anthropic.com/engineering/building-effective-agents` | 19/12/2024 | Workflows vs agents; 5 pattern: prompt chaining, routing, parallelization, orchestrator-workers, evaluator-optimizer; ACI design |
+| S6 | `anthropic.com/engineering/effective-context-engineering-for-ai-agents` | 29/09/2025 | "smallest set of high-signal tokens"; compaction; structured note-taking; subagent trả về 1.000-2.000 token; just-in-time context |
+| S7 | `claude.com/blog/building-agents-with-the-claude-agent-sdk` | 29/09/2025 | Loop **gather context → take action → verify work → repeat**; verify = rules-based / visual / LLM-as-judge |
+| S8 | `anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills` | 16/10/2025 | Progressive disclosure 3 lớp (name+description → SKILL.md → linked files) |
+| S9 | `anthropic.com/engineering/writing-tools-for-agents` | 11/09/2025 | Ít tool, giá trị cao; namespace; semantic ID; response format; mô tả tool "như cho new hire" |
+| S10 | `anthropic.com/engineering/multi-agent-research-system` | 13/06/2025 | Orchestrator + 3-5 subagent song song; agent ~4× token chat, multi-agent ~15×; evals từ ~20 query |
+| S11 | `anthropic.com/engineering/demystifying-evals-for-ai-agents` | 09/01/2026 | 20-50 task thật; grader code/model/human; đọc transcript; pass@k; saturation |
+| S12 | `anthropic.com/engineering` — "Effective harnesses for long-running agents" (26/11/2025) và "Harness design for long-running application development" (24/03/2026) | 2025-26 | Initializer + coding agent; progress file; feature checklist; "unacceptable to remove or edit tests"; tách generator/evaluator ("confident praising"); context reset > compaction khi "context anxiety"; early victory declaration |
+| S13 | `anthropic.com/engineering` — "Beyond permission prompts: sandboxing" (20/10/2025), "How we built Claude Code auto mode" (25/03/2026), "How we contain Claude across products" (25/05/2026) | 2025-26 | Sandbox = filesystem **và** network; 84% ít prompt hơn nội bộ; approval fatigue; classifier 2 lớp; 3 tier action; containment ở environment layer trước, model layer sau; "distrust custom components" |
+| S14 | `anthropic.com/engineering` — "Building a C compiler with a team of parallel Claudes" (05/02/2026) | 2026 | 16 agent song song, ~2.000 session, 100K dòng, $20K; "the task verifier is nearly perfect, otherwise Claude will solve the wrong problem"; log chi tiết ra file, giữ output in-context vài dòng |
+| S15 | `code.claude.com/docs/en/costs`, `/sub-agents`, `/agent-teams`, `/workflows`, `/checkpointing`, `/security` | living | Cost ladder; khi nào subagent / team / workflow; team ≈ 7× token; checkpoint không track Bash |
+
+**Loại khỏi course**: thread của Boris Cherny (10-15 session song song, ~80% bắt đầu bằng plan
+mode) — chỉ có bản paraphrase third-party, không fetch được nguồn gốc. Các con số "90% code do
+Claude viết", "Cowork 4 người 10 ngày", "54% PR nhận comment" — chưa có primary URL → không dùng.
+
+**Cần ⚠️ verify tận trang trước khi dạy** (agent trích từ best-practices nhưng audit chưa có):
+`/goal`, `/verify`, `/batch`, `/btw`, `/effort ultracode`, hook event `PostFileEdit`,
+`TaskCompleted`, `--teammate-mode`, `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`. Quy tắc §5 bước 1
+áp dụng: chỉ dạy khi docs page xác nhận.
+
+### 9.2 Xương sống course: hai vòng lặp
+
+Đưa vào **1.2 CONCEPT** (Wave 3 khi 1.2 tái cấu trúc; tạm thời 1.3 CONCEPT ở Wave 2) một
+diagram duy nhất, sau đó mọi phase tham chiếu lại thay vì tự nghĩ framework:
+
+```mermaid
+graph LR
+    subgraph "Vòng trong — mỗi turn (S7)"
+        G[Gather context] --> A[Take action] --> V[Verify] --> G
+    end
+    subgraph "Vòng ngoài — AI-native SDLC (S3)"
+        P[Plan → intent.md] --> D[Design → spec.md] --> B[Build → plan.md + diff]
+        B --> T[Test] --> Dp[Deploy → PR + governance] --> M[Maintain] --> P
+    end
+```
+
+- Vòng trong = cách Claude Code hoạt động trong một session (Phase 3, 5, 6, 8).
+- Vòng ngoài = cách team tổ chức công việc quanh Claude Code (Phase 6, 7, 10, 11, 16).
+  Human gate nằm ở **handoff giữa artifact**, không ở từng dòng code — đây là câu trả lời cho
+  câu hỏi "review thế nào khi Claude viết 80% code" mà 10.3 hiện chưa trả lời.
+
+Các framework sẵn có của course **giữ nguyên tên** nhưng map lên xương sống này: PCE loop (6.2)
+= Plan/Design/Build; RTAV (7.4) = vòng trong chạy tự động; STOP→ASSESS→CONTAIN→RECOVER (8.5) =
+Maintain re-entry; author/reviewer protocol (10.3) = Deploy gate.
+
+### 9.3 Mapping practice → module → block → wave
+
+| Practice (nguồn) | Module → block | Wave |
+|---|---|---|
+| Explore → Plan → Implement → Commit; "If you could describe the diff in one sentence, skip the plan" (S1) | 6.2 CONCEPT (PCE loop là tên course cho quy trình này); 3.1 WHY; 14.1 CHEAT SHEET | W1-5, W2-16 |
+| "Give Claude a check it can run: tests, a build, a screenshot"; "If you can't verify it, don't ship it" (S1, S7) | 7.2 bước VERIFY; 8.4 CONCEPT; 9.3 WHY; 14.3 CONCEPT; 3.2 DEMO self-review step | W1-4, W2-8, W2-12, W2-16 |
+| Writer ≠ reviewer: fresh-context subagent review, "the implementing session isn't the one grading it"; "confident praising" (S1, S12, S3 "the agent that wrote the code has no way to approve it") | 7.3 pattern specialist; 8.4; 10.3 CONCEPT; 14.3 | W1-4, W2-10, W2-12 |
+| CLAUDE.md prune test "Would removing this cause Claude to make mistakes?"; bảng include/exclude; "Bloated CLAUDE.md files cause Claude to ignore your actual instructions"; < 200 dòng, chuyển specialized instruction sang skills (S1, S15) | 4.2 CONCEPT + PITFALLS; 10.1 PITFALLS; 15.1 | W2-3, W2-10 |
+| Skill = advisory control, hook = deterministic layer (S3); "hooks for actions that must happen every time with zero exceptions" (S1) | 2.5 thesis "advisory vs enforced" (nay có nguồn); 11.3 WHY; 15.3 CONCEPT; 10.5 | W1-1, W1-3, W1-6, W2-10 |
+| 5 failure pattern: kitchen-sink session, correcting over and over (→ `/clear` sau 2 lần), over-specified CLAUDE.md, trust-then-verify gap, infinite exploration (S1) | 8.2 (3-strike rule của course ↔ "more than twice → `/clear`"); 8.3 PITFALLS; 5.1 PITFALLS; 16.3 checklist học viên | W2-12, W2-16 |
+| Course-correct: Esc, `/rewind`, `/clear`, "Undo that" (S1, S15 checkpoint không track Bash) | 8.5 STOP; 8.2 ladder; 3.2; 7.2 | W1-4, W2-12, W2-16 |
+| Context engineering: "smallest set of high-signal tokens"; subagent trả 1-2K token summary; JIT context bằng file path; context reset > compaction khi "context anxiety" (S6, S12) | 5.1 CONCEPT (memory-allocator model nay có nguồn); 5.2; 3.1 (Explore subagent thay "đọc signature tay"); 7.3 | W1-4, W2-16 |
+| "Let Claude interview you" → SPEC.md → fresh session; "Time spent making the spec precise pays off more than time spent watching the implementation" (S1) | 6.2 DEMO (bước Design → `spec.md` của S3); 4.1 PRACTICE; 7.2 PREPARE | W1-5, W2-16 |
+| Workflows vs agents; 5 pattern (S5) | 7.3 CONCEPT: 3 pattern course (orchestrator/pipeline/specialist) map lên orchestrator-workers / prompt chaining / evaluator-optimizer; 7.6 | W1-4, W3-2 |
+| Token cost song song: agent ~4×, multi-agent ~15×, team ~7×; chỉ khi "value of the task is high enough" (S10, S15) | 7.5 ladder; 14.4 CONCEPT (thay "Opus 5× Sonnet" bịa bằng số thật) | W1-4, W2-8 |
+| Long-running harness: init script, progress file, feature checklist JSON, "unacceptable to remove or edit tests", early victory declaration; "task verifier nearly perfect" (S12, S14) | 7.4 RTAV + healthy-vs-stuck (thêm "early victory" vào stuck signals); 9.3 "fix the TEST not the code" (nay có nguồn); 8.1 PITFALLS | W1-4, W2-12, W2-16 |
+| Layered containment: sandbox = filesystem **và** network; 84% ít prompt; approval fatigue; classifier auto mode 2 lớp; "distrust custom components" (S13) | 2.1 CONCEPT (thay "Bash-tool vs file-tool" thiếu); 2.2 (auto mode có nguồn); 2.3 (lý do bỏ `--network=none`: sandbox thật cho phép egress allowlist) | W1-6, W2-9 |
+| AI-native SDLC 6 stage + artifact + gate ở handoff; "Code is no longer the bottleneck" (S3) | 10.2 CONCEPT (git convention theo artifact); 10.3 CONCEPT; 6.3 mode matrix; **16.1 case study #1 = Anthropic** (giải quyết "100% real examples" không attribution) | W2-10, W2-16 |
+| Secure SDLC: 80% / 8×; review agent scope hẹp; risk-tier + sampled auto-merge; agent identity min-perm; SIEM (S4) | 10.5 REAL CASE (thay governance "trên giấy"); 10.6 mới; 2.4 REAL CASE | W2-10, W3-3 |
+| Per-team story (S2): Security TDD + stack-trace 3×; Data Infra screenshot outage 20 phút; Inference 80% research; Design Figma→code; Legal non-eng | 16.2 Roles (mỗi role một story có nguồn); 5.3 REAL CASE (outage screenshot); 9.3; 13.3 | W2-13, W2-16 |
+| Tool/ACI design: ít tool, semantic ID, response format, mô tả như cho new hire (S9, S5) | 11.5 PITFALLS (MCP overhead, S15 "prefer CLI tools"); 11.2 `tool()`; 15.5 skill description | W1-2, W1-3, W1-7 |
+| Progressive disclosure 3 lớp (S8) | 15.3 CONCEPT; 4.2 (CLAUDE.md vs skills vs on-demand) | W1-3, W2-3 |
+| Evals: 20-50 task thật, đọc transcript, grader mix, pass@k (S11, S10) | 8.4 Quality (Quick Scan → mini-eval); 14.3; 16.3 (workshop: chấm bằng eval nhỏ) | W2-8, W2-12 |
+| Fan-out `-p` với `--allowedTools`, thử 2-3 file trước rồi scale (S1) | 11.1 DEMO; 9.2 (migration); 14.2 | W2-6, W2-16 |
+| Cost ladder chính thức: `/clear` giữa task, model theo việc, `/usage`, ít MCP, hooks/skills preprocess (S15) | 14.4 CHEAT SHEET; 5.2 | W2-8, W2-16 |
+
+### 9.4 Quy tắc viết khi lồng ghép
+
+1. **Một câu, một link.** Lồng ghép = 1-3 câu trong block sẵn có + link registry, không thêm
+   section riêng. Ví dụ 4.2 PITFALLS: *"Anthropic's own test for every CLAUDE.md line: 'Would
+   removing this cause Claude to make mistakes?' If not, cut it (S1)."*
+2. **Số liệu nguyên văn + ngày.** "80% code merged" luôn kèm "(Anthropic, 07/2026)". Không làm
+   tròn, không suy diễn ("vậy bạn cũng sẽ 8×").
+3. **Framework của course giữ tên**, ghi chú tương đương với thuật ngữ Anthropic (PCE ↔
+   Explore/Plan/Implement; 3-strike ↔ "more than twice"). Người học cũ không mất mốc.
+4. **Không thần thánh hoá.** Mỗi practice đi kèm giới hạn Anthropic tự nêu: classifier còn 17%
+   false-negative; checkpoint không track Bash; reviewer "will usually report some [gaps], even
+   when the work is sound".
+5. **VI dịch quote sang tiếng Việt** nhưng giữ nguyên văn EN trong ngoặc cho quote ngắn (<15
+   từ), để người học tra được.
+6. **Registry là nguồn duy nhất.** Đổi URL/ngày → sửa registry, không sửa 20 module.
