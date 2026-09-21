@@ -641,7 +641,7 @@ $ cat .claude/settings.json
 }
 ```
 
-**Vì sao quan trọng:** Settings cấp project là plain JSON trong git, nên mọi teammate chạy cùng model — và thay đổi có thể review trong PR. Full key list: https://code.claude.com/docs/en/settings
+**Tại sao quan trọng:** Settings cấp project là plain JSON trong git, nên mọi teammate chạy cùng model — và thay đổi có thể review trong PR. Full key list: https://code.claude.com/docs/en/settings
 
 ### Step 7: Run Secure Claude Code Session
 

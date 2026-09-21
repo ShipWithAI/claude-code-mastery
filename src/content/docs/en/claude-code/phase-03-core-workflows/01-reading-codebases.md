@@ -3,11 +3,6 @@ title: 'Reading & Understanding Codebases'
 description: 'Use Claude Code to rapidly understand unfamiliar codebases, map architecture, and identify key patterns.'
 ---
 
-<!-- Note: This module exceeds standard word count (2802 vs 800-1500) due to
-     comprehensive 7-step DEMO required to demonstrate the 3-layer reading
-     strategy. Each step shows realistic Claude output. Approved by architect
-     review 2026-02-01. -->
-
 # Module 3.1: Reading & Understanding Codebases
 
 > **Estimated time**: ~30 minutes

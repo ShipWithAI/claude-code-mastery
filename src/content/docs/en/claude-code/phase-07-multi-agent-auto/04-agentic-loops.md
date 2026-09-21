@@ -83,7 +83,7 @@ Every loop must have a way to stop:
 | **Max iterations** | "Try at most 5 times" |
 | **Threshold** | "Stop when response time < 100ms" |
 | **Timeout** | "Stop after 10 minutes" |
-| **Human intervention** | User types "stop" or presses Ctrl+C |
+| **Human intervention** | User types "stop" or presses **Esc** to interrupt the current turn |
 
 Without termination conditions, loops run until token budget exhausted.
 
@@ -388,7 +388,7 @@ After intervention, give either:
 | Stuck loop | "Stop. Explain what you've tried so far." |
 | Wrong direction | "Let's try a completely different approach." |
 | Sufficient progress | "That's good enough. Move on to next task." |
-| Emergency stop | Press Ctrl+C |
+| Emergency stop | Press **Esc** to interrupt immediately |
 
 ### Context Management in Loops
 

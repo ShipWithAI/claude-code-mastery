@@ -403,13 +403,13 @@ từ Claude Code. Protection có hoạt động không?
 <details>
 <summary>💡 Gợi ý</summary>
 
-OS permission (chmod) hoạt động bất kể feature của Claude Code. File với
-`chmod 000` không thể đọc được ngay cả bởi Claude Code chạy với user của bạn
-(trừ khi bạn là root).
-
-Chờ đã — điều đó sai. `chmod 600` có nghĩa owner có thể read/write. Vì Claude
-chạy với user của bạn, nó CÓ THỂ đọc file 600. Để protection thực sự, bạn cần
-dùng user account khác hoặc containerization.
+OS permission chỉ chặn được Claude Code khi nó thực sự deny chính user account
+của bạn. File với `chmod 000` không ai đọc được ngoại trừ root — cái này chặn
+được Claude Code thật. Nhưng `chmod 600` (mức "khóa lại" phổ biến) vẫn cho
+owner read/write, mà Claude Code chạy dưới user của bạn — nên nó VẪN đọc được
+file 600. `chmod` một mình không phải protection thật sự trước Claude Code;
+chỉ `permissions.deny` trong `.claude/settings.json` mới chặn được chắc chắn.
+Để isolation thực sự, bạn cần dùng user account khác hoặc containerization.
 
 </details>
 
@@ -537,7 +537,7 @@ $ git push origin main
 
 **Breach xảy ra**:
 
-Repository là public (đáng lẽ phải private, nhưng Tùng đã config sai lúc
+Repository là public (đáng lẽ phải private, nhưng Nam đã config sai lúc
 setup). Trong **8 phút**, automated scanner đã tìm thấy AWS credential. Trong
 **20 phút**, crypto miner đang chạy trên AWS account của Nam.
 
@@ -553,7 +553,7 @@ Nam. May mắn là họ chỉ đào crypto thay vì xóa database production.
 
 1. `.env` không có trong `.gitignore` (sai lầm #1)
 2. Claude Code đọc file `.env` và include giá trị thật vào code generate
-3. Tùng không review kỹ file generate để tìm embedded secret
+3. Nam không review kỹ file generate để tìm embedded secret
 4. Repo vô tình public
 5. Không có AWS billing alert được config cho spending bất thường
 6. Dùng chung AWS account cho cả team tăng blast radius

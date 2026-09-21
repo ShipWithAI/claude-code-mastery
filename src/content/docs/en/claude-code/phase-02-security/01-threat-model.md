@@ -393,13 +393,14 @@ protected files from Claude Code. Did the protection work?
 <details>
 <summary>💡 Hint</summary>
 
-OS permissions (chmod) work regardless of Claude Code's features. A file with
-`chmod 000` cannot be read even by Claude Code running as your user (unless
-you're root).
-
-Wait — that's wrong. `chmod 600` means owner can read/write. Since Claude runs
-as your user, it CAN read 600 files. For true protection, you need to use a
-different user account or containerization.
+OS permissions only block Claude Code when they actually deny your own user
+account. A file with `chmod 000` cannot be read by anyone except root — that
+does block Claude Code. But `chmod 600` (the common "lock this down" default)
+still gives the owner read/write, and Claude Code runs as your user — so it
+CAN still read 600 files. `chmod` alone is not real protection against
+Claude Code; only `permissions.deny` in `.claude/settings.json` reliably
+blocks it. For true isolation, use a different user account or
+containerization.
 
 </details>
 

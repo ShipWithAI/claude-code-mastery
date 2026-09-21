@@ -37,7 +37,7 @@ Emergency xảy ra. Dù có tất cả safeguard từ module trước. Question 
 
 Memorize sequence này:
 
-1. **STOP**: `Ctrl+C` ngay. Đừng để Claude continue.
+1. **STOP**: Nhấn `Esc` ngay để ngắt turn hiện tại. Đừng để Claude continue.
 2. **ASSESS**: `git status` + `git diff` — actually changed gì?
 3. **CONTAIN**: `git stash` — save current state trước khi recover
 4. **RECOVER**: Chọn recovery strategy theo severity
@@ -67,7 +67,7 @@ Memorize sequence này:
 
 ### Scenario 1: Claude Deleted Important File
 
-**STOP** — Thấy Claude đang delete file? Press `Ctrl+C` ngay.
+**STOP** — Thấy Claude đang delete file? Nhấn `Esc` ngay để ngắt.
 
 **ASSESS**:
 ```bash
@@ -116,7 +116,7 @@ File đã về.
 
 ### Scenario 2: Claude Modified 50 File
 
-**STOP**: `Ctrl+C`
+**STOP**: Nhấn `Esc`
 
 **ASSESS**:
 ```bash
@@ -262,7 +262,7 @@ NEVER delete không có explicit approval:
 
 ### Emergency Playbook
 
-1. 🛑 **STOP**: `Ctrl+C`
+1. 🛑 **STOP**: Nhấn `Esc`
 2. 🔍 **ASSESS**: `git status` + `git diff`
 3. 📦 **CONTAIN**: `git stash`
 4. 🔧 **RECOVER**: Xem command bên dưới
@@ -324,7 +324,7 @@ git reset --hard <commit-hash>
 - Mất 4 giờ cố recover database
 
 **Nên làm**:
-1. STOP: `Ctrl+C` (hoặc đừng approve deletion)
+1. STOP: Nhấn `Esc` (hoặc đừng approve deletion)
 2. ASSESS: `git diff --stat` sẽ show migration deletion
 3. CONTAIN: `git stash`
 4. RECOVER: `git checkout db/migrations/`

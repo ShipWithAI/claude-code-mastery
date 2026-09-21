@@ -52,7 +52,7 @@ Start with the right prompt structure:
 
 ### Phase 3: MONITOR
 
-Full Auto doesn't mean unattended. Watch for unexpected file access, error messages, and scope creep. Keep Ctrl+C ready.
+Full Auto doesn't mean unattended. Watch for unexpected file access, error messages, and scope creep. Keep **Esc** ready to interrupt the current turn.
 
 ### Phase 4: VERIFY
 
@@ -133,7 +133,7 @@ Checkpoints:
 
 **Step 3: MONITOR — Watch Progress**
 
-Terminal shows checkpoint progress. Watch for files created outside `__tests__/`, repeated errors, or service file modifications. Keep Ctrl+C ready.
+Terminal shows checkpoint progress. Watch for files created outside `__tests__/`, repeated errors, or service file modifications. Keep **Esc** ready to interrupt the current turn.
 
 **Step 4: VERIFY — Check Everything**
 
@@ -235,7 +235,7 @@ Checkpoints:
 
 ### Emergency Stop
 
-**Ctrl+C** — stops execution immediately
+**Esc** — interrupts the current turn immediately; your session and context stay intact
 
 ### Post-Execution Verification
 
@@ -270,7 +270,7 @@ Checkpoints:
 **Attempt 2 (Right)**: Senior dev used proper workflow:
 - **PREPARE**: Created branch, planned 6 batches (utils → services → routes → components → pages → config)
 - **EXECUTE**: Batch 1 only touched `src/utils/`, explicit boundaries set
-- **MONITOR**: Caught Claude violating boundary (tried fixing import in `src/services/`), stopped (Ctrl+C), clarified, restarted
+- **MONITOR**: Caught Claude violating boundary (tried fixing import in `src/services/`), stopped (pressed **Esc**), clarified, restarted
 - **VERIFY**: `git diff`, type-check, tests all passed
 
 Repeated for 6 batches over one week.

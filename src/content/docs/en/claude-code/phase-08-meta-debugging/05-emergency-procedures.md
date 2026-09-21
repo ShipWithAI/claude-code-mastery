@@ -37,7 +37,7 @@ Emergencies happen. Even with all the safeguards from earlier modules. The quest
 
 Memorize this sequence:
 
-1. **STOP**: Ctrl+C immediately. Don't let Claude continue.
+1. **STOP**: Press **Esc** immediately to interrupt the current turn. Don't let Claude continue.
 2. **ASSESS**: `git status` + `git diff` — what actually changed?
 3. **CONTAIN**: `git stash` — save current state before recovering
 4. **RECOVER**: Choose recovery strategy based on severity
@@ -67,7 +67,7 @@ Memorize this sequence:
 
 ### Scenario 1: Claude Deleted Important Files
 
-**STOP** — See Claude deleting files? Press `Ctrl+C` immediately.
+**STOP** — See Claude deleting files? Press `Esc` immediately to interrupt.
 
 **ASSESS**:
 ```bash
@@ -116,7 +116,7 @@ Files are back.
 
 ### Scenario 2: Claude Modified 50 Files
 
-**STOP**: Ctrl+C
+**STOP**: Press `Esc`
 
 **ASSESS**:
 ```bash
@@ -262,7 +262,7 @@ NEVER delete without explicit approval:
 
 ### Emergency Playbook
 
-1. 🛑 **STOP**: Ctrl+C
+1. 🛑 **STOP**: Press `Esc`
 2. 🔍 **ASSESS**: `git status` + `git diff`
 3. 📦 **CONTAIN**: `git stash`
 4. 🔧 **RECOVER**: See commands below
@@ -324,7 +324,7 @@ git reset --hard <commit-hash>
 - Spent 4 hours trying to recover database
 
 **What should have happened**:
-1. STOP: Ctrl+C (or just don't approve the deletion)
+1. STOP: Press `Esc` (or just don't approve the deletion)
 2. ASSESS: `git diff --stat` would have shown migration deletions
 3. CONTAIN: `git stash`
 4. RECOVER: `git checkout db/migrations/`

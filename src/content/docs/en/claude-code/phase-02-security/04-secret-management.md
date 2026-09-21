@@ -88,7 +88,7 @@ Assume any secret Claude has seen is compromised. Establish rotation priorities:
 | Priority | Secret Type | Rotation Timeframe | Why Urgent |
 |----------|-------------|-------------------|------------|
 | 🔴 IMMEDIATE | Payment keys (VNPay, MoMo, Stripe) | Within 1 hour | Direct financial loss, regulatory penalties |
-| 🔴 IMMEDIATE | Cloud credentials (AWS, GCP, Azure) | Within 1 hour | Crypto mining, data exfiltration (recall Tùng's story) |
+| 🔴 IMMEDIATE | Cloud credentials (AWS, GCP, Azure) | Within 1 hour | Crypto mining, data exfiltration (recall Susan's story in Module 2.1) |
 | 🟡 HIGH | API keys (third-party services) | Within 24 hours | Service abuse, quota exhaustion |
 | 🟡 HIGH | Database passwords | Within 24 hours | Data breach, privacy violations |
 | 🟢 MEDIUM | Internal service tokens | Within 1 week | Limited blast radius in sandboxed environments |
@@ -787,8 +787,6 @@ object PaymentConfigLoader {
 - Secrets loaded at runtime from environment
 - Clear error messages if secrets are missing
 - Safe to commit, safe to share in PR reviews
-
-Susan's payment integration is secure. She can work with Claude Code without fear of credential leaks.
 
 Susan's payment integration is secure. She can work with Claude Code without fear of credential leaks.
 

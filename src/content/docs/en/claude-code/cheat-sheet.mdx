@@ -51,7 +51,7 @@ Use **one-shot mode** (`-p`) for quick questions. Use **REPL mode** for multi-tu
 | `/vim` | Enable vim mode | For vim users |
 | `/bug` | Report a bug | Send bug report to Anthropic |
 | `/export` | Export conversation to file | Save session for later reference |
-| `/exit` or `Ctrl+C` | Exit session | Done working |
+| `/exit` or `Ctrl+C` twice (or `Ctrl+D`) | Exit session | Done working |
 
 <Aside type="caution">
 `/compact` preserves task context while freeing space. `/clear` erases everything. Prefer `/compact` during active work.
@@ -61,9 +61,9 @@ Use **one-shot mode** (`-p`) for quick questions. Use **REPL mode** for multi-tu
 
 | Shortcut | Action |
 |----------|--------|
-| `Escape` | Cancel current generation |
+| `Escape` | Interrupt the current turn — session and context stay intact |
 | `Escape` × 2 | Rewind — show message selector to undo |
-| `Ctrl+C` | Interrupt / exit |
+| `Ctrl+C` twice (or `Ctrl+D`) | Exit the session |
 | `Ctrl+V` | Paste image from clipboard (macOS: `Ctrl+V`, NOT `Cmd+V`) |
 | `Ctrl+G` | Open prompt in external editor (`$EDITOR`) |
 | `Ctrl+L` | Clear terminal screen |

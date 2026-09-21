@@ -70,7 +70,7 @@ Khi ở trong REPL interactive session, các phím tắt sau giúp bạn làm vi
 
 - **Input nhiều dòng**: `\` + Enter, hoặc `Shift+Enter` (chạy `/terminal-setup` trước)
 - **Huỷ generation**: `Escape`
-- **Thoát**: `Ctrl+C` hoặc `/exit`
+- **Thoát**: `Ctrl+C` hai lần (hoặc `Ctrl+D`), hoặc `/exit`
 - **Dán ảnh**: `Ctrl+V` (KHÔNG PHẢI `Cmd+V` trên macOS)
 - **Đổi model**: `Option+P` / `Alt+P`
 - **Bật/tắt thinking**: `Option+T` / `Alt+T`
@@ -268,7 +268,7 @@ $ git log --oneline -10 | claude -p "Commit nào trong số này là bug fix?"
 3. Hỏi Claude cách fix
 4. Hỏi follow-up: "Làm sao thêm TypeScript type vào cái này?"
 5. Chạy `/cost` để xem token usage
-6. Thoát với `/exit` hoặc Ctrl+C
+6. Thoát với `/exit`, hoặc Ctrl+C hai lần (hoặc Ctrl+D)
 
 **Kết quả mong đợi**: Bạn có conversation nhiều lượt mà mỗi response xây dựng
 trên context trước, và thấy tổng token cost.
@@ -403,7 +403,7 @@ $ claude -p "Thay đổi gì?" < <(git diff HEAD~1)
 | **Xóa conversation** | `/clear` | Reset context trong REPL |
 | **Nén context** | `/compact` | Giảm token usage |
 | **Xem token usage** | `/cost` | Hiển thị usage cho session |
-| **Thoát REPL** | `/exit` hoặc Ctrl+C | Kết thúc interactive session |
+| **Thoát REPL** | `/exit`, hoặc Ctrl+C hai lần (hoặc Ctrl+D) | Kết thúc interactive session |
 
 ### Tham chiếu nhanh chọn chế độ
 

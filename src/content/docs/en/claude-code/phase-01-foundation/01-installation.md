@@ -293,7 +293,7 @@ $ claude
 | **Clear Context** | `/clear` | Inside session; resets conversation |
 | **Show Cost** | `/cost` | Inside session; shows token usage |
 | **Init Project** | `/init` | Inside session; creates CLAUDE.md |
-| **Exit Session** | `/exit` or Ctrl+C | Leave Claude Code |
+| **Exit Session** | `/exit`, or Ctrl+C twice (or Ctrl+D) | Leave Claude Code |
 | **Set API Key** | `export ANTHROPIC_API_KEY="sk-..."` | Alternative to OAuth |
 | **Configuration** | `claude config` | Manage settings |
 

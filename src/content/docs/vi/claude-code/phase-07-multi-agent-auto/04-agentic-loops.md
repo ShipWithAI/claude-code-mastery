@@ -48,7 +48,7 @@ graph LR
 Loop tiếp tục từ VERIFY về READ cho đến khi:
 1. Verification pass (success condition)
 2. Đạt max iteration limit
-3. Human can thiệp (Ctrl+C hoặc command)
+3. Human can thiệp (nhấn Esc để ngắt turn hiện tại, hoặc command)
 
 ### Pattern 1: Self-Correction Loop
 
@@ -179,7 +179,7 @@ Mọi loop PHẢI có điều kiện dừng rõ ràng. Không có = loop chạy 
 | **Iteration limit** | "Tối đa 5 lần", "Thử 3 approach" | Mọi loop nên có hard limit |
 | **Threshold** | "Response time < 100ms", "Improvement < 5%" | Optimization loop |
 | **Timeout** | "Dừng sau 10 phút", "Token budget < $2" | Long-running task |
-| **Human intervention** | "Stop", Ctrl+C, "đủ rồi" | Mọi loop — always có escape hatch |
+| **Human intervention** | "Stop", nhấn **Esc** để ngắt, "đủ rồi" | Mọi loop — always có escape hatch |
 
 **Best practice**: Combine nhiều condition với AND logic:
 ```text
@@ -648,7 +648,7 @@ Mọi loop prompt PHẢI có ít nhất 2 trong số này:
 - [ ] Max iteration: "tối đa 5 lần"
 - [ ] Threshold: "improvement < 5%"
 - [ ] Timeout: "dừng sau 10 phút"
-- [ ] Human escape: luôn có Ctrl+C
+- [ ] Human escape: luôn có Esc để ngắt turn hiện tại
 
 ### Intervention Phrase
 
@@ -658,7 +658,7 @@ Mọi loop prompt PHẢI có ít nhất 2 trong số này:
 | **Sai hướng** | `Approach hiện tại không work. Thử cách hoàn toàn khác: [suggestion].` |
 | **Đủ tốt rồi** | `Good enough. Chuyển task tiếp theo.` |
 | **Unsafe action** | `Stop ngay. [Explain risk]. Chờ approval.` |
-| **Khẩn cấp** | Ctrl+C (hard stop) |
+| **Khẩn cấp** | **Esc** để ngắt ngay lập tức |
 
 ### Context Management Trong Loop
 

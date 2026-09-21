@@ -3,10 +3,6 @@ title: 'Đọc & Hiểu Codebase'
 description: 'Dùng Claude Code để đọc, hiểu và điều hướng codebase lớn với chiến lược 3 lớp hiệu quả.'
 ---
 
-<!-- Note: Module này vượt word count tiêu chuẩn (3512 vs 800-1500) do cần
-     DEMO 8 bước đầy đủ để minh họa chiến lược đọc 3 lớp. Mỗi bước hiển thị
-     output thực tế từ Claude. Đã được architect review phê duyệt 2026-02-01. -->
-
 # Module 3.1: Đọc & Hiểu Codebase
 
 > **Thời gian học**: ~30 phút

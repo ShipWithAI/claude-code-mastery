@@ -126,7 +126,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: `## Claude Code Review\n\n${review}\n\n---\n*Automated by Claude Code v11.4*`
+              body: `## Claude Code Review\n\n${review}\n\n---\n*Automated by Claude Code*`
             });
 ```
 
@@ -174,7 +174,7 @@ Check PR — you'll see a comment from `github-actions[bot]`:
 - [src/test.js] Console.log should be removed before production
 
 ---
-*Automated by Claude Code v11.4*
+*Automated by Claude Code*
 ```
 
 **Step 4: Chatops workflow**

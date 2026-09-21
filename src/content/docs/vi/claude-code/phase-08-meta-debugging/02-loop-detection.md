@@ -273,7 +273,7 @@ Key: Yêu cầu Claude ANALYZE trước khi attempt lại.
 
 | Command | Effect |
 |---------|--------|
-| `Ctrl+C` | Emergency stop |
+| `Esc` | Ngắt turn hiện tại ngay lập tức (session và context vẫn giữ nguyên) |
 | `/cost` | Check token burn |
 | `/compact` | Compress context, giữ decision |
 | `/clear` | Nuclear reset (mất progress) |

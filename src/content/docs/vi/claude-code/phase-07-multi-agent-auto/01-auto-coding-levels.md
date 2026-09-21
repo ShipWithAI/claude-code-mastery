@@ -214,52 +214,13 @@ Done!
 
 ### Demo 3: Full Auto Mode ⚠️
 
-**Chuẩn bị**: Tạo plan file trước (best practice cho Full Auto)
-
 ```bash
-$ claude --plan refactor-helpers.md  # ⚠️ Cần xác minh - flag có thể khác
+$ claude --dangerously-skip-permissions  # ⚠️ Cần xác minh
 ```
 
-**File `refactor-helpers.md`**:
-```markdown
-# Refactor helpers.ts
+Claude thực thi toàn bộ việc refactor mà không dừng lại.
 
-## Goal
-Extract 3 functions to separate files for better organization
-
-## Steps
-1. Extract formatDate, truncateText → src/utils/string.ts
-2. Extract validateEmail → src/utils/validation.ts
-3. Update all imports (search *.tsx, *.ts)
-4. Run tests to verify
-
-## Safety
-- Rollback: git reset --hard (working tree clean)
-- Test: npm test src/utils/
-```
-
-**Execute**:
-```bash
-$ claude --auto --plan refactor-helpers.md  # ⚠️ Cần xác minh
-```
-
-Output:
-```text
-Full Auto Mode enabled with plan: refactor-helpers.md
-Executing...
-
-✓ Analyzed helpers.ts (3 functions found)
-✓ Created string.ts with 2 functions
-✓ Created validation.ts with 1 function
-✓ Updated helpers.ts (removed extracted functions)
-✓ Updated 3 import statements
-✓ Running tests...
-  ✓ All tests passed (12/12)
-
-Completed in 47 seconds.
-```
-
-**Tổng cộng**: 0 prompts interactive, ~1 phút, 0 lần approve. Fast nhưng cần trust + planning.
+**Tổng cộng**: 0 prompt interactive, ~1 phút, 0 lần approve. Fast nhưng cần trust + planning trước.
 
 ---
 
@@ -285,27 +246,18 @@ Completed in 47 seconds.
 
 3. Task: Thêm `console.log('Processing:', data)` vào đầu TỪNG function
 
-4. Làm task này 3 lần với 3 levels:
+4. Làm task này 2 lần với 2 levels:
    - **Lần 1 (Manual)**: Đếm số lần approve
    - **Lần 2 (Semi-Auto)**: Đo thời gian
-   - **Lần 3 (Full Auto)**: Viết plan file trước, execute
 
 **Expected result**:
 - Manual: ~8-10 approvals, ~3-4 phút
 - Semi-Auto: 1 approval, ~1 phút
-- Full Auto: 0 approvals, ~30 giây
 
 <details>
 <summary>💡 Hint</summary>
 
 Cho Semi-Auto, prompt: "Add console.log to all functions in practice-auto/*.ts"
-Cho Full Auto, plan file:
-```markdown
-# Add logging
-1. Read all .ts files
-2. Add console.log at start of each function
-3. Save files
-```
 </details>
 
 <details>
@@ -333,22 +285,6 @@ $ claude
 > Add console.log('Processing:', data) to the start of processData function in all .ts files in practice-auto/
 [approve: a]  # Allow for session
 # Claude executes all edits automatically
-```
-
-**Full Auto Mode**:
-Create `add-logging.md`:
-```markdown
-# Add Logging to All Functions
-
-## Steps
-1. Read all .ts files in practice-auto/
-2. For each file, add console.log('Processing:', data) at start of processData
-3. Preserve all other code
-```
-
-Execute:
-```bash
-$ claude --auto --plan add-logging.md
 ```
 </details>
 

@@ -88,7 +88,7 @@ Giả định bất kỳ secret nào Claude đã thấy là đã bị compromise
 | Ưu tiên | Loại Secret | Thời gian Rotation | Tại sao cấp bách |
 |---------|-------------|-------------------|------------------|
 | 🔴 NGAY LẬP TỨC | Payment keys (VNPay, MoMo, ZaloPay) | Trong 1 giờ | Mất tiền trực tiếp, phạt pháp lý |
-| 🔴 NGAY LẬP TỨC | Cloud credentials (AWS, GCP, Azure) | Trong 1 giờ | Crypto mining, data exfiltration (nhớ câu chuyện Tùng) |
+| 🔴 NGAY LẬP TỨC | Cloud credentials (AWS, GCP, Azure) | Trong 1 giờ | Crypto mining, data exfiltration (nhớ câu chuyện Nam trong Module 2.1) |
 | 🟡 CAO | API keys (third-party services) | Trong 24 giờ | Lạm dụng service, cạn quota |
 | 🟡 CAO | Database passwords | Trong 24 giờ | Data breach, vi phạm privacy |
 | 🟢 TRUNG BÌNH | Internal service tokens | Trong 1 tuần | Blast radius giới hạn trong sandbox |
@@ -669,7 +669,7 @@ EOF
 | Chạy `git add -A` mà không check staged files | Luôn chạy `git status` trước `git add`, hoặc stage files tường minh | Dễ accidentally stage .env nếu nó được tạo sau khi .gitignore đã commit. |
 | Lưu secrets trong browser password manager | Dùng dedicated secret manager (1Password, Bitwarden) với vault riêng cho dev secrets | Browser password managers sync qua devices, có thể xuất hiện trong search suggestions, dễ accidentally paste hơn. |
 | Chia sẻ .env qua Zalo hoặc Facebook Messenger cho "onboarding nhanh" | Dùng password manager (1Password, Bitwarden) có tính năng secure sharing, hoặc thiết lập vault riêng | File .env gửi qua chat tồn tại trên nhiều thiết bị (điện thoại, máy tính, cloud backup của chat app) — mỗi bản copy là một điểm leak tiềm năng. |
-| Startup Việt Nam hay skip secret rotation vì "chưa có thời gian" | Đặt calendar reminder rotate secret mỗi quý. Với AI coding tools như Claude Code, bất kỳ secret nào Claude đã "thấy" đều có thể đã bị log | "Chưa có thời gian" là quả bom hẹn giờ — nhớ Tùng trong Module 2.1 mất $2,847 vì không rotate AWS key? |
+| Startup Việt Nam hay skip secret rotation vì "chưa có thời gian" | Đặt calendar reminder rotate secret mỗi quý. Với AI coding tools như Claude Code, bất kỳ secret nào Claude đã "thấy" đều có thể đã bị log | "Chưa có thời gian" là quả bom hẹn giờ — nhớ Nam trong Module 2.1 mất $2,847 vì AWS key leak? |
 
 ---
 

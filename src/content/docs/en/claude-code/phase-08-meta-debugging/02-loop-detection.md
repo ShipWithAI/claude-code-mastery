@@ -273,7 +273,7 @@ The key is asking Claude to ANALYZE before attempting again.
 
 | Command | Effect |
 |---------|--------|
-| `Ctrl+C` | Emergency stop |
+| `Esc` | Interrupt the current turn immediately (session and context stay intact) |
 | `/cost` | Check token burn |
 | `/compact` | Compress context, preserve decisions |
 | `/clear` | Nuclear reset (loses progress) |

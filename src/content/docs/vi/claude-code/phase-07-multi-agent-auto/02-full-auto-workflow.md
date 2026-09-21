@@ -52,7 +52,7 @@ graph LR
 Full Auto ≠ unattended. Bạn vẫn phải watch output realtime.
 
 - **Look for**: file access lạ (sao nó đọc `.env`?), error pattern, scope creep (sao nó sửa file ngoài boundary?)
-- **Ctrl+C ready**: Nếu thấy đi sai hướng, stop ngay. Đừng để chạy hết rồi mới rollback — waste token + time.
+- **Esc sẵn sàng**: Nếu thấy đi sai hướng, nhấn **Esc** để ngắt ngay — session và context vẫn giữ nguyên. Đừng để chạy hết rồi mới rollback — waste token + time.
 
 ### Phase 4: XÁC MINH
 
@@ -147,7 +147,7 @@ Reading src/config/database.ts                         ← Warning! Out of bound
 Creating src/services/user.service.ts                  ← RED FLAG! Modifying source!
 ```
 
-Nếu thấy dòng cuối → `Ctrl+C` ngay. Trong case này, Claude chỉ read config (OK), không modify source.
+Nếu thấy dòng cuối → nhấn **Esc** ngay để ngắt turn. Trong case này, Claude chỉ read config (OK), không modify source.
 
 ---
 
@@ -254,9 +254,9 @@ FORBIDDEN: [critical files/dirs]
 ### Emergency Stop
 | Trigger | Action |
 |---------|--------|
-| Out-of-boundary access | `Ctrl+C` ngay |
-| Unexpected error pattern | `Ctrl+C`, review plan |
-| Scope creep | `Ctrl+C`, clarify boundary |
+| Out-of-boundary access | Nhấn **Esc** ngay |
+| Unexpected error pattern | Nhấn **Esc**, review plan |
+| Scope creep | Nhấn **Esc**, clarify boundary |
 
 ### Post-Execution Checklist
 - [ ] `git diff --stat` — check file list

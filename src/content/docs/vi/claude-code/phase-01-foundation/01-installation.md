@@ -291,7 +291,7 @@ $ claude
 | **Xóa context** | `/clear` | Trong session; reset conversation |
 | **Xem chi phí** | `/cost` | Trong session; hiển thị token usage |
 | **Init project** | `/init` | Trong session; tạo CLAUDE.md |
-| **Thoát session** | `/exit` hoặc Ctrl+C | Rời Claude Code |
+| **Thoát session** | `/exit`, hoặc Ctrl+C hai lần (hoặc Ctrl+D) | Rời Claude Code |
 | **Set API Key** | `export ANTHROPIC_API_KEY="sk-..."` | Thay thế cho OAuth |
 | **Cấu hình** | `claude config` | Quản lý settings |
 

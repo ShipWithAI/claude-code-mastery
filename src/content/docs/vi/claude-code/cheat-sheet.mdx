@@ -51,7 +51,7 @@ Dùng **one-shot mode** (`-p`) cho câu hỏi nhanh. Dùng **REPL mode** cho h�
 | `/vim` | Bật chế độ vim | Dành cho người dùng vim |
 | `/bug` | Báo lỗi | Gửi bug report cho Anthropic |
 | `/export` | Xuất cuộc hội thoại ra file | Lưu session để xem lại |
-| `/exit` hoặc `Ctrl+C` | Thoát phiên | Xong việc |
+| `/exit` hoặc `Ctrl+C` hai lần (hoặc `Ctrl+D`) | Thoát phiên | Xong việc |
 
 <Aside type="caution">
 `/compact` giữ lại context task đang làm. `/clear` xóa tất cả. Ưu tiên `/compact` khi đang làm việc.
@@ -61,9 +61,9 @@ Dùng **one-shot mode** (`-p`) cho câu hỏi nhanh. Dùng **REPL mode** cho h�
 
 | Phím tắt | Chức năng |
 |----------|-----------|
-| `Escape` | Huỷ generation đang chạy |
+| `Escape` | Ngắt turn hiện tại — session và context vẫn giữ nguyên |
 | `Escape` × 2 | Rewind — hiện danh sách message để undo |
-| `Ctrl+C` | Ngắt / thoát |
+| `Ctrl+C` hai lần (hoặc `Ctrl+D`) | Thoát session |
 | `Ctrl+V` | Dán ảnh từ clipboard (macOS: `Ctrl+V`, KHÔNG PHẢI `Cmd+V`) |
 | `Ctrl+G` | Mở prompt trong editor ngoài (`$EDITOR`) |
 | `Ctrl+L` | Xoá màn hình terminal |
