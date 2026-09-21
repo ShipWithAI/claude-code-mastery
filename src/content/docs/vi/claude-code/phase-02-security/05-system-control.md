@@ -1347,7 +1347,7 @@ Last updated: 2024-01-15 (sau incident #3)
 
 Khoa's team implement tất cả lessons đó vào single system. Đây là sức mạnh của defense-in-depth.
 
-**Their Actual CLAUDE.md and Checklists**: Available trong course repository như reference templates:
+**Their Actual CLAUDE.md and Checklists**: Available như reference templates trong course repository tại [`https://github.com/ShipWithAI/claude-code-mastery/tree/develop/templates`](https://github.com/ShipWithAI/claude-code-mastery/tree/develop/templates):
 - `templates/claude-md-security-example.md`
 - `templates/security-checklists.md`
 - `templates/onboarding-security.md`

@@ -1320,7 +1320,7 @@ Last updated: 2024-01-15 (after incident #3)
 
 **Khoa's Advice**: "The first 3 months were chaotic — we were learning security by suffering through incidents. After implementing the Phase 2 stack, we learned security by preventing incidents. That shift changed everything. The time investment (maybe 16 hours total) paid back in the first month. Now it's just part of how we work."
 
-**Their Actual CLAUDE.md and Checklists**: Available in the course repository as reference templates:
+**Their Actual CLAUDE.md and Checklists**: Available as reference templates in the course repository at [`https://github.com/ShipWithAI/claude-code-mastery/tree/develop/templates`](https://github.com/ShipWithAI/claude-code-mastery/tree/develop/templates):
 - `templates/claude-md-security-example.md`
 - `templates/security-checklists.md`
 - `templates/onboarding-security.md`
