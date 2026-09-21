@@ -40,3 +40,22 @@ test('applyReplacements honours regex, flags and file filter', () => {
   assert.equal(applyReplacements('only-in-phase-12', 'en/x/phase-01/a.md', rules), 'only-in-phase-12');
   assert.equal(applyReplacements('only-in-phase-12', 'en/x/phase-12/a.md', rules), 'X');
 });
+
+test('fixFenceNest handles a bare outer opener (no info string)', () => {
+  const input = '```\nintro\n```bash\nls\n```\n```\nafter\n';
+  const out = fixFenceNest(input);
+  assert.equal(out, '````\nintro\n```bash\nls\n```\n````\nafter\n');
+  const f = parseDoc(out).segments.find((s) => s.type === 'fence');
+  assert.equal(f.len, 4);
+  assert.deepEqual(f.nestedOpeners, []);
+  assert.equal(f.end, 6);
+  const text = parseDoc(out).segments.find((s) => s.type === 'text');
+  assert.deepEqual(text.lines.filter(Boolean), ['after']);
+});
+
+test('applyReplacements inserts a literal `to` verbatim, even with $ patterns', () => {
+  assert.equal(
+    applyReplacements('price is X', 'a.md', [{ from: 'price is X', to: 'now $100 (was $&)' }]),
+    'now $100 (was $&)',
+  );
+});

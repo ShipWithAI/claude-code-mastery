@@ -38,7 +38,7 @@ function fixFirstNestedFence(text) {
       const m = lines[i].match(FENCE_RE);
       if (!m) continue;
       const info = m[3].trim();
-      if (info) {
+      if (info || i === s.start - 1) {
         depth++;
         if (i !== s.start - 1) maxInner = Math.max(maxInner, m[2].length);
       } else {
@@ -63,7 +63,7 @@ export function applyReplacements(text, relPath, rules) {
   for (const r of rules) {
     if (r.files && !new RegExp(r.files).test(relPath)) continue;
     const re = r.regex ? new RegExp(r.from, r.flags ?? 'g') : new RegExp(r.from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), r.flags ?? 'g');
-    out = out.replace(re, r.to);
+    out = out.replace(re, r.regex ? r.to : () => r.to);
   }
   return out;
 }
