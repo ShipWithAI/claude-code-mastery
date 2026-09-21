@@ -1,5 +1,6 @@
 ---
 title: 'n8n + SDK Orchestration'
+description: 'Orchestrate Claude from n8n Code nodes and hand off to Claude Code headless for repo-aware tasks.'
 ---
 
 # Module 12.3: n8n + SDK Orchestration

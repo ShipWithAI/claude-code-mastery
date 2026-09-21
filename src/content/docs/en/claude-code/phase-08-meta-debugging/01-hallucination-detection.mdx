@@ -264,6 +264,27 @@ fs.readFile('file.txt', 'utf8', (err, data) => {
 Configuration paths vary by installation method and OS. Check with `ls -la ~/.config/`, `ls -la ~/Library/Application\ Support/`, and the official Claude Code docs.
 </details>
 
+<details>
+<summary>✅ Solution</summary>
+
+**Paths to check**:
+```bash
+ls -la ~/.claude/config.json            # verify
+ls -la ~/.config/claude/settings.json   # verify
+ls -la ~/.claude/                       # verify
+```
+
+**Verification**:
+```bash
+ls -la ~/.claude/
+# settings.json is present — this is the real global config file
+```
+
+**Real config location**: Claude Code stores global settings in `~/.claude/settings.json` (project-level overrides live in `.claude/settings.json` inside the repo, with `.claude/settings.local.json` for personal, gitignored overrides). Paths like `~/.claude/config.json` or `~/.config/claude/settings.json` are plausible-sounding but don't match what's actually on disk.
+
+**Lesson**: Confirm with `ls -la` on your own machine — never trust a suggested path without checking it yourself.
+</details>
+
 ---
 
 ## 5. CHEAT SHEET

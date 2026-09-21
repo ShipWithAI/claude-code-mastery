@@ -433,7 +433,7 @@ Ngay cả khi bạn là solo developer hoặc team nhỏ, vẫn nên document po
 | Cho rằng permission prompt sẽ bắt hết mọi thứ | Permission system bảo vệ khỏi SHELL COMMAND. Claude Code vẫn có thể ĐỌC bất kỳ file nào bạn có quyền truy cập mà không cần prompt. Permission không thay thế sandbox. |
 | Approve command trên path bạn không nhận ra | Nếu thấy `/etc/`, `~/.ssh/`, hoặc path ngoài project, DỪNG LẠI. Deny và hỏi Claude Code tại sao truy cập location đó. |
 | Phát triển "approval fatigue" và auto-click yes | Chống lại bằng: (1) allowlist các command thực sự an toàn ⚠️, (2) nghỉ giải lao, (3) hỏi tại sao Claude Code cần nhiều shell command — có thể prompt của bạn cần cải thiện. |
-| Văn hóa "chạy cho nhanh" dẫn đến approve không suy nghĩ | Dừng lại 3 giây trước mỗi approve. Nếu bạn không thể giải thích command đó làm gì, DENY. Nhớ Tùng trong Module 2.1 mất $2,847 vì "nhanh một chút"? |
+| Văn hóa "chạy cho nhanh" dẫn đến approve không suy nghĩ | Dừng lại 3 giây trước mỗi approve. Nếu bạn không thể giải thích command đó làm gì, DENY. Nhớ Nam trong Module 2.1 mất $2,847 vì "nhanh một chút"? |
 
 ---
 

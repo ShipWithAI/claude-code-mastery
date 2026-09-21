@@ -207,6 +207,26 @@ Nếu Claude suggest tên nghe "quá perfect" như `super-date-formatter` hoặc
 3. Check official docs tại nodejs.org
 4. So sánh: Claude đúng hay sai?
 
+<details>
+<summary>✅ Solution</summary>
+
+Ví dụ verification:
+```bash
+# Claude suggest: fs.promises.readFileAsync('file.txt')
+# Check tại nodejs.org/api/fs.html#fspromisesreadfilepath-options
+# → Method thật là fs.promises.readFile(), không có suffix "Async"
+```
+
+So sánh:
+
+| Claude suggest | Thực tế (nodejs.org) | Kết quả |
+|---|---|---|
+| `fs.promises.readFileAsync()` | `fs.promises.readFile()` | ❌ Hallucination |
+| `fs.promises.writeFile()` | `fs.promises.writeFile()` | ✅ Đúng |
+
+**Why it works**: Docs của Node.js là nguồn xác thực duy nhất — tên method nghe "hợp lý" (thêm "Async" cho rõ nghĩa) nhưng không tồn tại thật.
+</details>
+
 ### Bài 3: Path Verification
 
 **Goal**: Verify file path Claude mention.
@@ -216,6 +236,24 @@ Nếu Claude suggest tên nghe "quá perfect" như `super-date-formatter` hoặc
 2. Claude mention một file path
 3. Run `ls <path>` hoặc `find . -name "filename"`
 4. Có match không?
+
+<details>
+<summary>✅ Solution</summary>
+
+Ví dụ:
+```bash
+# Claude nói: "Config nằm ở src/config/settings.ts"
+$ ls src/config/settings.ts
+ls: src/config/settings.ts: No such file or directory  # Output may vary
+
+$ find . -name "settings.ts"
+./src/lib/config.ts   # Output may vary — file thật ở path khác
+```
+
+Kết quả: path Claude đưa ra sai — Claude "đoán" theo convention phổ biến (`config/settings.ts`) thay vì đọc structure thật của project.
+
+**Why it works**: `ls`/`find` là ground truth — không bao giờ tin path AI đưa ra khi chưa verify trên chính máy bạn.
+</details>
 
 ---
 

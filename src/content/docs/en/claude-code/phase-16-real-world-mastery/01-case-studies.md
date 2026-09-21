@@ -195,11 +195,11 @@ Best match: Case Study 2 (Startup)
 
 **Scenario**: Senior Android Engineer (12+ years experience, Vietnam-based) creating comprehensive Claude Code course while working full-time.
 
-**Problem**: Massive scope (55 modules, bilingual EN/VI, 44K-82K words total). Must maintain consistency, ensure every technique is real and tested, write in two languages without losing quality.
+**Problem**: Massive scope (64 modules, bilingual EN/VI, 44K-82K words total). Must maintain consistency, ensure every technique is real and tested, write in two languages without losing quality.
 
 **Solution**: Created CLAUDE.md defining course standards (7-block structure, quality rules). Created module template. Applied every technique taught in the course to create the course content. Used CLAUDE.md (Phase 4.2), Think mode for curriculum design (Phase 6.1), templates for consistency (Phase 15.1), quality optimization (Phase 14.3).
 
-**Result**: 55 modules following identical structure, bilingual throughout, 100% real examples, practical exercises in every module. Published as open educational resource.
+**Result**: 64 modules following identical structure, bilingual throughout, drawn from real projects and Anthropic's published case studies, practical exercises in every module. Published as open educational resource.
 
 **Key insight**: Eating your own cooking works. This course was built using the exact techniques it teaches. If they didn't work in practice, they wouldn't be in this course.
 

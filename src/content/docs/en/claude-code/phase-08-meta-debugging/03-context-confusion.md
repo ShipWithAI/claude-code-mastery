@@ -171,6 +171,33 @@ Good confusion triggers:
 Watch for: old patterns appearing in new implementation, mixed terminology.
 </details>
 
+<details>
+<summary>✅ Solution</summary>
+
+**Before `/compact` (contaminated)**:
+```text
+You: "Let's build this with GraphQL instead."
+Claude: "Here's a GraphQL resolver...
+         return res.status(200).json({ data })"  # REST leftover
+```
+REST vocabulary (`res.status`, `route`, `endpoint`) leaks into the GraphQL answer because both topics are still in context.
+
+**Fix**:
+```text
+/compact
+"New topic: GraphQL API for the same feature. We are NOT using REST anymore —
+no res.status, no routes. Use a resolver returning a typed object."
+```
+
+**After `/compact` + re-grounding (clean)**:
+```text
+Claude: "Here's the GraphQL resolver:
+         resolve: async (_, { id }) => ({ id, name, ... })"
+```
+
+**Why it works**: `/compact` drops the detailed REST discussion from context, and the explicit re-grounding statement stops Claude from re-deriving old patterns from the conversation summary.
+</details>
+
 ### Exercise 2: Proactive Compaction
 
 **Goal**: Practice preventing confusion before it happens.
@@ -182,6 +209,27 @@ Watch for: old patterns appearing in new implementation, mixed terminology.
 4. Compare: is confusion less than without proactive compaction?
 
 **Expected result**: Cleaner transitions, less contamination from previous topic.
+
+<details>
+<summary>✅ Solution</summary>
+
+**Proactive compaction sequence**:
+```text
+[30+ min of auth feature discussion/implementation]
+
+/compact
+
+"New topic: Payment processing.
+Previous topic (auth) is complete — don't reference it.
+Payment uses Stripe webhooks, no JWT/user tokens involved."
+```
+
+**Comparison**:
+- **Without proactive `/compact`**: asking about payment mid-session often produces answers referencing the auth middleware, JWT checks, or session patterns that don't apply here.
+- **With proactive `/compact` + explicit statement**: responses stay scoped to Stripe/webhook concerns, no auth vocabulary bleeding through.
+
+**Why it works**: Compacting before the pivot removes most of the old topic's detail from active context, and naming the new topic explicitly stops Claude from treating it as a continuation of the same feature.
+</details>
 
 ### Exercise 3: Re-grounding Drills
 

@@ -170,13 +170,13 @@ Match theo thứ tự: team size → project type (greenfield/legacy) → constr
 
 ### Meta-Case: Khóa Học Này Được Tạo Ra Như Thế Nào
 
-**Context**: Author (Senior Android Engineer, 12+ năm) cần tạo comprehensive course 16 phases, 55 modules, bilingual EN/VI, professional-grade cho digital + print + workshop, đồng thời có full-time job.
+**Context**: Author (Senior Android Engineer, 12+ năm) cần tạo comprehensive course 16 phases, 64 modules, bilingual EN/VI, professional-grade cho digital + print + workshop, đồng thời có full-time job.
 
-**Challenge**: Scope khổng lồ (200+ topics), consistency perfect across 55 modules, maintain bilingual sync.
+**Challenge**: Scope khổng lồ (200+ topics), consistency perfect across 64 modules, maintain bilingual sync.
 
 **Approach**: "Eating your own cooking" — CLAUDE.md 400+ lines define standards (7-block structure, tone, accuracy protocol), templates cho mọi module, Think mode cho curriculum design, Full Auto cho boilerplate, cost optimization under $600/month.
 
-**Result**: 55 modules trong 8 tuần (estimate 16+ tuần), 100% consistency, bilingual sync, cost $520/month, quality 100% tested.
+**Result**: 64 modules trong 8 tuần (estimate 16+ tuần), consistent structure, bilingual sync, cost $520/month.
 
 **Lessons**: ✅ CLAUDE.md 400 lines save 200+ hours, template approach scales, apply own advice (technique không work → remove from course). ❌ Quality checklist should automate sớm (week 3 build validator), bilingual phải rewrite chứ không translate (add 30% effort).
 
