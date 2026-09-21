@@ -118,7 +118,7 @@ Do NOT write code. ONLY give me the plan.
 ```
 
 Expected output:
-```text
+```markdown
 ## Execution Plan: Notification System
 
 ### Files Affected (12 files)

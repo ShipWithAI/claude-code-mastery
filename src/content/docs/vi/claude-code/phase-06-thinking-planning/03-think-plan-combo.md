@@ -119,7 +119,7 @@ Phân tích trade-offs của từng cái. Chưa plan hay code.
 ```
 
 Expected output:
-```text
+```markdown
 ## Analysis: User Service Extraction
 
 ### 1. Communication Pattern
@@ -171,7 +171,7 @@ Chưa code.
 ```
 
 Expected output:
-```text
+```markdown
 ## Execution Plan: User Service Extraction
 
 ### Files Bị Ảnh Hưởng (23 files)

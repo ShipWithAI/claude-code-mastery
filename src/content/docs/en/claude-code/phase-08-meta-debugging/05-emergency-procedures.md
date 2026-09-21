@@ -247,7 +247,7 @@ Example post-mortem:
 **Why**: Vague prompt ("clean up") + approved without reviewing
 
 **Prevention**: Add to CLAUDE.md:
-```text
+```markdown
 ## Dangerous Operations
 NEVER delete without explicit approval:
 - .env files

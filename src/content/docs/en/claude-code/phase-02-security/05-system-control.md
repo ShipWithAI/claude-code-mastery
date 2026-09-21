@@ -1324,7 +1324,7 @@ Last updated: 2024-01-15 (after incident #3)
 
 ---
 
-## Phase 2 Complete — Your Security Graduation
+### Phase 2 Complete — Your Security Graduation
 
 Congratulations! You've completed Phase 2: Security & Sandboxing. You now have a complete, operational security toolkit:
 

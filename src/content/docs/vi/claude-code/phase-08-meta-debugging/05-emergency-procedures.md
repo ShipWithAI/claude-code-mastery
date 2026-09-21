@@ -247,7 +247,7 @@ Example post-mortem:
 **Tại sao**: Vague prompt ("clean up") + approve không review
 
 **Prevention**: Add vào CLAUDE.md:
-```text
+```markdown
 ## Dangerous Operation
 NEVER delete không có explicit approval:
 - .env file

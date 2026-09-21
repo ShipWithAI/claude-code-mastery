@@ -96,7 +96,7 @@ Save to reports/december-2023-sales.md
 
 ### Step 2: Claude Generates Report
 
-```text
+```markdown
 Claude: [Analyzes data, generates report]
 
 Created: reports/december-2023-sales.md

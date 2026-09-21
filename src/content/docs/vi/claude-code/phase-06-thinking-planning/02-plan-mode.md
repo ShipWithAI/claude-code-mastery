@@ -118,7 +118,7 @@ KHÔNG viết code. CHỈ plan.
 ```
 
 Output mong đợi:
-```text
+```markdown
 ## Execution Plan: Notification System
 
 ### File Ảnh Hưởng (12 file)

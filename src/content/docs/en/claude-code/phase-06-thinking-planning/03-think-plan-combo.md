@@ -117,7 +117,7 @@ Analyze trade-offs for each. Don't plan or code yet.
 ```
 
 Expected output:
-```text
+```markdown
 ## Analysis: User Service Extraction
 
 ### 1. Communication Pattern
@@ -158,7 +158,7 @@ Don't code yet.
 ```
 
 Expected output:
-```text
+```markdown
 ## Execution Plan: User Service Extraction
 
 ### Files Affected (23 files)

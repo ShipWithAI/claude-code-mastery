@@ -167,7 +167,7 @@ Run Claude review
 
 Check PR — you'll see a comment from `github-actions[bot]`:
 
-```text
+```markdown
 ## Claude Code Review
 
 - [src/test.js] Missing semicolon may cause ASI issues

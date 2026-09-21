@@ -1351,7 +1351,7 @@ Khoa's team implement tất cả lessons đó vào single system. Đây là sứ
 
 ---
 
-## Phase 2 Hoàn Tất — Security Graduation Của Bạn
+### Phase 2 Hoàn Tất — Security Graduation Của Bạn
 
 Chúc mừng! Bạn đã hoàn thành Phase 2: Security & Sandboxing. Bạn giờ có complete, operational security toolkit:
 
