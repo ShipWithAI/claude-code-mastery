@@ -407,9 +407,11 @@ OS permission chỉ chặn được Claude Code khi nó thực sự deny chính 
 của bạn. File với `chmod 000` không ai đọc được ngoại trừ root — cái này chặn
 được Claude Code thật. Nhưng `chmod 600` (mức "khóa lại" phổ biến) vẫn cho
 owner read/write, mà Claude Code chạy dưới user của bạn — nên nó VẪN đọc được
-file 600. `chmod` một mình không phải protection thật sự trước Claude Code;
-chỉ `permissions.deny` trong `.claude/settings.json` mới chặn được chắc chắn.
-Để isolation thực sự, bạn cần dùng user account khác hoặc containerization.
+file 600. `chmod` một mình không phải protection thật sự trước Claude Code —
+nó chạy dưới chính user của bạn. Cơ chế được document là `permissions.deny`
+trong `.claude/settings.json` (xem Option A); hãy verify bằng cách yêu cầu
+Claude đọc file đó. Để isolation thực sự, bạn cần dùng user account khác
+hoặc container.
 
 </details>
 

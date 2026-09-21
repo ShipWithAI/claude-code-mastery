@@ -118,11 +118,11 @@ Node.js REST API for task management with real-time notifications.
 
 Define how the code is organized — this prevents Claude from putting files in wrong places:
 
-```markdown
+````markdown
 ## Architecture Rules
 
 **Directory structure:**
-```
+```text
 src/
 ├── routes/          ← Express route handlers (thin, delegate to services)
 ├── services/        ← Business logic (fat, testable)
@@ -130,13 +130,13 @@ src/
 ├── middleware/      ← Express middleware (auth, validation, error)
 ├── types/           ← TypeScript interfaces and types
 └── utils/           ← Pure functions (no dependencies)
-```text
+```
 
 **Layering (enforced):**
 - Routes → Services → Repositories → Database
 - NEVER skip layers (e.g., routes calling repositories directly)
 - Services are the ONLY place for business logic
-```
+````
 
 ### Step 4: Add Coding Conventions
 

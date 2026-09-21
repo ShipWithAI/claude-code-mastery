@@ -398,9 +398,10 @@ account. A file with `chmod 000` cannot be read by anyone except root — that
 does block Claude Code. But `chmod 600` (the common "lock this down" default)
 still gives the owner read/write, and Claude Code runs as your user — so it
 CAN still read 600 files. `chmod` alone is not real protection against
-Claude Code; only `permissions.deny` in `.claude/settings.json` reliably
-blocks it. For true isolation, use a different user account or
-containerization.
+Claude Code — it runs as your user. The documented mechanism is
+`permissions.deny` in `.claude/settings.json` (see Option A); verify it by
+asking Claude to read the file. For true isolation, use a different user
+account or a container.
 
 </details>
 
