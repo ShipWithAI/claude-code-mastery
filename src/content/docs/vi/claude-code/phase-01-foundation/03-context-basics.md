@@ -485,7 +485,7 @@ invocation. Đó là khác biệt căn bản.
 
 | ❌ Sai lầm | ✅ Cách đúng |
 |-----------|-------------|
-| Paste toàn bộ file lớn khi chỉ cần một function | Dùng `/read path/to/file` hoặc tự extract function liên quan trước. Context đắt — hãy surgical về những gì bạn paste. |
+| Paste toàn bộ file lớn khi chỉ cần một function | Dùng `@path/to/file` hoặc tự extract function liên quan trước. Context đắt — hãy surgical về những gì bạn paste. |
 | Bỏ qua `/cost` trong session dài | Check `/cost` mỗi 5–10 turn. Nhiều developer không nhận ra họ đang ở 70%+ context cho đến khi chất lượng xuống cấp rõ rệt. Chạy thường xuyên. |
 | **Không biết tiếng Việt tốn nhiều token hơn tiếng Anh** | **Tiếng Việt, tiếng Nhật, tiếng Trung (CJK) dùng 1.5–2x token hơn tiếng Anh. Comment tiếng Việt trong code, tên biến tiếng Việt, log message tiếng Việt — tất cả đều "đắt" hơn. Nếu paste file Kotlin 2000 dòng với comment tiếng Việt xuyên suốt, context sẽ đầy nhanh hơn 40-50% so với cùng file với comment tiếng Anh.** |
 | Dùng `/clear` khi `/compact` đủ | `/clear` hủy conversation của bạn. Thử `/compact` trước — nó giữ context trong khi giải phóng 30–50% dung lượng. Chỉ `/clear` nếu bạn thực sự cần bắt đầu lại. |

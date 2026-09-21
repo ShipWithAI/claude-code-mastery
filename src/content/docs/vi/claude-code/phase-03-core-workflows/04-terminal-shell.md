@@ -236,7 +236,7 @@ Output mong đợi:
  => [internal] load build definition from Dockerfile
  => => transferring dockerfile: 432B
  => [stage-1 3/5] COPY package*.json ./
- => [stage-1 4/5] RUN npm ci --only=production
+ => [stage-1 4/5] RUN npm ci --omit=dev
  => exporting to image
  => => naming to docker.io/library/user-service:latest
 ```
@@ -408,7 +408,7 @@ Output:
 <details>
 <summary>💡 Gợi Ý</summary>
 
-Tạo một Dockerfile với lỗi như `FRON node:18` (viết sai FROM) hoặc `COPY nonexistent.txt /app/`. Claude sẽ thấy Docker build error output và có thể xác định syntax hoặc file issue.
+Tạo một Dockerfile với lỗi như `FRON node:22` (viết sai FROM) hoặc `COPY nonexistent.txt /app/`. Claude sẽ thấy Docker build error output và có thể xác định syntax hoặc file issue.
 
 </details>
 
@@ -421,7 +421,7 @@ Bạn: "Tạo một Dockerfile cho Node app nhưng cố tình làm nó bị lỗ
 
 Claude tạo:
 ```dockerfile
-FRON node:18
+FRON node:22
 WORKDIR /app
 COPY package.json .
 RUN npm install
@@ -585,15 +585,15 @@ Claude chạy lại toàn bộ chuỗi với tên branch đúng. Tất cả các
 
 ❌ Sai:
 ```bash
-docker-compose up
+docker compose up
 # Cái này block mãi mãi
 ```
 
 ✅ Đúng:
 ```bash
-docker-compose up -d  # Detached mode
+docker compose up -d  # Detached mode
 sleep 3
-docker-compose ps     # Verify container đã start
+docker compose ps     # Verify container đã start
 ```
 
 **Trường Hợp Đặc Biệt — npm/yarn Script**:

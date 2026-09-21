@@ -354,28 +354,25 @@ full unrestricted access to your system.
 
 **Goal**: Set up practical protections for your sensitive files.
 
-⚠️ **Claude Code may or may not support `.claudeignore` files.** This exercise
-shows the concept; verify if your version supports it.
+**Claude Code has no gitignore-style file blocklist** (no ignore-file mechanism exists).
+The real mechanism is `permissions.deny` in `.claude/settings.json`.
 
 **Instructions**:
 
-**Option A: If .claudeignore exists**
-1. Create a `.claudeignore` file in your home directory:
-```bash
-$ cat > ~/.claudeignore << 'EOF'
-.ssh/
-.aws/
-.env
-*.pem
-*.key
-credentials*
-EOF
+**Option A: Deny sensitive paths in settings.json**
+1. Add a `permissions.deny` list to `~/.claude/settings.json` (user-level, applies to every project):
+```json
+{
+  "permissions": {
+    "deny": ["Read(~/.ssh/**)", "Read(~/.aws/**)", "Read(./.env)", "Read(./.env.*)", "Read(**/*.pem)", "Read(**/*.key)"]
+  }
+}
 ```
 
-2. Verify it works by asking Claude to read an ignored file
+2. Verify it works by asking Claude to read one of the denied paths — the request should be blocked, not just prompted
 
-**Option B: If .claudeignore doesn't exist (more likely)**
-1. Use OS-level protections instead:
+**Option B: OS-level protections (defense in depth, stack with Option A)**
+1. Use OS-level protections as a second layer:
 ```bash
 $ chmod 600 ~/.ssh/*
 $ chmod 600 ~/.aws/credentials
@@ -411,16 +408,19 @@ different user account or containerization.
 
 The most reliable protections:
 
-1. **Directory-based**: Only run Claude Code inside project directories, never
+1. **`permissions.deny`**: Block reads of `~/.ssh/`, `~/.aws/`, `.env`, and key/pem
+   files in `.claude/settings.json` (see Option A above)
+
+2. **Directory-based**: Only run Claude Code inside project directories, never
    in ~
 
-2. **Container-based**: Run Claude Code in Docker without mounting sensitive
+3. **Container-based**: Run Claude Code in Docker without mounting sensitive
    directories (see Module 2.3)
 
-3. **Separate user**: Create a dedicated user account for Claude Code work
+4. **Separate user**: Create a dedicated user account for Claude Code work
    (advanced)
 
-4. **Vigilance**: Always read command proposals carefully before approving
+5. **Vigilance**: Always read command proposals carefully before approving
 
 Verification: After each protection, test by trying to access the file from
 Claude Code. If it succeeds, your protection failed.

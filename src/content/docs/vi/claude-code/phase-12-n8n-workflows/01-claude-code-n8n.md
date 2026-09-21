@@ -363,7 +363,7 @@ return [{ json: { result: output } }];
 
 | ❌ Sai | ✅ Đúng |
 |--------|---------|
-| Claude CLI không trong PATH của n8n | Dùng full path: `/usr/local/bin/claude` |
+| Claude CLI không trong PATH của n8n | Dùng full path: `~/.local/bin/claude` |
 | API key không available | Set `ANTHROPIC_API_KEY` trước khi start n8n |
 | Không timeout cho Claude call | Set timeout trong Execute Command (60000ms+) |
 | Quote làm hỏng prompt | Dùng Set node prepare prompt phức tạp |

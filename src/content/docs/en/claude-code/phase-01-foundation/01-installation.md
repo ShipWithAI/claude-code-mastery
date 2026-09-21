@@ -88,7 +88,7 @@ current recommended installation method, as this may change.
 
 **Option B: Homebrew (macOS)** ⚠️ Needs verification
 ```bash
-$ brew install claude-code
+$ brew install --cask claude-code
 ```
 
 ⚠️ The exact Homebrew formula name needs verification. Check `brew search claude`
@@ -284,7 +284,7 @@ $ claude
 | Task | Command | Notes |
 |------|---------|-------|
 | **Install (npm)** | `npm install -g @anthropic-ai/claude-code` | Requires Node.js 18+ |
-| **Install (Homebrew)** | `brew install claude-code` | ⚠️ Verify formula name |
+| **Install (Homebrew)** | `brew install --cask claude-code` | ⚠️ Verify formula name |
 | **Check Version** | `claude --version` | Verify installation works |
 | **Start Session** | `claude` | Opens interactive mode |
 | **One-shot Mode** | `claude -p "prompt"` | Single query, no session |

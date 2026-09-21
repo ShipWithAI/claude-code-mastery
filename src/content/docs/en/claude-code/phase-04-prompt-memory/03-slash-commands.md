@@ -92,15 +92,19 @@ The `/compact` command is your most critical tool for long sessions. Here's how 
 
 Claude Code supports custom slash commands via Markdown files in the `.claude/commands/` directory:
 
+Project commands live in `.claude/commands/<name>.md` and are invoked as `/<name>`.
+User commands live in `~/.claude/commands/<name>.md` (available in every project) and are
+also invoked as `/<name>`.
+
 **Project-level commands** (shared with team via git):
 ```text
-.claude/commands/review.md     → appears as /project:review
-.claude/commands/test.md       → appears as /project:test
+.claude/commands/review.md     → appears as /review
+.claude/commands/test.md       → appears as /test
 ```
 
-**Global commands** (available in all projects):
+**User-level commands** (available in all projects):
 ```text
-~/.claude/commands/my-prompt.md  → appears as /user:my-prompt
+~/.claude/commands/my-prompt.md  → appears as /my-prompt
 ```
 
 **Example:** Create a reusable code review command:
@@ -116,7 +120,7 @@ Review the current changes with focus on:
 Use the project's coding conventions from CLAUDE.md.
 ```
 
-Now type `/project:review` in any REPL session to invoke it. Custom commands can also use the `$ARGUMENTS` placeholder to accept parameters.
+Now type `/review` in any REPL session to invoke it. Custom commands can also use the `$ARGUMENTS` placeholder to accept parameters.
 
 ---
 

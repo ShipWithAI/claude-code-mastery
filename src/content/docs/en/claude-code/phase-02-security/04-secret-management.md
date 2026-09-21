@@ -44,7 +44,7 @@ Your secret management strategy needs defense in depth. Each layer cuts the chai
 | Layer | What It Does | Cuts Chain At | Example Tools |
 |-------|--------------|---------------|---------------|
 | **Layer 1: Context Prevention** | Keep secrets out of Claude's context entirely | A → B | .env.example pattern, prompt discipline |
-| **Layer 2: File Protection** | Protect secret files from being read | A → B | File permissions, .gitignore, ⚠️ .claudeignore (needs verification) |
+| **Layer 2: File Protection** | Protect secret files from being read | A → B | File permissions, .gitignore, `permissions.deny` in `.claude/settings.json` |
 | **Layer 3: Rotation Discipline** | Assume exposed secrets are compromised, rotate them | After B | AWS Secrets Manager, HashiCorp Vault |
 | **Layer 4: Detection & Monitoring** | Catch leaked secrets before they cause damage | D → E, E → F | gitleaks, trufflehog, git hooks |
 
@@ -75,8 +75,11 @@ Critical distinction: .gitignore prevents git commits but does NOT prevent Claud
 **File Permissions:**
 From Module 2.1, recall that file permissions (chmod 600) can restrict access, but this is brittle if Claude runs as your user.
 
-**⚠️ Needs verification — .claudeignore:**
-Check if Claude Code respects a .claudeignore file (similar to .gitignore) that prevents reading specific files. This feature may or may not exist in current versions.
+**Deny list — `permissions.deny`:**
+Claude Code has no gitignore-style ignore-file mechanism. To block Claude Code from reading a path outright, add it to `permissions.deny` in `.claude/settings.json`:
+```json
+{ "permissions": { "deny": ["Read(./.env)", "Read(./.env.*)", "Read(~/.ssh/**)"] } }
+```
 
 ### Layer 3: Secret Rotation Discipline
 
@@ -158,7 +161,7 @@ MOMO_ACCESS_KEY=your_momo_access_key_here
 MOMO_SECRET_KEY=your_momo_secret_key_here
 
 # Database
-DATABASE_URL=postgresql://user:password@localhost:5432/payment_db
+DATABASE_URL=postgresql://username:password@localhost:5432/payment_db
 
 # Redis cache
 REDIS_URL=redis://:password@localhost:6379
@@ -217,7 +220,7 @@ v8.18.1
 cat > .git/hooks/pre-commit << 'EOF'
 #!/bin/bash
 echo "Running gitleaks scan on staged files..."
-gitleaks protect --staged --verbose
+gitleaks git --pre-commit --staged --verbose
 
 if [ $? -ne 0 ]; then
     echo ""
@@ -372,7 +375,7 @@ nano .env.example  # Replace generic placeholders with specific instructions
 
 # Example transformation:
 # Before: DATABASE_URL=your_value_here
-# After:  DATABASE_URL=postgresql://user:password@localhost:5432/dbname
+# After:  DATABASE_URL=postgresql://username:password@localhost:5432/dbname
 
 # Ensure .env is gitignored
 if ! grep -q "^\.env$" .gitignore; then
@@ -444,7 +447,7 @@ cd ~/projects/my-app
 cat > .git/hooks/pre-commit << 'EOF'
 #!/bin/bash
 echo "Running gitleaks scan..."
-gitleaks protect --staged --verbose
+gitleaks git --pre-commit --staged --verbose
 if [ $? -ne 0 ]; then
     echo "❌ Secrets detected! Commit blocked."
     exit 1
@@ -490,7 +493,7 @@ Now every commit is automatically scanned. Secrets cannot enter git history with
    - List each secret with: type, location (commit hash, file, line)
    - Classify by rotation priority (🔴 IMMEDIATE, 🟡 HIGH, 🟢 MEDIUM)
    - Create rotation plan with timeline
-   - Use `git filter-branch` or BFG Repo-Cleaner to remove from history (advanced)
+   - Use `git filter-repo` or BFG Repo-Cleaner to remove from history (advanced)
 4. If no secrets found: Document the clean audit result with date
 
 **Expected result**: Complete audit report with action plan for any exposed secrets.
@@ -567,10 +570,8 @@ After rotating all secrets, remove from git history:
 # Using BFG Repo-Cleaner (recommended)
 bfg --replace-text secrets.txt repo.git
 
-# OR using git filter-branch (slower)
-git filter-branch --force --index-filter \
-  'git rm --cached --ignore-unmatch config/aws.json' \
-  --prune-empty --tag-name-filter cat -- --all
+# OR using git filter-repo (faster, actively maintained — different CLI from the old filter-branch)
+git filter-repo --path config/aws.json --invert-paths
 ```
 
 ⚠️ WARNING: History rewrite forces pushes to all collaborators.
@@ -641,7 +642,7 @@ This creates a documented audit trail for compliance and security reviews.
 
 | Tool | Purpose | Command | When to Run |
 |------|---------|---------|-------------|
-| **gitleaks** | Pre-commit scanning | `gitleaks protect --staged` | Every commit (via hook) |
+| **gitleaks** | Pre-commit scanning | `gitleaks git --pre-commit --staged` | Every commit (via hook) |
 | **gitleaks** | Full history audit | `gitleaks detect --verbose` | Monthly, before releases |
 | **trufflehog** | Deep history scan | `trufflehog git file://.` | Quarterly, after incidents |
 | **git-secrets** | AWS-focused scanning | `git secrets --scan` | AWS projects only |
@@ -738,7 +739,7 @@ MOMO_SECRET_KEY=your_momo_secret_key_here
 ```bash
 # .git/hooks/pre-commit
 #!/bin/bash
-gitleaks protect --staged --verbose
+gitleaks git --pre-commit --staged --verbose
 ```
 
 **Layer 4 - Safe Prompt:**

@@ -86,7 +86,7 @@ const claude = new ClaudeCode({ apiKey: process.env.ANTHROPIC_API_KEY });
 const result = await claude.execute({
   prompt: "Generate a React component",
   workingDirectory: "./src",
-  model: "claude-opus-4",
+  model: "opus",
 });
 
 console.log(result.output);

@@ -364,28 +364,25 @@ như có full unrestricted access đến hệ thống của bạn.
 
 **Mục tiêu**: Thiết lập protection thực tế cho file nhạy cảm.
 
-⚠️ **Claude Code có thể có hoặc không hỗ trợ file `.claudeignore`.** Bài tập
-này show concept; verify xem version của bạn có hỗ trợ không.
+**Claude Code không có cơ chế blocklist kiểu gitignore** (không tồn tại ignore-file nào cả).
+Cơ chế thật là `permissions.deny` trong `.claude/settings.json`.
 
 **Hướng dẫn**:
 
-**Option A: Nếu .claudeignore tồn tại**
-1. Tạo file `.claudeignore` trong home directory:
-```bash
-$ cat > ~/.claudeignore << 'EOF'
-.ssh/
-.aws/
-.env
-*.pem
-*.key
-credentials*
-EOF
+**Option A: Deny các path nhạy cảm trong settings.json**
+1. Thêm list `permissions.deny` vào `~/.claude/settings.json` (user-level, áp dụng cho mọi project):
+```json
+{
+  "permissions": {
+    "deny": ["Read(~/.ssh/**)", "Read(~/.aws/**)", "Read(./.env)", "Read(./.env.*)", "Read(**/*.pem)", "Read(**/*.key)"]
+  }
+}
 ```
 
-2. Verify nó hoạt động bằng cách yêu cầu Claude đọc file bị ignore
+2. Verify nó hoạt động bằng cách yêu cầu Claude đọc một trong các path bị deny — request phải bị chặn, không chỉ là prompt hỏi
 
-**Option B: Nếu .claudeignore không tồn tại (khả năng cao hơn)**
-1. Dùng OS-level protection thay thế:
+**Option B: OS-level protection (defense in depth, dùng cùng Option A)**
+1. Dùng OS-level protection như một lớp bổ sung:
 ```bash
 $ chmod 600 ~/.ssh/*
 $ chmod 600 ~/.aws/credentials
@@ -421,15 +418,18 @@ dùng user account khác hoặc containerization.
 
 Các protection đáng tin cậy nhất:
 
-1. **Dựa trên directory**: Chỉ chạy Claude Code trong project directory, không
+1. **`permissions.deny`**: Chặn đọc `~/.ssh/`, `~/.aws/`, `.env`, và các file
+   key/pem trong `.claude/settings.json` (xem Option A ở trên)
+
+2. **Dựa trên directory**: Chỉ chạy Claude Code trong project directory, không
    bao giờ trong ~
 
-2. **Dựa trên container**: Chạy Claude Code trong Docker mà không mount
+3. **Dựa trên container**: Chạy Claude Code trong Docker mà không mount
    directory nhạy cảm (xem Module 2.3)
 
-3. **User riêng**: Tạo user account riêng cho công việc Claude Code (nâng cao)
+4. **User riêng**: Tạo user account riêng cho công việc Claude Code (nâng cao)
 
-4. **Cảnh giác**: Luôn đọc kỹ command proposal trước khi approve
+5. **Cảnh giác**: Luôn đọc kỹ command proposal trước khi approve
 
 Verification: Sau mỗi protection, test bằng cách thử truy cập file từ Claude
 Code. Nếu thành công, protection của bạn đã fail.

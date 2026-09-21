@@ -209,7 +209,7 @@ Thumbs.db
 
 ```bash
 # .env.example — commit vào git, an toàn cho Claude đọc
-DATABASE_URL=postgresql://user:password@localhost:5432/dbname
+DATABASE_URL=postgresql://username:password@localhost:5432/dbname
 REDIS_URL=redis://:password@localhost:6379
 API_KEY=your_api_key_here
 STRIPE_KEY=sk_test_placeholder
@@ -245,7 +245,7 @@ brew install gitleaks
 # Thêm pre-commit hook
 cat > .git/hooks/pre-commit << 'HOOK'
 #!/bin/bash
-gitleaks protect --staged --verbose
+gitleaks git --pre-commit --staged --verbose
 if [ $? -ne 0 ]; then
     echo "PHÁT HIỆN SECRET! Commit bị chặn."
     exit 1

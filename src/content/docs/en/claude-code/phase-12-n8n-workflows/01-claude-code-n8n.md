@@ -375,7 +375,7 @@ return [{ json: { result: output } }];
 
 | ❌ Mistake | ✅ Correct Approach |
 |---|---|
-| Claude CLI not in n8n's PATH | Use full path: `/usr/local/bin/claude` |
+| Claude CLI not in n8n's PATH | Use full path: `~/.local/bin/claude` |
 | API key not available | Set `ANTHROPIC_API_KEY` before starting n8n |
 | No timeout on Claude calls | Set timeout in Execute Command (60000ms+) |
 | Quotes breaking prompts | Use Set node to prepare complex prompts |

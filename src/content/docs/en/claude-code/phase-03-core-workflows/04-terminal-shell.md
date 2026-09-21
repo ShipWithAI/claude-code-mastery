@@ -236,7 +236,7 @@ Expected output:
  => [internal] load build definition from Dockerfile
  => => transferring dockerfile: 432B
  => [stage-1 3/5] COPY package*.json ./
- => [stage-1 4/5] RUN npm ci --only=production
+ => [stage-1 4/5] RUN npm ci --omit=dev
  => exporting to image
  => => naming to docker.io/library/user-service:latest
 ```
@@ -408,7 +408,7 @@ Output:
 <details>
 <summary>💡 Hint</summary>
 
-Create a Dockerfile with an error like `FRON node:18` (misspelled FROM) or `COPY nonexistent.txt /app/`. Claude will see the Docker build error output and can identify the syntax or file issue.
+Create a Dockerfile with an error like `FRON node:22` (misspelled FROM) or `COPY nonexistent.txt /app/`. Claude will see the Docker build error output and can identify the syntax or file issue.
 
 </details>
 
@@ -421,7 +421,7 @@ You: "Create a Dockerfile for a Node app but make it broken on purpose — I wan
 
 Claude creates:
 ```dockerfile
-FRON node:18
+FRON node:22
 WORKDIR /app
 COPY package.json .
 RUN npm install
@@ -585,15 +585,15 @@ Claude re-runs the full chain with the correct branch name. All steps complete s
 
 ❌ Wrong:
 ```bash
-docker-compose up
+docker compose up
 # This blocks forever
 ```
 
 ✅ Correct:
 ```bash
-docker-compose up -d  # Detached mode
+docker compose up -d  # Detached mode
 sleep 3
-docker-compose ps     # Verify containers started
+docker compose ps     # Verify containers started
 ```
 
 **Special Case — npm/yarn Scripts**:

@@ -87,7 +87,7 @@ phương pháp cài đặt được recommend hiện tại, vì có thể thay �
 
 **Phương án B: Homebrew (macOS)** ⚠️ Cần xác minh
 ```bash
-$ brew install claude-code
+$ brew install --cask claude-code
 ```
 
 ⚠️ Tên formula Homebrew chính xác cần xác minh. Chạy `brew search claude` để
@@ -282,7 +282,7 @@ $ claude
 | Tác vụ | Lệnh | Ghi chú |
 |--------|------|---------|
 | **Cài (npm)** | `npm install -g @anthropic-ai/claude-code` | Cần Node.js 18+ |
-| **Cài (Homebrew)** | `brew install claude-code` | ⚠️ Cần xác minh tên formula |
+| **Cài (Homebrew)** | `brew install --cask claude-code` | ⚠️ Cần xác minh tên formula |
 | **Kiểm tra version** | `claude --version` | Xác minh cài đặt thành công |
 | **Bắt đầu session** | `claude` | Mở interactive mode |
 | **Chế độ one-shot** | `claude -p "prompt"` | Single query, không session |

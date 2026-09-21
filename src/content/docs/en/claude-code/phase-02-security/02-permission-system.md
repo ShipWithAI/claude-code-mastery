@@ -193,11 +193,13 @@ Click "Approve Always" (for demonstration only — be careful with this in real 
 
 Expected: Claude Code runs the command. Next time it wants to run `head`, it won't ask (you've approved this command type permanently for this session or project ⚠️ exact scope needs verification).
 
-**Step 6: Check Permission Settings** ⚠️ Needs verification
+**Step 6: Check Permission Settings**
 ```bash
-$ claude config show
+$ cat ~/.claude/settings.json          # user settings
+$ cat .claude/settings.json            # project settings (committed)
+$ cat .claude/settings.local.json      # project-local (gitignored)
 ```
-Expected: Configuration output showing current permission settings, allowlist, and trust level. ⚠️ The exact command and output format need verification.
+Expected: JSON showing the `permissions` block (allow/deny/ask lists). Settings are plain files — there's no CLI subcommand for viewing configuration.
 
 ---
 

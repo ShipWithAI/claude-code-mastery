@@ -44,7 +44,7 @@ Chiến lược quản lý secret của bạn cần phòng thủ theo chiều s�
 | Lớp | Tác dụng | Cắt chuỗi tại | Công cụ ví dụ |
 |-----|----------|---------------|---------------|
 | **Lớp 1: Ngăn Context** | Giữ secrets hoàn toàn ngoài context của Claude | A → B | Pattern .env.example, kỷ luật prompt |
-| **Lớp 2: Bảo vệ File** | Bảo vệ secret files khỏi bị đọc | A → B | File permissions, .gitignore, ⚠️ .claudeignore (cần xác minh) |
+| **Lớp 2: Bảo vệ File** | Bảo vệ secret files khỏi bị đọc | A → B | File permissions, .gitignore, `permissions.deny` trong `.claude/settings.json` |
 | **Lớp 3: Kỷ luật Rotation** | Giả định secrets đã lộ là đã bị compromise, rotate chúng | Sau B | AWS Secrets Manager, HashiCorp Vault |
 | **Lớp 4: Phát hiện & Giám sát** | Bắt leaked secrets trước khi gây thiệt hại | D → E, E → F | gitleaks, trufflehog, git hooks |
 
@@ -75,8 +75,11 @@ Phân biệt quan trọng: .gitignore ngăn git commits nhưng KHÔNG ngăn Clau
 **File Permissions:**
 Từ Module 2.1, nhớ lại rằng file permissions (chmod 600) có thể hạn chế access, nhưng cách này dễ vỡ nếu Claude chạy với user của bạn.
 
-**⚠️ Cần xác minh — .claudeignore:**
-Kiểm tra xem Claude Code có tôn trọng file .claudeignore không (tương tự .gitignore) để ngăn đọc các files cụ thể. Tính năng này có thể có hoặc không có trong phiên bản hiện tại.
+**Deny list — `permissions.deny`:**
+Claude Code không có cơ chế ignore-file kiểu gitignore. Để chặn Claude Code đọc hẳn một path, thêm nó vào `permissions.deny` trong `.claude/settings.json`:
+```json
+{ "permissions": { "deny": ["Read(./.env)", "Read(./.env.*)", "Read(~/.ssh/**)"] } }
+```
 
 ### Lớp 3: Kỷ luật Secret Rotation
 
@@ -164,7 +167,7 @@ MOMO_SECRET_KEY=your_momo_secret_key_here
 ZALOPAY_APP_ID=your_zalopay_app_id_here
 
 # Database
-DATABASE_URL=postgresql://user:password@localhost:5432/payment_db
+DATABASE_URL=postgresql://username:password@localhost:5432/payment_db
 
 # Redis cache
 REDIS_URL=redis://:password@localhost:6379
@@ -223,7 +226,7 @@ v8.18.1
 cat > .git/hooks/pre-commit << 'EOF'
 #!/bin/bash
 echo "Đang chạy gitleaks scan trên staged files..."
-gitleaks protect --staged --verbose
+gitleaks git --pre-commit --staged --verbose
 
 if [ $? -ne 0 ]; then
     echo ""
@@ -378,7 +381,7 @@ nano .env.example  # Thay generic placeholders bằng hướng dẫn cụ thể
 
 # Ví dụ transformation:
 # Trước: DATABASE_URL=your_value_here
-# Sau:  DATABASE_URL=postgresql://user:password@localhost:5432/dbname
+# Sau:  DATABASE_URL=postgresql://username:password@localhost:5432/dbname
 
 # Đảm bảo .env đã gitignored
 if ! grep -q "^\.env$" .gitignore; then
@@ -450,7 +453,7 @@ cd ~/projects/my-app
 cat > .git/hooks/pre-commit << 'EOF'
 #!/bin/bash
 echo "Đang chạy gitleaks scan..."
-gitleaks protect --staged --verbose
+gitleaks git --pre-commit --staged --verbose
 if [ $? -ne 0 ]; then
     echo "❌ Phát hiện secrets! Commit bị chặn."
     exit 1
@@ -496,7 +499,7 @@ Giờ mọi commit đều được tự động scan. Secrets không thể vào 
    - List từng secret với: type, location (commit hash, file, line)
    - Phân loại theo rotation priority (🔴 NGAY LẬP TỨC, 🟡 CAO, 🟢 TRUNG BÌNH)
    - Tạo rotation plan với timeline
-   - Dùng `git filter-branch` hoặc BFG Repo-Cleaner để xóa khỏi history (nâng cao)
+   - Dùng `git filter-repo` hoặc BFG Repo-Cleaner để xóa khỏi history (nâng cao)
 4. Nếu không tìm thấy secrets: Document kết quả audit clean với ngày tháng
 
 **Kết quả mong đợi**: Báo cáo audit hoàn chỉnh với action plan cho bất kỳ exposed secrets nào.
@@ -573,10 +576,8 @@ Sau khi rotate tất cả secrets, xóa khỏi git history:
 # Dùng BFG Repo-Cleaner (khuyến nghị)
 bfg --replace-text secrets.txt repo.git
 
-# HOẶC dùng git filter-branch (chậm hơn)
-git filter-branch --force --index-filter \
-  'git rm --cached --ignore-unmatch config/aws.json' \
-  --prune-empty --tag-name-filter cat -- --all
+# HOẶC dùng git filter-repo (nhanh hơn, đang được maintain — CLI khác hẳn filter-branch cũ)
+git filter-repo --path config/aws.json --invert-paths
 ```
 
 ⚠️ CẢNH BÁO: History rewrite buộc force pushes đến tất cả collaborators.
@@ -647,7 +648,7 @@ EOF
 
 | Tool | Mục đích | Command | Khi nào chạy |
 |------|---------|---------|--------------|
-| **gitleaks** | Pre-commit scanning | `gitleaks protect --staged` | Mỗi commit (qua hook) |
+| **gitleaks** | Pre-commit scanning | `gitleaks git --pre-commit --staged` | Mỗi commit (qua hook) |
 | **gitleaks** | Full history audit | `gitleaks detect --verbose` | Hàng tháng, trước releases |
 | **trufflehog** | Deep history scan | `trufflehog git file://.` | Hàng quý, sau incidents |
 | **git-secrets** | AWS-focused scanning | `git secrets --scan` | Chỉ AWS projects |
@@ -762,7 +763,7 @@ VIETCOMBANK_API_KEY=your_vietcombank_api_key_here
 ```bash
 # .git/hooks/pre-commit
 #!/bin/bash
-gitleaks protect --staged --verbose
+gitleaks git --pre-commit --staged --verbose
 ```
 
 **Lớp 4 - Prompt An toàn:**

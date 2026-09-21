@@ -193,11 +193,13 @@ Click "Approve Always" (chỉ để demo thôi — cẩn thận với cái này 
 
 Kết quả mong đợi: Claude Code chạy command. Lần sau nó muốn chạy `head`, nó sẽ không hỏi (bạn đã approve command type này permanently cho session hoặc project này ⚠️ exact scope cần verification).
 
-**Bước 6: Kiểm tra Permission Setting** ⚠️ Needs verification
+**Bước 6: Kiểm tra Permission Setting**
 ```bash
-$ claude config show
+$ cat ~/.claude/settings.json          # user settings
+$ cat .claude/settings.json            # project settings (committed)
+$ cat .claude/settings.local.json      # project-local (gitignored)
 ```
-Kết quả mong đợi: Configuration output hiển thị current permission setting, allowlist, và trust level. ⚠️ Command chính xác và output format cần verification.
+Kết quả mong đợi: JSON hiển thị block `permissions` (allow/deny/ask lists). Settings là plain files — không có CLI subcommand để xem configuration.
 
 ---
 

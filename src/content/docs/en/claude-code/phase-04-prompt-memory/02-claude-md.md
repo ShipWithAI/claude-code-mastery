@@ -181,7 +181,7 @@ npm run test:watch   # Jest in watch mode
 npm run lint         # ESLint + Prettier check
 npm run db:migrate   # Run Prisma migrations
 npm run db:seed      # Seed database with test data
-docker-compose up    # Start PostgreSQL + Redis locally
+docker compose up    # Start PostgreSQL + Redis locally
 ```
 
 **Deploy:** `git push` triggers Railway deploy (main branch only)
@@ -328,7 +328,7 @@ npm run test:watch   # Jest in watch mode
 npm run lint         # ESLint + Prettier check
 npm run db:migrate   # Run Prisma migrations
 npm run db:seed      # Seed database with test data
-docker-compose up    # Start PostgreSQL + Redis locally
+docker compose up    # Start PostgreSQL + Redis locally
 ```
 
 **Deploy:** `git push` triggers Railway deploy (main branch only)

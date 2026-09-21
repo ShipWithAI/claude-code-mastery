@@ -63,20 +63,16 @@ That said, CLAUDE.md is incredibly powerful because:
 
 ### Configuration Settings
 
-⚠️ Needs verification — the exact configuration commands may vary by Claude Code version.
-
-Claude Code has both global and project-level configuration:
+**There is no `claude config` subcommand.** Settings are plain JSON files — read and edit
+them directly:
 
 ```bash
-# View current configuration
-claude config show
-
-# Set a configuration value
-claude config set <key> <value>
-
-# Reset to defaults
-claude config reset
+cat ~/.claude/settings.json          # user settings
+cat .claude/settings.json            # project settings (committed)
+cat .claude/settings.local.json      # project-local (gitignored)
 ```
+
+⚠️ Field names inside these files are not verified in this course — check the official Claude Code docs for the current settings schema.
 
 **Typical configuration areas:**
 - **Permissions**: Default approval settings (callback to Module 2.2)
@@ -85,9 +81,10 @@ claude config reset
 - **Logging**: What gets logged and where
 
 **Project-level vs Global:**
-- **Global config**: Lives in `~/.claude/config` — affects all projects
-- **Project config**: Lives in `.claude/config` in project root — overrides global
-- **Use case**: Global = safe defaults, Project = exceptions for trusted repos
+- **Global settings**: `~/.claude/settings.json` — affects all projects
+- **Project settings**: `.claude/settings.json` in project root — committed, shared with the team
+- **Project-local settings**: `.claude/settings.local.json` — gitignored, machine-specific overrides
+- **Use case**: Global = safe defaults, project settings = exceptions for trusted repos
 
 ### Team Governance
 
@@ -286,7 +283,7 @@ EOF
 ```bash
 $ cat > .env.example << 'EOF'
 # Database
-DATABASE_URL=postgresql://user:password@localhost:5432/banking_dev
+DATABASE_URL=postgresql://username:password@localhost:5432/banking_dev
 DB_POOL_SIZE=10
 
 # Authentication
@@ -369,7 +366,7 @@ $ cat > .git/hooks/pre-commit << 'EOF'
 echo "🔍 Running gitleaks secret scan..."
 
 # Run gitleaks on staged files only
-gitleaks protect --staged --verbose
+gitleaks git --pre-commit --staged --verbose
 
 EXIT_CODE=$?
 
@@ -613,7 +610,7 @@ EOF
 
 ```bash
 # Set project-level configuration
-$ claude config set model claude-3-5-sonnet-20241022
+$ claude config set model sonnet
 $ claude config set auto-compact true
 $ claude config set log-level info
 ```
@@ -621,7 +618,7 @@ $ claude config set log-level info
 **Expected output:**
 ```text
 Configuration updated:
-  model: claude-3-5-sonnet-20241022
+  model: sonnet
   auto-compact: true
   log-level: info
 
@@ -1109,16 +1106,18 @@ High-risk, high-likelihood, low-effort fixes go first.
 | **Git** | Never push without showing diff | Catches accidental commits |
 | **Database** | Never `DELETE` without `WHERE` | Prevents data loss |
 
-### Configuration Commands (⚠️ Needs verification)
+### Configuration Files
+
+Settings are plain JSON files — there's no CLI subcommand for viewing or resetting configuration.
 
 | Command | Purpose | Scope |
 |---------|---------|-------|
-| `claude config show` | View current settings | Global or project |
-| `claude config set key value` | Change setting | Global or project |
-| `claude config reset` | Restore defaults | Global or project |
+| `cat ~/.claude/settings.json` | View user settings | Global |
+| `cat .claude/settings.json` | View project settings (committed) | Project |
+| `cat .claude/settings.local.json` | View project-local settings (gitignored) | Project |
 
-**Project config**: Lives in `.claude/config` (overrides global)
-**Global config**: Lives in `~/.claude/config` (default for all projects)
+**Project settings**: Lives in `.claude/settings.json` (overrides global)
+**Global settings**: Lives in `~/.claude/settings.json` (default for all projects)
 
 ### Phase 2 Security Stack Summary
 
@@ -1165,7 +1164,7 @@ High-risk, high-likelihood, low-effort fixes go first.
 ```bash
 # Secret scanning
 gitleaks detect                    # Scan entire repo
-gitleaks protect --staged          # Scan staged files only
+gitleaks git --pre-commit --staged          # Scan staged files only
 gitleaks detect --verbose          # Detailed output
 
 # Environment verification

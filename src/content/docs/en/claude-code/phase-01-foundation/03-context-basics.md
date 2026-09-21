@@ -474,7 +474,7 @@ invocation. That's the fundamental difference.
 
 | ❌ Mistake | ✅ Correct Approach |
 |-----------|-------------------|
-| Pasting entire large files when you only need one function | Use `/read path/to/file` or manually extract the relevant function first. Context is expensive — be surgical about what you paste. |
+| Pasting entire large files when you only need one function | Use `@path/to/file` or manually extract the relevant function first. Context is expensive — be surgical about what you paste. |
 | Ignoring `/cost` in long sessions | Check `/cost` every 5–10 turns. Many developers don't realize they're at 70%+ context until quality degrades noticeably. Run it regularly. |
 | Assuming one token = one character in all languages | Vietnamese, Japanese, Chinese (CJK) use 1.5–2x more tokens per character than English. A Vietnamese doc is more expensive than the same English document. |
 | Using `/clear` when `/compact` would suffice | `/clear` destroys your conversation. Try `/compact` first — it preserves context while freeing 30–50% of space. Only `/clear` if you truly need to start over. |

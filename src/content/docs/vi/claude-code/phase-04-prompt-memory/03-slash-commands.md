@@ -92,15 +92,19 @@ Lệnh `/compact` là công cụ quan trọng nhất cho session dài. Đây là
 
 Claude Code hỗ trợ custom slash commands thông qua file Markdown trong thư mục `.claude/commands/`:
 
+Project commands nằm ở `.claude/commands/<name>.md` và gọi bằng `/<name>`.
+User commands nằm ở `~/.claude/commands/<name>.md` (có sẵn trong mọi project) và cũng
+gọi bằng `/<name>`.
+
 **Lệnh cấp project** (chia sẻ với team qua git):
 ```text
-.claude/commands/review.md     → hiển thị là /project:review
-.claude/commands/test.md       → hiển thị là /project:test
+.claude/commands/review.md     → hiển thị là /review
+.claude/commands/test.md       → hiển thị là /test
 ```
 
-**Lệnh toàn cục** (có sẵn trong mọi project):
+**Lệnh cấp user** (có sẵn trong mọi project):
 ```text
-~/.claude/commands/my-prompt.md  → hiển thị là /user:my-prompt
+~/.claude/commands/my-prompt.md  → hiển thị là /my-prompt
 ```
 
 **Ví dụ:** Tạo lệnh code review tái sử dụng:
@@ -116,7 +120,7 @@ Review các thay đổi hiện tại với focus vào:
 Dùng coding conventions của project từ CLAUDE.md.
 ```
 
-Giờ gõ `/project:review` trong bất kỳ REPL session nào để sử dụng. Custom commands cũng có thể dùng placeholder `$ARGUMENTS` để nhận tham số.
+Giờ gõ `/review` trong bất kỳ REPL session nào để sử dụng. Custom commands cũng có thể dùng placeholder `$ARGUMENTS` để nhận tham số.
 
 ---
 
