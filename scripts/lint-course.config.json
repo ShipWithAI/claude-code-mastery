@@ -1,0 +1,36 @@
+{
+  "moduleGlob": "src/content/docs/{en,vi}/claude-code/phase-*/*.{md,mdx}",
+  "extraFiles": [
+    "src/content/docs/en/claude-code/cheat-sheet.mdx",
+    "src/content/docs/vi/claude-code/cheat-sheet.mdx",
+    "src/content/docs/en/claude-code/tips-tricks.mdx",
+    "src/content/docs/vi/claude-code/tips-tricks.mdx"
+  ],
+  "h2Count": 7,
+  "words": { "warn": 1500, "max": 2200, "maxLevel": "warn" },
+  "lineWidth": { "limit": 100, "level": "warn" },
+  "frontmatter": {
+    "required": ["title", "description"],
+    "recommended": ["verified", "claude_version"],
+    "recommendedLevel": "warn"
+  },
+  "markdownLangs": ["markdown", "md", "mdx"],
+  "blacklist": [
+    { "pattern": "claude config (show|reset)", "level": "error", "note": "không tồn tại; dùng ~/.claude/settings.json" },
+    { "pattern": "\\.claudeignore", "level": "error", "note": "chưa từng tồn tại; dùng permissions.deny" },
+    { "pattern": "(^|[^\\w/])/read \\S", "level": "error", "note": "dùng @path" },
+    { "pattern": "/(project|user):[a-z]", "level": "error", "note": "namespace đã bỏ; dùng /name" },
+    { "pattern": "pre-file-write|post-file-write|pre-command|post-command|pre-session|post-session", "level": "error", "note": "hook events bịa; xem docs/en/hooks" },
+    { "pattern": "\\.claude/hooks\\.json", "level": "error", "note": "hooks nằm trong settings.json" },
+    { "pattern": "claude skill (install|list|remove|info)", "level": "error", "note": "không tồn tại; skills = .claude/skills/<name>/SKILL.md" },
+    { "pattern": "claude_desktop_config", "level": "error", "note": "file của Claude Desktop, không phải Claude Code" },
+    { "pattern": "--network[= ]none", "level": "error", "note": "Claude Code cần reach api.anthropic.com" },
+    { "pattern": "claude-3-5-sonnet|claude-sonnet-4-2025|claude-opus-4\\b", "level": "error", "note": "model ID cũ; dùng alias opus/sonnet/haiku" },
+    { "pattern": "from ['\"]@anthropic-ai/claude-code['\"]", "level": "error", "note": "SDK là @anthropic-ai/claude-agent-sdk" },
+    { "pattern": "Split In Batches", "level": "error", "note": "n8n node nay là Loop Over Items" },
+    { "pattern": "gitleaks protect", "level": "error", "note": "gitleaks git --pre-commit --staged" },
+    { "pattern": "git filter-branch", "level": "error", "note": "git filter-repo" },
+    { "pattern": "/usr/local/bin/claude", "level": "error", "note": "native installer: ~/.local/bin/claude" },
+    { "pattern": "Ctrl\\+C.{0,40}(stop|interrupt|emergency|dừng|ngắt)", "level": "warn", "note": "Esc = interrupt; Ctrl+C ×2 = thoát — đọc ngữ cảnh" }
+  ]
+}
