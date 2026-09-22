@@ -1,417 +1,289 @@
 ---
 title: 'Think Mode (Extended Thinking)'
-description: 'Kích hoạt Think Mode trong Claude Code để giải quyết bài toán phức tạp với extended thinking.'
+description: 'Điều khiển độ sâu suy luận của Claude Code bằng effort level, keyword ultrathink và công tắc thinking.'
+verified: 2026-09-22
+claude_version: 2.1.278
 ---
 
 # Module 6.1: Think Mode (Extended Thinking)
 
-> **Thời gian học**: ~30 phút
+> **Thời gian**: ~30 phút
 >
-> **Yêu cầu trước**: Module 5.3 (Context Hình ảnh & Visual)
+> **Yêu cầu trước**: Module 5.3 (Image & Visual Context)
 >
-> **Kết quả**: Sau module này, bạn sẽ biết cách kích hoạt extended thinking mode, khi nào dùng think vs quick mode, và cách nhận kết quả tốt hơn đáng kể cho vấn đề phức tạp.
+> **Kết quả**: Sau module này bạn biết extended thinking vốn đã bật sẵn, biết tăng/giảm nó
+> bằng effort level, biết khi nào dùng `ultrathink`, và biết cách đọc phần reasoning mà
+> Claude Code giấu đi.
 
 ---
 
-## 1. WHY — Tại Sao Cần Think Mode
+## 1. WHY — Tại Sao Quan Trọng
 
-Bạn bảo Claude: "Refactor module auth để hỗ trợ OAuth2." Nó lập tức viết code — nhưng nông cạn, bỏ sót edge case, không tận dụng session management có sẵn. Vấn đề? Claude đang sprint khi lẽ ra phải đi bộ và suy nghĩ. Giống như senior dev code trước, nghĩ sau — kết quả là phải rework.
+Một nửa lời khuyên về Claude Code trên mạng bảo bạn gõ "think step by step" hoặc "think
+harder" để mở một chế độ sâu hơn. Những câu đó **không làm gì cả**. Docs nói thẳng: Claude
+Code "passes other phrases such as 'think', 'think hard', and 'think more' through as ordinary
+prompt text and doesn't recognize them as keywords" — chúng đi thẳng vào prompt như text
+thường.
 
-Think mode chính là cách bạn nói với dev: "Đừng vội code. Nghĩ thấu đáo trước, RỒI MỚI implement." Ví von: đánh cờ — người mới thấy quân ăn được là ăn liền, kiện tướng nghĩ 5 nước sau. Think mode biến Claude từ "người mới háo hức" thành "kiện tướng có kế hoạch".
+Nghĩa là bạn trả tiền cho câu thần chú, trong khi hai thứ thật sự xoay được cái núm — **effort
+level** và keyword **`ultrathink`** — thì nằm không. Tệ hơn: extended thinking đã bật sẵn từ
+đầu. Module này thay folklore bằng bốn công tắc thật.
 
 ---
 
 ## 2. CONCEPT — Ý Tưởng Cốt Lõi
 
-### Think Mode là gì?
+**Extended thinking bật mặc định.** Không có "mode" nào để vào. Thứ bạn điều khiển là: Claude
+suy luận *nhiều bao nhiêu* (effort level, phạm vi cả session), một lượt có được thêm không
+(`ultrathink`), có suy luận hay không (`Option+T`), và bạn có thấy nó không (`Ctrl+O`). Bốn
+công tắc độc lập, không chồng lên nhau.
 
-Think mode là cách bạn bảo Claude dành nhiều thời gian **suy luận** trước khi hành động. Thay vì generate code ngay lập tức, Claude sẽ:
-1. Phân tích constraint và dependency
-2. Xem xét edge case và alternative approach
-3. Đánh giá trade-off
-4. **Sau đó mới** tạo solution chu đáo hơn
+Effort level là núm chính: `low`, `medium`, `high`, `xhigh`, `max`, `ultracode`. `high` là
+"the default on every model except Opus 4.7" — model đó mặc định `xhigh`. `max` không phải
+bản nâng cấp miễn phí: nó "may show diminishing returns and is prone to overthinking".
 
-### Cách Kích Hoạt Think Mode
-
-Think mode trigger qua **prompt engineering** — không phải lệnh hệ thống mà là cách bạn đặt câu hỏi:
-
-| Level | Trigger Phrase | Độ Sâu Reasoning |
-|-------|----------------|------------------|
-| **Level 0** | (không có) | Quick mode — tạo ngay |
-| **Level 1** | `"think about this"` | Basic extended reasoning |
-| **Level 2** | `"think step by step"` | Chia vấn đề thành bước |
-| **Level 3** | `"think carefully"` | Xét edge case, alternative, trade-off |
-| **Level 4** | `"ultrathink"` ⚠️ | Reasoning depth tối đa (cần xác minh) |
-
-⚠️ **Lưu ý**: Lệnh `/think` có thể tồn tại trong một số version — cần xác minh trong môi trường của bạn.
-
-### Khi Nào THINK vs ACT
-
-**Dùng THINK mode khi:**
-- Architecture decision
-- Refactoring phức tạp
-- Debug issue bí ẩn (race condition, memory leak)
-- Security review
-- Database migration
-- API design ảnh hưởng nhiều service
-
-**KHÔNG cần think mode khi:**
-- Generate code đơn giản (CRUD)
-- Format code
-- Thêm field vào class
-- Viết unit test cơ bản
-- File operation (copy, rename)
-
-### Think-Act Spectrum
-
-Think mode không phải nhị phân (0 hoặc 1) — nó là **gradient**. Matching think depth với complexity:
+`ultrathink` là keyword duy nhất Claude Code thật sự nhận ra, và chỉ có tác dụng một lượt:
+"Include `ultrathink` anywhere in your prompt to request deeper reasoning on that turn without
+changing your session effort setting… The effort level sent to the API is unchanged."
 
 ```mermaid
-graph LR
-    A[Trivial Task<br/>add field] -->|Level 0| B[Quick Act]
-    C[Moderate Task<br/>refactor function] -->|Level 2| D[Think Step by Step]
-    E[Complex Task<br/>design caching] -->|Level 3| F[Think Carefully]
-    G[Critical Task<br/>plan migration] -->|Level 4| H[Ultrathink]
-
-    style B fill:#90EE90
-    style D fill:#FFD700
-    style F fill:#FFA500
-    style H fill:#FF6347
+graph TD
+    A[Prompt của bạn] --> B{Thinking bật?<br/>Option+T · alwaysThinkingEnabled}
+    B -->|tắt| E[Trả lời thẳng]
+    B -->|bật, mặc định| C[Effort level<br/>low · medium · high · xhigh · max]
+    A -->|có chữ ultrathink| D[+ instruction in-context<br/>chỉ lượt này]
+    C --> F[Reasoning, thu gọn]
+    D --> F
+    F -->|Ctrl+O| G[Thấy reasoning]
 ```
-
-### Chi Phí Think Mode
-
-Think mode **tốn nhiều token và lâu hơn**. Nhưng đây là đầu tư — dùng khi vấn đề xứng đáng. Một lần think cẩn thận = tránh 3 vòng rework.
 
 ---
 
-## 3. DEMO — Từng Bước Một
+## 3. DEMO — Từng Bước
 
-Kịch bản: Refactor module payment để hỗ trợ Stripe, PayPal, và VNPay (Vietnamese payment gateway).
+Mọi bước chạy trong một lab repo nhỏ có `src/math.js` và một file test.
 
-### Bước 1: KHÔNG Think Mode (Baseline)
+**Bước 1: Đọc effort level bạn đang dùng**
+
+Chạy `claude` và nhìn dòng ngay trên ô prompt. {/* docs: model-config */}
+
+```text
+# Output may vary
+ ▐▛███▛█   Claude Code v2.1.278
+▝▜██████▀  Opus 5 (1M context) · Claude Max
+  ▝▝ ▝▝    ~/cc-lab
+                                                                                  ● high · /effort
+────────────────────────────────────────────────────────────────────────────────────
+❯
+```
+
+`● high · /effort` là level hiện tại. Bạn chưa hề bật thinking — nó bật sẵn rồi.
+
+**Bước 2: Mở slider bằng `/effort`**
+
+Gõ `/effort` rồi Enter. {/* docs: model-config */}
+
+```text
+# Output may vary
+   Effort
+                   Faster                                                 Smarter
+                   ────────────────────▲──────────────────────┆──────────────────
+                   low     medium     high     xhigh      max       ultracode
+                                                                xhigh + workflows
+   ←/→ to adjust · Enter to confirm · s for this session only · Esc to cancel
+```
+
+Mọi level trong docs đều nằm trên slider. `/effort <level>` đặt thẳng; `/effort auto` xóa
+level đã lưu cho model đang chạy.
+
+**Bước 3: Xem công tắc bật/tắt với `Option+T`**
+
+Nhấn `Option+T` (macOS) hoặc `Alt+T` (Windows/Linux). {/* docs: interactive-mode */}
+
+```text
+# Output may vary
+  Toggle thinking mode
+  Enable or disable thinking for this session.
+  ❯ 1. Enabled ✔  Claude will think before responding
+    2. Disabled   Claude will respond without extended thinking
+  Enter to confirm · Esc to cancel
+```
+
+Enabled đã được tick sẵn. `/config` lưu lựa chọn này vĩnh viễn thành `alwaysThinkingEnabled`
+trong `~/.claude/settings.json`.
+
+**Bước 4: Dùng keyword duy nhất có tác dụng**
+
+```text
+ultrathink: does the guard in divide() in src/math.js also reject -0? Answer in one sentence.
+```
+
+```text
+# Output may vary
+❯ ultrathink: does the guard in divide() in src/math.js also reject -0? …
+⏺ I'll read the file.
+  Thought for 2s, read 1 file
+⏺ Yes — b === 0 is true for -0 as well (strict equality doesn't distinguish the two zeros,
+  unlike Object.is), so divide(1, -0) also throws instead of returning -Infinity.
+```
+
+`Thought for 2s` là tất cả những gì bạn thấy mặc định: "Claude Code collapses thinking output
+by default."
+
+**Bước 5: Mở reasoning bằng `Ctrl+O`**
+
+Nhấn `Ctrl+O` để bật transcript viewer. {/* docs: model-config, interactive-mode */}
+
+```text
+# Output may vary
+                                                                  10:00 PM claude-opus-5
+⏺ I'll read the file.
+⏺ Read(/Users/luatnq/cc-lab/src/math.js)
+  ⎿  Read 6 lines
+∴ Since -0 equals 0 in the comparison, it correctly rejects -0 too.
+────────────────────────────────────────────────────────────────────────────────────
+  Showing detailed transcript · ctrl+o to toggle · ? for shortcuts          verbose
+```
+
+Dòng `∴` là thinking summary. Capture này dùng `{ "showThinkingSummaries": true }` trong
+`.claude/settings.json`, vì "interactive sessions on the Anthropic API receive redacted
+thinking blocks by default."
+
+**Bước 6: Đo chênh lệch bằng headless**
 
 ```bash
-$ claude
+# docs: cli-reference
+claude --effort low  -p "List the edge cases divide() in src/math.js does not handle." \
+  --output-format json --permission-mode default --allowedTools "Read"
+claude --effort high -p "List the edge cases divide() in src/math.js does not handle." \
+  --output-format json --permission-mode default --allowedTools "Read"
 ```
 
-**Prompt:**
-```text
-Refactor src/payment.ts to support multiple payment gateways: Stripe, PayPal, VNPay
-```
-
-**Kết quả Claude trả về:**
-```typescript
-// Generic strategy pattern - nông cạn
-interface PaymentGateway {
-  processPayment(amount: number): Promise<void>;
-}
-
-class StripeGateway implements PaymentGateway { ... }
-// Bỏ sót: webhook verification, idempotency, VNPay hash signature
-```
-
-**Vấn đề**: Code compile được nhưng miss nhiều edge case thực tế.
+Cả hai lượt chỉ đọc file nên `--allowedTools "Read"` là toàn bộ quyền cần cấp. Hai object JSON
+với cùng prompt, cùng repo: `result` dài 1.399 ký tự ở `low` và 2.494 ở `high`; `num_turns`
+2 so với 4; `duration_ms` 10.615 so với 40.056; `total_cost_usd` 0.381219 so với 0.479397.
+Output may vary — đây là một cặp run trên một máy. So độ dài, số turn và nội dung, **đừng bao
+giờ** so token count của thinking: Claude Code không in ra con số đó.
 
 ---
 
-### Bước 2: CÓ Think Mode Level 2
+## 4. PRACTICE — Tự Làm
 
-**Prompt:**
-```text
-Think step by step:
-1. What are the key differences between Stripe, PayPal, and VNPay?
-2. What edge cases exist for Vietnamese payment gateways?
-3. Design the payment module architecture
+### Bài 1: Chứng minh cái thang "think" đã chết
 
-Then refactor src/payment.ts
-```
-
-**Kết quả Claude thinking (excerpt):**
-```text
-Step 1 Analysis:
-- Stripe: webhook-based, USD by default
-- PayPal: redirect flow, sandbox required
-- VNPay: HMAC-SHA256 signature, VND only, no decimal
-
-Step 2 Edge Cases:
-- VNPay requires vnp_TxnRef unique per day
-- Settlement time differs: Stripe instant, VNPay T+1
-- Refund flow different for each gateway
-
-Step 3 Architecture:
-[Đưa ra design với abstract factory + gateway-specific config]
-```
-
-**Code sinh ra**: Tốt hơn nhiều — có config per gateway, signature verification, idempotency key.
-
----
-
-### Bước 3: CÓ Think Mode Level 3 (Carefully)
-
-**Prompt:**
-```text
-Think carefully about this payment refactoring:
-- What could go wrong in production?
-- What security risks exist?
-- What are the trade-offs of different approaches?
-- How does this affect existing transaction history?
-
-Then design and refactor src/payment.ts
-```
-
-**Kết quả thinking thêm:**
-```text
-Security Risks:
-- VNPay hash must use secret key - never expose in client
-- Webhook endpoint needs CSRF protection
-- Store payment attempts for audit (NHNN compliance)
-
-Trade-offs:
-- Sync vs async payment processing
-- Retry strategy vs manual reconciliation
-- Monolith vs microservice for gateway isolation
-
-Impact on Existing Data:
-- Migrate payment_method ENUM → support new gateway codes
-- Backfill vnp_TxnRef for old VNPay transactions (nullable)
-```
-
-**Code sinh ra**: Production-ready — có audit log, retry mechanism, migration script, security checklist.
-
----
-
-### Bước 4: Kết Hợp Think + Act
-
-**Best practice**: Think trước, act sau — không trộn lẫn.
-
-```text
-# Phase 1: Think
-Think carefully: design a payment gateway abstraction that supports
-Stripe, PayPal, VNPay with proper security and audit trail.
-Output the design document.
-
-# Phase 2: Act (sau khi review design)
-Based on the design above, implement:
-1. src/payment/gateway.interface.ts
-2. src/payment/gateways/vnpay.ts
-3. Migration script for payment_method column
-```
-
-**Lợi ích**: Bạn review design trước khi code. Nếu sai hướng, dừng sớm — không mất công code rồi mới phát hiện.
-
----
-
-### Bước 5: So Sánh Chi Phí
-
-```bash
-/cost
-```
-
-**Output:**
-```text
-Recent conversation costs:
-- No think mode:    850 input tokens,  2,100 output tokens
-- Think level 2:  1,200 input tokens,  4,500 output tokens
-- Think level 3:  1,500 input tokens,  6,800 output tokens
-
-Think level 3 cost ~3x more BUT prevented 2 rework cycles
-= net savings in real time and total tokens
-```
-
-**Insight**: Think mode tốn token hơn, nhưng **tiết kiệm tổng chi phí** nếu tránh được rework.
-
----
-
-## 4. PRACTICE — Tự Làm Thử
-
-### Bài Tập 1: Think vs Rush
-
-**Mục tiêu**: So sánh trực tiếp quality của think mode vs không think.
+**Mục tiêu**: Xác nhận "think step by step" chỉ là text thường, còn `ultrathink` thì không.
 
 **Hướng dẫn**:
-1. Chọn task refactoring vừa phải (ví dụ: thêm caching layer cho user profile API)
-2. Lần 1 — KHÔNG think mode:
-   ```text
-   Add Redis caching to src/api/user.ts for getProfile() endpoint
-   ```
-3. Ghi lại: code quality, có xử lý cache invalidation không, có TTL strategy không
-4. Lần 2 — CÓ think mode:
-   ```text
-   Think carefully: Design a Redis caching strategy for user profile API
-   - When to invalidate cache?
-   - What TTL is appropriate?
-   - How to handle cache stampede?
-   Then implement in src/api/user.ts
-   ```
-5. So sánh: accuracy, edge case coverage, code quality
-6. Check `/cost` cả hai lần
+1. Trong repo của bạn, chạy `claude` và hỏi một câu có tiền tố `think step by step:`.
+2. Nhấn `Ctrl+O` và ghi lại phần reasoning.
+3. Hỏi đúng câu đó với tiền tố `ultrathink:`. Nhấn `Ctrl+O` lần nữa.
+4. So hai transcript.
 
-**Kết quả mong đợi**: Think mode cost cao hơn ~2x nhưng code quality tốt hơn rõ rệt.
+**Kết quả mong đợi**: Cả hai lượt đều suy luận, vì thinking bật mặc định. Chỉ lượt
+`ultrathink` được thêm instruction.
 
 <details>
 <summary>💡 Gợi ý</summary>
-
-Edge case cần check:
-- Cache stampede (nhiều request cùng miss cache)
-- Race condition khi update user + invalidate cache
-- Partial cache failure (Redis down nhưng DB ok)
-- Cache warming strategy
+Đừng tìm chỉ báo "mode". So độ dài reasoning trong transcript viewer — câu ở bước 1 đến model
+dưới dạng text thường.
 </details>
 
 <details>
-<summary>✅ Đáp Án</summary>
+<summary>✅ Lời giải</summary>
 
-Think mode nên sinh ra design gồm:
-- TTL: 5 phút cho profile data
-- Cache key: `user:profile:{userId}`
-- Invalidation: on user update event
-- Stampede prevention: probabilistic early expiration hoặc distributed lock
-- Graceful degradation: fallback to DB nếu Redis fail
-
-Code nên có distributed lock để prevent stampede, TTL config, và proper error handling khi Redis fail.
+Prompt đầu không khác gì prompt bình thường — Claude Code "passes other phrases such as
+'think', 'think hard', and 'think more' through as ordinary prompt text." Prompt thứ hai được
+nhận ra: Claude Code "adds an in-context instruction. The effort level sent to the API is
+unchanged." `ultrathink` mua cho bạn một lượt sâu hơn; câu thần chú chỉ mua token.
 </details>
 
----
+### Bài 2: Tìm mức effort sàn của bạn
 
-### Bài Tập 2: Think Level Calibration
+**Mục tiêu**: Chọn effort level rẻ nhất mà vẫn giải được một task bạn chạy thật.
 
-**Mục tiêu**: Học cách chọn think level phù hợp với task complexity.
+**Hướng dẫn**:
+1. Chọn một task lặp lại được (ví dụ "tóm tắt commit gần nhất đổi gì").
+2. Chạy với `--effort low`, `--effort medium`, `--effort high`, mỗi lượt kèm
+   `--output-format json`, lưu lại từng kết quả.
+3. So field `result` theo **độ đúng**, không theo độ dài.
+4. Ghim mức thắng bằng `/effort <level>` hoặc setting `effortLevel`.
 
-**Hướng dẫn**: Với 5 task sau, xác định think level (0-4) và thử execute:
-
-1. **Task A**: Thêm field `phoneNumber: string` vào User interface
-2. **Task B**: Viết unit test cho function `calculateDiscount(price, couponCode)`
-3. **Task C**: Refactor function `processOrder()` có 250 dòng thành smaller functions
-4. **Task D**: Thiết kế distributed caching layer cho e-commerce platform (10M users)
-5. **Task E**: Lập kế hoạch migration từ MongoDB sang PostgreSQL (500GB data)
-
-**Câu hỏi**: Bạn sẽ dùng think level nào cho từng task? Tại sao?
+**Kết quả mong đợi**: Một ghi chú nói bạn sẽ dùng level nào cho nhóm task này.
 
 <details>
 <summary>💡 Gợi ý</summary>
-
-Think về:
-- Scope ảnh hưởng (1 file vs entire system)
-- Risk nếu sai (typo vs data loss)
-- Reversibility (dễ rollback vs không rollback được)
+`low` dành cho việc "not intelligence-sensitive". Nếu `low` đã ra đúng đáp án duy nhất thì
+`high` là tiền vứt đi.
 </details>
 
 <details>
-<summary>✅ Đáp Án</summary>
+<summary>✅ Lời giải</summary>
 
-| Task | Think Level | Lý Do |
-|------|-------------|-------|
-| A | 0 (none) | Trivial — add field, no logic |
-| B | 1 (basic) | Simple logic, need consider edge case (null coupon, expired) |
-| C | 2 (step by step) | Moderate — break down logic, preserve behavior |
-| D | 3 (carefully) | Complex — consider CAP theorem, stampede, cost, latency SLA |
-| E | 4 (ultrathink) | Critical — data migration, downtime, rollback strategy, schema mapping |
-
-**Quy tắc ngón tay cái**: Khi nghi ngờ, lên 1 bậc. Chi phí thêm token < chi phí sửa lỗi production.
+Với task cơ học, `low` thường hòa `high`, nên hãy ghim theo model bằng `modelSettings` thay vì
+nâng default toàn cục. Lưu ý `effortLevel` "accepts `low`, `medium`, `high`, or `xhigh`. `max`
+is not accepted here" — muốn `max` thì phải qua `/effort` hoặc `--effort`.
 </details>
 
 ---
 
 ## 5. CHEAT SHEET
 
-| Think Level | Trigger Phrase | Phù Hợp Cho | Token Cost | Ví Dụ |
-|-------------|----------------|-------------|------------|-------|
-| **0** | (không có) | Trivial task | 1x | Add field, format code |
-| **1** | `"think about this"` | Simple logic | 1.5x | Viết function đơn giản |
-| **2** | `"think step by step"` | Moderate complexity | 2-3x | Refactor function, add validation |
-| **3** | `"think carefully"` | Complex/risky task | 3-4x | API design, caching strategy |
-| **4** | `"ultrathink"` ⚠️ | Critical decision | 4-5x | Migration plan, security architecture |
+| Control | Ở đâu | Làm gì |
+|---|---|---|
+| `/effort` | Session | Mở slider; `s` = chỉ session này |
+| `/effort <level>` | Session | `low`, `medium`, `high`, `xhigh`, `max`, `ultracode` |
+| `/effort auto` | Session | Xóa level đã lưu cho model đang chạy |
+| `--effort <level>` | CLI | Cùng bộ level; không persist |
+| `effortLevel` | settings.json | Default cho model chưa có level riêng (không nhận `max`) |
+| `modelSettings` | settings.json | Effort level lưu theo từng model |
+| `ultrathink` | Trong prompt | Suy luận sâu hơn, chỉ lượt đó |
+| `Option+T` / `Alt+T` | Session | Bật/tắt extended thinking |
+| `alwaysThinkingEnabled` | settings.json | Tắt thinking cho mọi session |
+| `MAX_THINKING_TOKENS=0` | Env var | Tắt thinking trên Anthropic API |
+| `Ctrl+O` | Session | Bật/tắt transcript viewer |
+| `showThinkingSummaries` | settings.json | Giữ summary đầy đủ thay vì block bị redact |
 
-### Quy Tắc Vàng
-
-```text
-Complexity × Risk = Think Level
-
-Nghi ngờ → Lên 1 bậc
-```
-
-**Khi nào KHÔNG dùng think mode**:
-- Task < 5 dòng code
-- Pure formatting/linting
-- Copy-paste operation
-
-**Khi nào BẮT BUỘC think mode (level 3+)**:
-- Task liên quan payment/security
-- Database migration
-- API breaking change
-- Multi-service refactoring
+Mặc định: thinking bật; effort `high` trừ Opus 4.7 (`xhigh`). Không tắt được thinking trên
+model Fable.
 
 ---
 
-## 6. PITFALLS — Sai Lầm Thường Gặp
+## 6. PITFALLS — Lỗi Thường Gặp
 
-| ❌ Sai Lầm | ✅ Đúng Cách |
-|-----------|-------------|
-| Dùng think mode cho trivial task (add field) | Chỉ think cho task moderate+ complexity |
-| Không dùng think mode cho complex refactoring → rework 3 lần | Task > 50 dòng code hoặc multiple file → luôn think level 2+ |
-| Bỏ qua thinking analysis Claude đưa ra, nhảy thẳng vào code | **Đọc kỹ thinking section** — đó là phần giá trị nhất |
-| Dùng ultrathink cho mọi request → tốn token vô ích | Calibrate think level: match complexity |
-| Kỳ vọng think mode fix prompt tệ | Think mode amplify prompt quality. Garbage in → garbage out |
-| Không kết hợp think + act — trộn lẫn trong 1 prompt | **Tách riêng**: Think phase → Review → Act phase |
-
----
-
-## 7. REAL CASE — Câu Chuyện Thực Tế
-
-### Kịch Bản: Payment Reconciliation cho Banking App
-
-**Team**: Fintech startup Việt Nam, đang build payment reconciliation system cho banking app.
-
-**Bối cảnh**:
-- Tiền VND (không có decimal — 10,000₫ không phải 10,000.00₫)
-- Multi-bank: VietcomBank, Techcombank, MBBank (API khác nhau)
-- Compliance NHNN (Ngân hàng Nhà nước) — audit trail bắt buộc
-- Settlement time khác nhau giữa các bank
-
-**Lần 1 — Không Think Mode**:
-
-```text
-Implement payment reconciliation logic in src/reconcile.ts
-```
-
-Kết quả:
-- Generic code giả định USD (dùng `amount: number` với decimal)
-- Miss case VNPay settlement T+1 (assume instant như Stripe)
-- Bỏ qua bank API differences
-- Không có audit trail (NHNN compliance risk)
-
-**Bug phát hiện**: 3 vòng review, mất 3 ngày sửa.
+| ❌ Sai | ✅ Đúng |
+|---|---|
+| Gõ "think step by step" để mở chế độ sâu hơn | Thinking đã bật. Nâng `/effort`, hoặc dùng `ultrathink` |
+| Trích con số "thinking tokens: 2,768" | Claude Code không in con số đó. So độ dài, số turn, chi phí |
+| Tưởng `ultrathink` nâng effort level | "The effort level sent to the API is unchanged" |
+| Để mọi thứ ở `max` | `max` "may show diminishing returns and is prone to overthinking" |
+| `"effortLevel": "max"` trong settings.json | Không được nhận. Dùng `/effort max` hoặc `--effort max` |
+| Trông chờ `Option+T` có tác dụng trên Fable | "You can't turn thinking off on Fable models" |
+| Tưởng reasoning thu gọn là miễn phí | "You are charged for all thinking tokens generated, even when collapsed or redacted" |
 
 ---
 
-**Lần 2 — Có Think Mode Level 3**:
+## 7. REAL CASE — Câu Chuyện Thật
 
-```text
-Think carefully about payment reconciliation for Vietnamese banking:
-- VND currency specifics (no decimal)
-- Multi-bank API differences (VietcomBank, Techcombank, MBBank)
-- Settlement timing differences
-- NHNN compliance requirements (audit trail)
-- What could go wrong in production?
+**Bối cảnh**: Một team fintech Việt Nam xây module đối soát thanh toán cho app ngân hàng: số
+tiền VND (không có phần thập phân), ba ngân hàng với format API khác nhau (VietcomBank,
+Techcombank, MBBank), và yêu cầu audit của Ngân hàng Nhà nước (SBV).
 
-Then design src/reconcile.ts
-```
+**Vấn đề**: Họ bảo Claude Code "implement payment reconciliation logic" ở effort mặc định,
+trong một session đã chứa hai task không liên quan. Kết quả: giả định đơn vị nhỏ kiểu USD
+(`amount * 100`), giả định ba ngân hàng cùng một shape response, và bỏ qua state machine cùng
+audit trail theo yêu cầu SBV. Năm vòng sửa tiếp theo đều chất đống trong cùng một context đã
+nhiễu.
 
-Thinking output:
-- VND: integer only, không decimal
-- Bank adapter pattern cho API khác nhau
-- State machine: PENDING → SETTLING → SETTLED
-- Audit log với append-only constraint
-- Retention 10 năm theo quy định NHNN
+**Giải pháp**: Team lead chạy `/clear`, nâng session bằng `/effort xhigh`, và viết lại prompt
+mang theo đúng những ràng buộc mà lần đầu phải đoán: VND là integer currency, mỗi ngân hàng có
+tên field riêng, SBV đòi state machine cộng audit trail, settlement window khác nhau theo ngân
+hàng. Bài con khó nhất — đối soát settlement window lệch nhau — được cho riêng một lượt với
+tiền tố `ultrathink`.
 
-**Kết quả**: Pass compliance review lần đầu, QA tìm 0 bug critical. Tiết kiệm **2 ngày** so với lần trước.
-
----
-
-**Bài Học Team**:
-
-> "Bất kỳ task nào liên quan tiền hoặc compliance → **luôn dùng think carefully**. Chi phí token thấp hơn chi phí legal risk."
+**Kết quả**: Lần thứ hai cho ra xử lý VND dạng integer, một lớp adapter theo từng ngân hàng, và
+state machine tường minh kèm audit event. Điều họ ghi vào CLAUDE.md không phải "thêm chữ think
+vào prompt", mà là: clear context, đưa ràng buộc vào prompt, và dùng effort cùng `ultrathink`
+một cách có chủ đích.
 
 ---
 
