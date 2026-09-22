@@ -126,8 +126,8 @@ ec31a8e docs: jsdoc for src/strings.js
 
 Ba session nguội, ba commit, không chia sẻ context. Hai chi tiết làm nó chạy được: prompt kết thúc
 bằng một hợp đồng một từ (`OK`/`FAIL`), và `--allowedTools` nêu đúng những gì một lần chạy được
-làm — sửa file đó, commit. `--permission-mode default` ép về hành vi gốc; máy mới cài cho kết quả
-y hệt dù không có nó, trừ khi `settings.json` đặt `permissions.defaultMode`.
+làm — sửa file đó, commit. `--permission-mode default` ép về hành vi gốc; trên gói Pro, Max và
+Team, starting mode built-in là `auto`, và `permissions.defaultMode` ghi đè nó.
 
 **Bước 3: Bắn một background agent**
 

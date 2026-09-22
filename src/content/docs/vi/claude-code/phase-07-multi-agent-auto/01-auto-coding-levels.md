@@ -175,8 +175,8 @@ The write to `hello.txt` was blocked pending your permission. Please approve the
 ls: hello.txt: No such file or directory
 ```
 
-`--permission-mode default` ép hành vi gốc; trên máy mới cài bạn nhận kết quả y hệt mà không
-cần cờ, trừ khi `settings.json` đặt `permissions.defaultMode`. Level 2:
+`--permission-mode default` ép hành vi gốc; trên gói Pro, Max và Team, starting mode built-in
+là `auto`, và `permissions.defaultMode` ghi đè nó. Level 2:
 
 ```bash
 claude -p "Create a file hello.txt containing hi" --permission-mode acceptEdits

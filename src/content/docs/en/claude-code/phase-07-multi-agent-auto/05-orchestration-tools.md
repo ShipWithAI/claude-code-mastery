@@ -126,9 +126,9 @@ ec31a8e docs: jsdoc for src/strings.js
 ```
 
 Three cold sessions, three commits, no shared context. Two details make it work: the prompt ends in
-a one-word contract (`OK`/`FAIL`), and `--allowedTools` names exactly what a run may do — edit that
-file, commit. `--permission-mode default` forces the stock behaviour; on a fresh install you get
-the same without it unless `settings.json` sets `permissions.defaultMode`.
+a one-word contract (`OK`/`FAIL`), and `--allowedTools` names exactly what a run may do: edit that
+file, commit. `--permission-mode default` forces the stock behaviour; on Pro, Max and Team plans
+the built-in starting mode is `auto`, which `permissions.defaultMode` overrides.
 
 **Step 3: Dispatch a background agent**
 
