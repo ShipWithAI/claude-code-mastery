@@ -154,7 +154,7 @@ github:
     Authorization: Bearer ${GITHUB_TOKEN}
 ```
 
-Đó là bằng chứng: header in ra theo tên biến, không phải giá trị — với local, project và user
+Bằng chứng: header in ra theo tên biến, không phải giá trị — với local, project và user
 scope, cả ba bề mặt đều hiện `${VAR}` chưa expand. Export token thật là warning biến mất.
 
 **Bước 6: Duyệt project server** — chạy `claude` trong repo
@@ -173,7 +173,7 @@ scope, cả ba bề mặt đều hiện `${VAR}` chưa expand. Export token th�
   Enter to confirm · Esc to cancel
 ```
 
-Chọn option 3 cho server nào bạn chưa đọc source.
+Chọn option 3 cho server chưa đọc source.
 
 **Bước 7: Xem toàn bộ server bằng `/mcp`**
 
@@ -188,7 +188,7 @@ Chọn option 3 cho server nào bạn chưa đọc source.
    https://code.claude.com/docs/en/mcp for help
 ```
 
-Panel này cũng lo đăng nhập OAuth và tắt server theo project.
+Danh sách của bạn sẽ ngắn hơn. Panel này cũng lo đăng nhập OAuth và tắt server theo project.
 
 **Bước 8: Nhìn tool xin permission**
 
@@ -207,10 +207,10 @@ Chạy `claude --permission-mode default`, rồi hỏi:
  Esc to cancel · Tab to amend
 ```
 
-`--permission-mode default` ép về hành vi gốc; trên máy cài mới bạn nhận kết quả y hệt mà không
-cần flag, trừ khi `settings.json` đặt `permissions.defaultMode`.
+`--permission-mode default` chính là thứ làm prompt hiện ra: trên gói Pro, Max và Team, starting
+mode built-in là `auto`, và `permissions.defaultMode` ghi đè nó.
 
-**Bước 9: Pre-allow một tool, deny tool khác** — phiên headless không trả lời được prompt đó:
+**Bước 9: Pre-allow một tool, deny tool khác** — headless không trả lời được prompt:
 
 ```bash
 claude -p "Use the fs MCP server to read src/math.js and show me line 1." --permission-mode default
@@ -363,7 +363,7 @@ của Claude.
 | `permissions.deny: ["mcp__*"]` | Chặn mọi MCP tool |
 | `enabledMcpjsonServers` / `enableAllProjectMcpServers` | Duyệt server trong `.mcp.json` |
 | `disabledMcpjsonServers` | Từ chối một server, ở file settings bất kỳ |
-| `allowedMcpServers` (managed settings) | Allowlist của admin |
+| `allowedMcpServers` *(ép buộc ở managed settings)* | Allowlist của admin |
 | `MAX_MCP_OUTPUT_TOKENS` | Trần output; mặc định 25.000 |
 | `--strict-mcp-config` | Chỉ server từ `--mcp-config` |
 
@@ -373,10 +373,10 @@ của Claude.
 
 | ❌ Sai | ✅ Đúng |
 |---|---|
-| Sửa file JSON config của app Claude Desktop rồi chờ Claude Code đọc | Khác sản phẩm, khác file: dùng `claude mcp add`, hoặc `claude mcp add-from-claude-desktop` |
+| Sửa file JSON config của app Claude Desktop rồi chờ Claude Code đọc | Khác sản phẩm, khác file: dùng `claude mcp add`, hoặc `claude mcp add-from-claude-desktop` (macOS/WSL) |
 | `npm i -g @modelcontextprotocol/server-sqlite` — các reference server SQLite, PostgreSQL, GitHub đã archived | Chọn server còn được bảo trì; ví dụ database trên docs là `claude mcp add --transport stdio db -- npx -y @bytebase/dbhub --dsn "…"`, dùng user read-only |
 | Commit `"Authorization": "Bearer ghp_FAKE-DO-NOT-USE-xxxx"` trong `.mcp.json` | `"Bearer ${GITHUB_TOKEN}"`, kiểm chứng bằng `claude mcp get <name>`: phải in ra tên biến |
-| "Claude không bao giờ thấy credential thô, server giữ hết" | **Output** của tool rơi thẳng vào context: một tool trả về dòng dữ liệu có API key là vừa đưa key đó vào transcript. Deny các tool chạm tới secret |
+| "Claude không bao giờ thấy credential thô, server giữ hết" | **Output** của tool rơi thẳng vào context: một tool trả về dòng có API key là vừa đưa key vào transcript. Deny các tool chạm tới secret |
 | Cài mười server rồi nghĩ là miễn phí | Definition được defer, nhưng tên tool và server instructions vẫn nạp. Xem `/context`, tắt server không dùng trong `/mcp`, ưu tiên `gh`/`aws` (S15) |
 | Tin một server chỉ vì nó phổ biến | Server fetch nội dung bên ngoài có thể tiêm chỉ thị vào phiên của bạn ([Module 2.1](../../phase-02-security/01-threat-model/)). Đọc source, pin version |
 

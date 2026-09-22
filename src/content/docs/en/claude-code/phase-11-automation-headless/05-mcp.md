@@ -154,7 +154,7 @@ github:
     Authorization: Bearer ${GITHUB_TOKEN}
 ```
 
-That is the proof: the header prints by name, not by value — for local, project and user scope,
+The proof: the header prints by name, not by value — for local, project and user scope,
 all three surfaces show `${VAR}` unexpanded. Export the token and the warning goes away.
 
 **Step 6: Approve the project server** — start `claude` in the repo
@@ -173,7 +173,7 @@ all three surfaces show `${VAR}` unexpanded. Export the token and the warning go
   Enter to confirm · Esc to cancel
 ```
 
-Pick option 3 for any server you have not vetted.
+Pick option 3 for anything unvetted.
 
 **Step 7: See every server with `/mcp`**
 
@@ -188,7 +188,7 @@ Pick option 3 for any server you have not vetted.
    https://code.claude.com/docs/en/mcp for help
 ```
 
-The panel also handles OAuth sign-in and per-project disable.
+Your list will be shorter; the panel also handles OAuth sign-in and per-project disable.
 
 **Step 8: Watch a tool ask for permission**
 
@@ -207,10 +207,10 @@ Run `claude --permission-mode default`, then ask:
  Esc to cancel · Tab to amend
 ```
 
-`--permission-mode default` forces the stock behavior; on a fresh install you get the same result
-without it unless `settings.json` sets `permissions.defaultMode`.
+`--permission-mode default` is what makes the prompt appear: on Pro, Max and Team plans the
+built-in starting mode is `auto`, which `permissions.defaultMode` overrides.
 
-**Step 9: Pre-allow one tool, deny another** — headless runs cannot answer that prompt:
+**Step 9: Pre-allow one tool, deny another** — headless cannot answer it:
 
 ```bash
 claude -p "Use the fs MCP server to read src/math.js and show me line 1." --permission-mode default
@@ -365,7 +365,7 @@ context entirely.
 | `permissions.deny: ["mcp__*"]` | Block every MCP tool |
 | `enabledMcpjsonServers` / `enableAllProjectMcpServers` | Approve `.mcp.json` servers |
 | `disabledMcpjsonServers` | Reject one, any file |
-| `allowedMcpServers` (managed settings) | Admin allowlist |
+| `allowedMcpServers` *(enforce in managed settings)* | Admin allowlist |
 | `MAX_MCP_OUTPUT_TOKENS` | Output cap; default 25,000 |
 | `--strict-mcp-config` | Only `--mcp-config` servers |
 
@@ -375,10 +375,10 @@ context entirely.
 
 | ❌ Mistake | ✅ Correct Approach |
 |---|---|
-| Editing the Claude Desktop app's JSON config and expecting Claude Code to read it | Different product, different file: use `claude mcp add`, or `claude mcp add-from-claude-desktop` |
+| Editing the Claude Desktop app's JSON config and expecting Claude Code to read it | Different product, different file: use `claude mcp add`, or `claude mcp add-from-claude-desktop` (macOS/WSL) |
 | `npm i -g @modelcontextprotocol/server-sqlite` — SQLite, PostgreSQL and GitHub reference servers are archived | Pick a maintained one; the docs' database example is `claude mcp add --transport stdio db -- npx -y @bytebase/dbhub --dsn "…"`, read-only user |
 | `"Authorization": "Bearer ghp_FAKE-DO-NOT-USE-xxxx"` committed in `.mcp.json` | `"Bearer ${GITHUB_TOKEN}"`, verified with `claude mcp get <name>`: it must print the variable name |
-| "Claude never sees raw credentials — the server holds them" | Tool **output** lands in context: a tool returning a row with an API key just put that key in your transcript. Deny tools that reach secrets |
+| "Claude never sees raw credentials — the server holds them" | Tool **output** lands in context: a tool returning a row with an API key just put it in your transcript. Deny tools that reach secrets |
 | Adding ten servers and assuming they are free | Definitions are deferred, but names and instructions still load. Check `/context`, disable unused ones in `/mcp`, prefer `gh`/`aws` (S15) |
 | Trusting a server because it is popular | One that fetches external content can inject instructions into your session ([Module 2.1](../../phase-02-security/01-threat-model/)). Read the source, pin the version |
 
