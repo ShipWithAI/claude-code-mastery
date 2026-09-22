@@ -1,6 +1,8 @@
 ---
 title: 'Plan Mode'
-description: 'Use Claude Code Plan Mode to create execution plans before coding, with step-by-step checkpoints.'
+description: 'Use Claude Code native plan mode to research and approve a plan before any edit touches disk.'
+verified: 2026-09-22
+claude_version: 2.1.278
 ---
 
 # Module 6.2: Plan Mode
@@ -9,385 +11,302 @@ description: 'Use Claude Code Plan Mode to create execution plans before coding,
 >
 > **Prerequisite**: Module 6.1 (Think Mode)
 >
-> **Outcome**: After this module, you will be able to activate Plan Mode — making Claude Code create detailed execution plans before touching code, then implementing step by step with checkpoints. This eliminates the #1 mistake: letting Claude code before planning.
+> **Outcome**: After this module, you will be able to enter Claude Code's native plan mode,
+> read and edit the plan it proposes, approve it into the permission mode you want, and tell
+> when planning is not worth it.
 
 ---
 
 ## 1. WHY — Why This Matters
 
-PM drops a feature request: "Add multi-language support to the app." You type it into Claude Code. Claude immediately starts coding — touches 15 files, misses critical translation files, breaks existing tests. You're left with a half-working mess.
+You ask for "extract the notification logic into its own service." Claude starts editing
+immediately. Twenty minutes later there are eleven changed files, two of them wrong, and you
+are reading a diff to work out what it thought you meant.
 
-The problem? Claude CODED when it should have PLANNED.
-
-Think Mode (6.1) made Claude reason deeper. But deeper reasoning without structure still leads to chaotic execution. Plan Mode adds STRUCTURE — Claude creates a battle plan with exact files, steps, dependencies, and checkpoints BEFORE writing a single line of code. This is the #1 mistake with AI coding tools: skipping the planning phase. Complex features need a battle plan first.
+Plan mode inverts that. It is not a prompt — it is a permission mode that blocks edits until
+you have read what Claude intends. You decide once, with the whole design in front of you,
+instead of eleven times while the diff grows.
 
 ---
 
 ## 2. CONCEPT — Core Ideas
 
-### What is Plan Mode?
+Plan mode is a permission mode, and the docs define it exactly: "Plan mode tells Claude to
+research and propose changes without making them. Claude reads files, runs shell commands to
+explore, and writes a plan, but does not edit your source." Edits "stay blocked until you
+approve the plan."
 
-Plan Mode is an operational pattern where you explicitly tell Claude to create an execution plan BEFORE writing any code. It's not a toggle or built-in command — it's a workflow discipline you enforce through prompts.
+Three ways in:
 
-The core phrase: **"Do NOT write code. Give me the plan first."**
+- `Shift+Tab` until the status bar shows `⏸ plan mode on`
+- prefix one prompt with `/plan`
+- `claude --permission-mode plan`, or `defaultMode: "plan"` in `.claude/settings.json`
 
-### The Plan-Confirm-Execute (PCE) Pattern
+`Shift+Tab` again leaves plan mode without approving. Approving instead "exits plan mode and
+switches the session to the permission mode each approve option describes" — you pick the
+blast radius as you accept the design.
+
+The course's **PCE loop** — Plan, Challenge, Execute — maps onto the docs' four phases
+(Explore → Plan → Implement → Commit):
+
+| PCE step | Native mechanism |
+|---|---|
+| **Plan** | Plan mode: explore read-only, then a written plan; `Ctrl+G` edits it |
+| **Challenge** | "Review this plan — what could go wrong?" before approving |
+| **Execute** | Approve (or `Shift+Tab`) to leave plan mode, then implement |
+
+Challenge is not ceremony. The AI-native SDLC playbook puts it plainly: "The agent that wrote
+the code has no way to approve it." (S3) The same holds for the plan.
+
+Planning is not free either: "Planning is most useful when you're uncertain about the
+approach, when the change modifies multiple files, or when you're unfamiliar with the code
+being modified. If you could describe the diff in one sentence, skip the plan." (S1)
 
 ```mermaid
-graph TD
-    A[Requirement] --> B[PLAN<br/>Claude analyzes,<br/>creates execution plan]
-    B --> C[CONFIRM<br/>Review plan,<br/>challenge assumptions]
-    C --> D{Approved?}
-    D -->|No| E[Revise Plan]
-    E --> C
-    D -->|Yes| F[EXECUTE Step 1]
-    F --> G[Checkpoint]
-    G --> H{More Steps?}
-    H -->|Yes| I[EXECUTE Next Step]
-    I --> G
-    H -->|No| J[Done]
-
-    style B fill:#e1f5fe
-    style C fill:#fff3e0
-    style F fill:#e8f5e9
+graph LR
+    A[Shift+Tab / --permission-mode plan] --> B[Explore, read-only]
+    B --> C[Plan proposed]
+    C -->|Ctrl+G| D[Edit the plan]
+    C -->|Challenge| B
+    D --> E[Approve: pick the mode]
+    E --> F[Execute + commit]
 ```
-
-1. **PLAN**: Give Claude the requirement + constraints. Claude analyzes the codebase, identifies affected files, lists dependencies, creates step-by-step plan. NO CODE yet.
-2. **CONFIRM**: Review the plan. Challenge: "What risks did you miss?" "What about X dependency?" Adjust scope.
-3. **EXECUTE**: Implement step by step. Checkpoint every 3-5 steps with `/compact` to review progress.
-
-**Why it works**: Bad assumptions are caught BEFORE they become bad code.
-
-### The Planning Prompt Template
-
-```text
-I need to [specific goal].
-Current state: [what exists]
-Constraints: [what can't change]
-
-Before writing ANY code:
-1. Analyze what needs to change
-2. List ALL files that will be affected
-3. Identify risks and dependencies
-4. Create step-by-step execution plan
-
-Do NOT write code. ONLY give me the plan.
-```
-
-### Task Decomposition Strategies
-
-| Strategy | Best For | Example |
-|----------|----------|---------|
-| **Vertical Slicing** | User-facing features | Login → Register → Profile → Settings |
-| **Horizontal Slicing** | Refactoring, migrations | DB schema → API → Service → UI |
-| **Risk-First** | Uncertain technology | Prove WebSocket scaling → then build features |
-| **Dependency-First** | Complex dependency chains | Auth system → User service → Notifications |
-
-### Plan Granularity Rule
-
-- Task **> 2 hours** → Needs a plan
-- Task **< 30 minutes** → Just code directly
 
 ---
 
 ## 3. DEMO — Step by Step
 
-**Scenario**: Add notification system (email + push) to Express/TypeScript API.
+A lab repo: `src/math.js` (`add`, `divide`) and one test file.
 
-### Step 1: PLAN — Activate Plan Mode
+**Step 1: Enter plan mode**
+
+Press `Shift+Tab` until the status bar says so. <!-- docs: permission-modes -->
+
+```text
+# Output may vary
+  [OMC#4.5.1] | session:0m | ctx:0%
+  ⏸ plan mode on (shift+tab to cycle)
+```
+
+The cycle runs `default` → `acceptEdits` → `plan`; from `auto` the first press goes to
+`default`. Or start there: `claude --permission-mode plan`.
+
+**Step 2: Ask for the change**
+
+```text
+Add input validation to divide() in src/math.js: throw a RangeError when the divisor
+is 0. Leave add() alone. Write the plan.
+```
+
+Claude reads the file, lists the directory, runs a read-only shell command. Nothing is
+edited. The status line names the plan file it writes:
+
+```text
+# Output may vary
+Planning: /Users/luatnq/.claude/plans/add-input-validation-to-enumerated-prism.md
+```
+
+⚠️ Needs verification — that path shows in the live UI but is not on any page under
+`https://code.claude.com/docs/en/`. Treat `Ctrl+G` as the supported way in.
+
+**Step 3: Read the plan and the approval prompt**
+
+```text
+# Output may vary
+ Ready to code?
+ Here is Claude's plan:
+ Add divide-by-zero validation to divide()
+ Context
+ src/math.js:2 currently is a bare a / b. With a divisor of 0 JavaScript returns
+ Infinity, -Infinity, or NaN (for 0 / 0) instead of failing — a silent bad value
+ that propagates to callers. add() is explicitly out of scope and stays as is.
+ Change
+ src/math.js — guard the divisor in divide(), keeping the existing one-line style
+ …
+ Claude has written up a plan and is ready to execute. Would you like to proceed?
+ ❯ 1. Yes, and use auto mode
+   2. Yes, manually approve edits
+   3. Tell Claude what to change
+      shift+tab to approve with this feedback
+ ctrl+g to edit in Vim · ~/.claude/plans/add-input-validation-to-reflective-nova.md
+```
+
+Option 3 is the **Challenge** step: send it back with "what breaks if `b` is `'0'`?" and you
+stay in plan mode.
+
+**Step 4: Approve, and watch the mode change**
+
+Choosing option 1 approves and switches the session out of plan mode.
+
+```text
+# Output may vary
+  ⎿  Updated src/math.js (+4 -1)
+      1  export function add(a, b) { return a + b; }
+      2 -export function divide(a, b) { return a / b; }
+      2 +export function divide(a, b) {
+      3 +  if (b === 0) throw new RangeError('Division by zero');
+      4 +  return a / b;
+      5 +}
+  ⎿  Updated tests/math.test.mjs (+5 -1)
+──────────────────────────────────────────────── add-divide-by-zero-validation ─
+  ⏵⏵ auto mode on (shift+tab to cycle)
+```
+
+Two documented side effects: the mode is now `auto`, and the session took a title from the
+plan.
+
+**Step 5: Verify**
 
 ```bash
-$ claude
+# docs: common-workflows
+git diff --stat
+npm test 2>&1 | tail -5
 ```
-
-Prompt:
-```text
-I need to add a notification system supporting email (SendGrid) and push
-(Firebase). Include template system and rate limiting.
-
-Current state: Express + TypeScript + Prisma
-Constraints: Can't modify existing user table schema
-
-Before writing ANY code:
-1. Analyze what needs to change
-2. List ALL files affected
-3. Identify risks and dependencies
-4. Create step-by-step execution plan
-
-Do NOT write code. ONLY give me the plan.
-```
-
-Expected output:
-```markdown
-## Execution Plan: Notification System
-
-### Files Affected (12 files)
-- src/services/notification/ (new directory)
-- src/types/notification.ts (new)
-- src/config/notification.config.ts (new)
-- prisma/schema.prisma (modify - add NotificationLog)
-- package.json (add @sendgrid/mail, firebase-admin)
-...
-
-### Dependencies
-- SendGrid API key required
-- Firebase service account
-- Redis for rate limiting (optional)
-
-### Risks
-1. Firebase token expiry handling
-2. SendGrid rate limits (100/sec)
-3. Template variable injection security
-
-### Execution Steps
-1. Define notification interfaces and types
-2. Create template system with variable substitution
-3. Implement SendGrid email provider
-4. Implement Firebase push provider
-5. Add rate limiting middleware
-6. Create NotificationService orchestrator
-7. Add database logging (Prisma migration)
-8. Write unit tests for providers
-9. Integration test with test accounts
-10. Documentation and config examples
-```
-
-### Step 2: CONFIRM — Challenge and Adjust
-
-Prompt:
-```text
-Good plan. Three adjustments:
-1. Add SMS via Twilio as third channel
-2. Move template system to step 2 (providers depend on it)
-3. What's your solution for Firebase token expiry?
-
-Update the plan.
-```
-
-Claude revises — issues caught BEFORE any code exists.
-
-### Step 3: EXECUTE Step 1
-
-Prompt:
-```text
-Plan approved. Implement step 1: notification interfaces and types.
-```
-
-Claude generates focused, plan-aligned code:
-```typescript
-// src/types/notification.ts
-export interface NotificationPayload {
-  channel: 'email' | 'push' | 'sms';
-  recipient: string;
-  template: string;
-  variables: Record<string, string>;
-}
-```
-
-### Step 4: Checkpoint — Mid-Execution Review
-
-After completing steps 1-4:
 
 ```text
-/compact
+# Output may vary
+ src/math.js           | 5 ++++-
+ tests/math.test.mjs   | 6 +++++-
+# pass 5
+# fail 0
 ```
 
-Then:
-```text
-We're at step 5 of 12. Review progress against plan. On track?
-Any adjustments needed before continuing?
-```
-
-Claude compares progress vs plan, suggests any needed adjustments.
-
-### Step 5: Result Comparison
-
-| Approach | Time | Rework |
-|----------|------|--------|
-| **Without Plan Mode** | 8+ hours | 2+ hours fixing missed requirements |
-| **With Plan Mode** | 6.25 hours (30min plan + 15min confirm + 5.5h execute) | Zero |
+If the plan was wrong, `/rewind` (or `Esc` twice on an empty prompt) restores the
+conversation, the code, or both.
 
 ---
 
 ## 4. PRACTICE — Try It Yourself
 
-### Exercise 1: PCE in Action
+### Exercise 1: Plan a multi-file change
 
-**Goal**: Practice the full Plan-Confirm-Execute cycle.
+**Goal**: Use plan mode where it pays off — an unfamiliar, multi-file change.
 
 **Instructions**:
-1. Choose a medium feature for your project (or use: "Add CSV export for user data")
-2. Write a planning prompt using the template
-3. Get Claude's plan — DON'T accept it immediately
-4. Challenge: "What risks did you miss?" "What if the export is 100K rows?"
-5. Refine until confident
-6. Execute first 3 steps only
-7. Reflect: did planning save time vs jumping to code?
+1. In a real repo, run `claude --permission-mode plan`.
+2. Ask for a change that must touch at least three files.
+3. Read the plan: how many files does it name, and are they the right ones?
+4. Approve with **Yes, manually approve edits** so you still see each write.
 
-**Expected result**: Plan with 6-10 steps, at least 2 risks identified, first 3 steps implemented cleanly.
-
-<details>
-<summary>💡 Hint</summary>
-
-For the challenge phase, good questions include:
-- "What if the data is too large for memory?"
-- "How do we handle special characters in CSV?"
-- "What about concurrent export requests?"
-- "Where do we store the generated file?"
-</details>
+**Expected result**: A plan you corrected before any file changed.
 
 <details>
 <summary>✅ Solution</summary>
 
-**Planning prompt**:
+The tell that plan mode earned its keep is a plan naming a file you had forgotten. If the
+plan just restates your prompt, you picked a task (S1) says to skip: "If you could describe
+the diff in one sentence, skip the plan."
+</details>
+
+### Exercise 2: Let Claude interview you into a SPEC.md
+
+**Goal**: Produce a spec for a larger feature, then execute it in a fresh session.
+
+**Instructions**:
+1. Start in plan mode and send the interview prompt from Anthropic's best practices (S1):
+
 ```text
-I need to add CSV export for user data. Should support filtering by date
-range and user status. Current: Express API with Prisma ORM.
+I want to build [brief description]. Interview me in detail using the AskUserQuestion tool.
 
-Before writing ANY code:
-1. Analyze what needs to change
-2. List files affected
-3. Identify risks and dependencies
-4. Create step-by-step plan
+Ask about technical implementation, UI/UX, edge cases, concerns, and tradeoffs. Don't ask
+obvious questions, dig into the hard parts I might not have considered.
 
-Do NOT write code. ONLY give me the plan.
+Keep interviewing until we've covered everything, then write a complete spec to SPEC.md.
 ```
 
-**Challenge prompts**:
-- "What if we have 100K users? Will this load everything in memory?"
-- "How do we handle Unicode characters in names?"
-- "What about rate limiting concurrent exports?"
+2. Answer until it stops asking. Let it write `SPEC.md`.
+3. Quit, start a **fresh** session, implement from `SPEC.md`.
 
-**Good plan should include**:
-- Streaming approach for large datasets
-- Proper CSV escaping for special characters
-- Queue system or rate limiting for exports
-- Temporary file storage strategy
+**Expected result**: A self-contained spec, then a clean session.
+
+<details>
+<summary>✅ Solution</summary>
+
+"Once the spec is complete, start a fresh session to execute it." (S1) A good spec should
+"name the files and interfaces involved, state what is out of scope, and end with an
+end-to-end verification step that proves the feature works." Writing `SPEC.md` is itself an
+edit, so plan mode will ask you to approve it — working as designed.
 </details>
 
----
+### Exercise 3: Challenge the plan
 
-### Exercise 2: Decomposition Strategy Picker
+**Goal**: Reject a plan productively instead of accepting and fixing later.
 
-**Goal**: Learn to choose the right decomposition strategy.
+**Instructions**:
+1. Get any plan proposed.
+2. Choose **Tell Claude what to change** and ask: "Review this plan — what could go wrong in
+   production, and what did you assume about the existing code?"
+3. Compare the second plan with the first.
 
-For each feature, choose the best strategy and justify:
-
-1. **User authentication** (login, register, password reset, 2FA)
-2. **Data export to CSV** (single feature, transforms data)
-3. **Real-time chat** (WebSocket, storage, presence)
-4. **Admin dashboard** (users, stats, settings)
+**Expected result**: A second plan with its assumptions made explicit.
 
 <details>
 <summary>💡 Hint</summary>
-
-Ask yourself:
-- Multiple user journeys? → Vertical
-- Single feature, multiple layers? → Horizontal
-- High technical uncertainty? → Risk-First
-- Clear dependency chain? → Dependency-First
+Reject on *assumptions*, not style. "What did you assume?" surfaces more than "make it better".
 </details>
 
 <details>
 <summary>✅ Solution</summary>
 
-| Feature | Strategy | Reason |
-|---------|----------|--------|
-| User auth | **Vertical** | Each auth feature (login, register, 2FA) is a complete user journey |
-| CSV export | **Horizontal** | Single feature spanning layers: API → Service → File generation |
-| Real-time chat | **Risk-First** | WebSocket scaling is the risky unknown — prove it first |
-| Admin dashboard | **Vertical** | Independent pages (users, stats, settings) can ship separately |
+Option 3 keeps you in plan mode, so a revision costs one turn — far cheaper than approving
+and reverting. That is the Challenge step, and the same idea as (S3)'s "The agent that wrote
+the code has no way to approve it."
 </details>
 
 ---
 
 ## 5. CHEAT SHEET
 
-### Planning Prompt Template
+| Action | How |
+|---|---|
+| Enter plan mode | `Shift+Tab` until `⏸ plan mode on`, or `/plan <prompt>` |
+| Start in plan mode | `claude --permission-mode plan` |
+| Default for a project | `"permissions": { "defaultMode": "plan" }` in `.claude/settings.json` |
+| Leave without approving | `Shift+Tab` |
+| Edit the plan | `Ctrl+G` |
+| Approve into auto mode | **Yes, and use auto mode** |
+| Approve, review each edit | **Yes, manually approve edits** |
+| Challenge | **Tell Claude what to change** |
+| Undo after approving | `/rewind`, or `Esc` twice on an empty prompt |
+| Opus plans, Sonnet builds | `claude --model opusplan` |
 
-```text
-I need to [goal].
-Current state: [what exists]
-Constraints: [what can't change]
-
-Before writing ANY code:
-1. Analyze what needs to change
-2. List ALL files affected
-3. Identify risks and dependencies
-4. Create step-by-step execution plan
-
-Do NOT write code. ONLY give me the plan.
-```
-
-### Checkpoint Template
-
-```text
-We're at step X of Y. /compact then review:
-- Progress vs plan?
-- Any adjustments needed?
-- Risks materialized?
-```
-
-### Plan Revision Template
-
-```text
-Good plan. Adjustments needed:
-1. [Add/remove/reorder]
-2. [New constraint]
-3. [Question about risk]
-
-Update the plan.
-```
-
-### Decomposition Decision Table
-
-| If... | Use... |
-|-------|--------|
-| Multiple user features | Vertical Slicing |
-| Single feature, many layers | Horizontal Slicing |
-| High technical uncertainty | Risk-First |
-| Clear dependency chain | Dependency-First |
-
-### Plan Granularity Rule
-
-| Task Duration | Action |
-|---------------|--------|
-| > 2 hours | Full PCE cycle |
-| 30 min - 2 hours | Quick plan, minimal confirm |
-| < 30 minutes | Code directly |
+`opusplan` "uses `opus` during plan mode, then switches to `sonnet` for execution." Its banner
+reads `Opus Plan`.
 
 ---
 
 ## 6. PITFALLS — Common Mistakes
 
 | ❌ Mistake | ✅ Correct Approach |
-|-----------|---------------------|
-| Jumping to code without plan for task >2 hours | ALWAYS Plan-Confirm-Execute for tasks touching 3+ files |
-| Over-planning simple tasks (adding a button) | Task <30 min → skip plan, code directly |
-| Accepting first plan without challenging | CONFIRM phase is mandatory. Ask: "What risks? What dependencies?" |
-| Planning everything then executing all at once | Execute step-by-step, checkpoint every 3-5 steps |
-| Skipping `/compact` between plan and execute | After CONFIRM, `/compact` before EXECUTE step 1 |
-| Abandoning plan when execution gets hard | If reality diverges, STOP and re-plan. Don't force it. |
-| Planning without letting Claude read codebase | Let Claude read key files BEFORE planning |
+|---|---|
+| Writing "do NOT write code yet" in the prompt | Plan mode enforces it; a prompt only asks |
+| Planning a one-line fix | "If you could describe the diff in one sentence, skip the plan." (S1) |
+| Approving unread, then reverting | Use **Tell Claude what to change** — it stays in plan mode |
+| Expecting plan mode to persist after approval | Approving "exits plan mode". `Shift+Tab` back |
+| Assuming it blocks every command | It permits reads and, with auto mode, classifier-approved commands |
+| Trusting it under bypass permissions | In interactive terminals with bypass permissions available, plan mode's blocks are not enforced |
+| Retyping the plan to fix a line | `Ctrl+G` |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: Vietnamese e-commerce startup building multi-warehouse inventory management. Feature: real-time stock sync across 5 warehouses. 40+ files, 3 new DB tables, WebSocket, 2 external APIs.
+**Scenario**: A KMP team shipping an Android + iOS banking client had to move session
+handling out of the Android module into `commonMain`. Roughly a dozen files, two of them
+`expect`/`actual` pairs nobody had touched in a year.
 
-**Without Plan Mode (first attempt)**:
-- Day 1-2: Coded immediately, built basic sync
-- Day 3: Discovered missing conflict resolution for concurrent updates
-- Day 5: WebSocket approach didn't scale, had to switch to Redis pub/sub
-- **Total: 7 days** (2 days wasted on rework)
+**Problem**: The first attempt ran in the default mode. Claude moved the interfaces, then the
+implementations, then began rewriting the iOS `actual`. The team noticed when the iOS build
+broke, six files into a diff they had not read.
 
-**With Plan Mode (next similar feature)**:
-1. **PLAN** (2 hours): Claude analyzed codebase, listed 35 affected files, identified 4 critical dependencies, created 12-step plan, flagged WebSocket scaling risk
-2. **CONFIRM** (1 hour): Team caught 2 missing steps. Claude suggested CRDT for conflict resolution and Redis pub/sub from the start.
-3. **EXECUTE** (3 days): Step-by-step, checkpoint every 4 steps
+**Solution**: They restarted with `claude --model opusplan --permission-mode plan` and asked
+for the migration plan only. The plan named the `expect`/`actual` pair as the risky step and
+proposed doing it last, behind the shared interface. They challenged it once — "what did you
+assume about the iOS Keychain wrapper?" — and the revision added a step to read that wrapper
+first. Then they approved with **Yes, manually approve edits**.
 
-**Result**: 3.5 days vs 7 days. Zero rework. Team quote: "3 hours planning saved 3.5 days coding."
+**Result**: The migration landed in one session, iOS green at every step. The takeaway was
+the mode, not the prompt: no prompt would have blocked that first edit; plan mode did.
 
 ---
 

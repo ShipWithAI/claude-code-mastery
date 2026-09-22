@@ -1,393 +1,312 @@
 ---
-title: 'Chế độ Plan (Plan Mode)'
-description: 'Dùng Plan Mode trong Claude Code để lập kế hoạch trước khi code, phân tích và thiết kế giải pháp.'
+title: 'Plan Mode'
+description: 'Dùng plan mode native của Claude Code để đọc và duyệt kế hoạch trước khi bất kỳ edit nào chạm vào disk.'
+verified: 2026-09-22
+claude_version: 2.1.278
 ---
 
-# Module 6.2: Chế độ Plan (Plan Mode)
+# Module 6.2: Plan Mode
 
-> **Thời gian học**: ~35 phút
+> **Thời gian**: ~35 phút
 >
 > **Yêu cầu trước**: Module 6.1 (Think Mode)
 >
-> **Kết quả**: Sau module này, bạn sẽ kích hoạt Plan Mode — Claude Code tạo execution plan chi tiết trước khi đụng code, rồi implement từng bước với checkpoint. Loại bỏ sai lầm #1: để Claude code trước khi plan.
+> **Kết quả**: Sau module này bạn vào được plan mode native của Claude Code, đọc và sửa được
+> kế hoạch nó đề xuất, duyệt kế hoạch vào đúng permission mode bạn muốn, và biết khi nào
+> planning không đáng.
 
 ---
 
-## 1. WHY — Tại Sao Cần Plan Mode
+## 1. WHY — Tại Sao Quan Trọng
 
-PM đưa yêu cầu: "Thêm đa ngôn ngữ cho app." Mở Claude Code, gõ requirement. Claude code ngay — sửa 15 file, miss translation file, break 3 test, tạo đống mess. Vấn đề? Claude CODE khi lẽ ra phải PLAN.
+Bạn bảo "extract notification logic ra service riêng." Claude edit ngay lập tức. Hai mươi phút
+sau có mười một file đã đổi, hai file sai, và bạn đang đọc diff để đoán xem nó hiểu ý bạn thế
+nào.
 
-Think Mode (6.1) giúp Claude suy luận sâu. Nhưng suy luận sâu MÀ KHÔNG CÓ plan cấu trúc vẫn dẫn đến execution hỗn loạn. Plan Mode thêm CẤU TRÚC — Claude tạo battle plan với exact file, step, dependency, checkpoint TRƯỚC khi viết dòng code nào.
-
-Ví von: xây nhà không bản vẽ — thợ giỏi mấy cũng đập đi xây lại. 3 tiếng thiết kế tiết kiệm 3 tuần sửa sai.
+Plan mode lật ngược điều đó. Nó **không phải** một câu prompt — nó là một permission mode chặn
+mọi edit cho tới khi bạn đọc xong ý định của Claude. Bạn quyết định một lần, với cả thiết kế
+trước mặt, thay vì mười một lần trong lúc diff phình ra.
 
 ---
 
 ## 2. CONCEPT — Ý Tưởng Cốt Lõi
 
-### Plan Mode là gì?
+Plan mode là một permission mode, và docs định nghĩa rất rõ: "Plan mode tells Claude to
+research and propose changes without making them. Claude reads files, runs shell commands to
+explore, and writes a plan, but does not edit your source." Edit "stay blocked until you
+approve the plan."
 
-Plan Mode là pattern vận hành nơi bạn CHỦ ĐỘNG bảo Claude tạo execution plan TRƯỚC khi viết code. Không phải toggle hay built-in command — là kỷ luật workflow bạn enforce qua prompt.
+Ba cách vào:
 
-Câu thần chú: **"KHÔNG viết code. Cho tôi plan trước."**
+- `Shift+Tab` cho tới khi status bar hiện `⏸ plan mode on`
+- thêm tiền tố `/plan` cho một prompt
+- `claude --permission-mode plan`, hoặc `defaultMode: "plan"` trong `.claude/settings.json`
 
-### Pattern Plan-Confirm-Execute (PCE)
+`Shift+Tab` lần nữa là thoát plan mode mà không duyệt gì. Còn duyệt thì "exits plan mode and
+switches the session to the permission mode each approve option describes" — bạn chọn luôn
+bán kính ảnh hưởng ngay lúc chấp nhận thiết kế.
+
+**Vòng PCE** của khóa học — Plan, Challenge, Execute — ánh xạ thẳng vào bốn pha trong docs
+(Explore → Plan → Implement → Commit):
+
+| Bước PCE | Cơ chế native |
+|---|---|
+| **Plan** | Plan mode: khám phá read-only rồi viết plan; `Ctrl+G` để sửa plan |
+| **Challenge** | "Review this plan — what could go wrong?" trước khi duyệt |
+| **Execute** | Duyệt (hoặc `Shift+Tab`) để rời plan mode, rồi implement |
+
+Challenge không phải thủ tục cho có. AI-native SDLC playbook nói thẳng: "The agent that wrote
+the code has no way to approve it." (S3) Với plan cũng vậy.
+
+Và planning không miễn phí: "Planning is most useful when you're uncertain about the approach,
+when the change modifies multiple files, or when you're unfamiliar with the code being
+modified. If you could describe the diff in one sentence, skip the plan." (S1)
 
 ```mermaid
-graph TD
-    A[Requirement] --> B[PLAN<br/>Claude phân tích,<br/>tạo execution plan]
-    B --> C[CONFIRM<br/>Review plan,<br/>challenge assumption]
-    C --> D{Duyệt?}
-    D -->|Không| E[Chỉnh Plan]
-    E --> C
-    D -->|Có| F[EXECUTE Bước 1]
-    F --> G[Checkpoint]
-    G --> H{Còn bước?}
-    H -->|Có| I[EXECUTE Bước Tiếp]
-    I --> G
-    H -->|Không| J[Hoàn Thành]
-
-    style B fill:#e1f5fe
-    style C fill:#fff3e0
-    style F fill:#e8f5e9
+graph LR
+    A[Shift+Tab / --permission-mode plan] --> B[Khám phá, read-only]
+    B --> C[Plan được đề xuất]
+    C -->|Ctrl+G| D[Sửa plan]
+    C -->|Challenge| B
+    D --> E[Duyệt: chọn mode]
+    E --> F[Execute + commit]
 ```
-
-1. **PLAN**: Đưa requirement + constraint. Claude phân tích codebase, xác định file ảnh hưởng, list dependency, tạo step-by-step plan. CHƯA viết code.
-2. **CONFIRM**: Review plan. Challenge: "Risk nào miss?" "Dependency nào?" Điều chỉnh scope.
-3. **EXECUTE**: Implement từng bước. Checkpoint mỗi 3-5 bước với `/compact` để review progress.
-
-**Tại sao hiệu quả**: Assumption sai bị bắt TRƯỚC khi thành code sai.
-
-### Planning Prompt Template
-
-```text
-Tôi cần [mục tiêu cụ thể].
-Trạng thái hiện tại: [cái gì đã có]
-Constraint: [cái gì không đổi được]
-
-Trước khi viết BẤT KỲ code nào:
-1. Phân tích cần thay đổi gì
-2. Liệt kê TẤT CẢ file bị ảnh hưởng
-3. Xác định risk và dependency
-4. Tạo execution plan từng bước
-
-KHÔNG viết code. CHỈ cho tôi plan.
-```
-
-### Chiến Lược Task Decomposition
-
-| Strategy | Phù Hợp Khi | Ví Dụ |
-|----------|-------------|-------|
-| **Vertical Slicing** | Feature user-facing | Login → Register → Profile → Settings |
-| **Horizontal Slicing** | Refactoring, migration | DB schema → API → Service → UI |
-| **Risk-First** | Tech uncertain | Prove WebSocket scaling → xây feature |
-| **Dependency-First** | Dependency chain phức tạp | Auth → User service → Notifications |
-
-### Quy Tắc Plan Granularity
-
-- Task **> 2 tiếng** → Cần plan
-- Task **< 30 phút** → Code luôn
 
 ---
 
-## 3. DEMO — Làm Mẫu Từng Bước
+## 3. DEMO — Từng Bước
 
-**Kịch bản**: Thêm notification system (email + push) vào Express/TypeScript API.
+Lab repo: `src/math.js` (`add`, `divide`) và một file test.
 
-### Bước 1: PLAN — Kích Hoạt Plan Mode
+**Bước 1: Vào plan mode**
+
+Nhấn `Shift+Tab` tới khi status bar báo. <!-- docs: permission-modes -->
+
+```text
+# Output may vary
+  [OMC#4.5.1] | session:0m | ctx:0%
+  ⏸ plan mode on (shift+tab to cycle)
+```
+
+Vòng lặp là `default` → `acceptEdits` → `plan`; từ `auto` thì lần nhấn đầu về `default`. Hoặc
+vào thẳng: `claude --permission-mode plan`.
+
+**Bước 2: Yêu cầu thay đổi**
+
+```text
+Add input validation to divide() in src/math.js: throw a RangeError when the divisor
+is 0. Leave add() alone. Write the plan.
+```
+
+Claude đọc file, liệt kê thư mục, chạy một lệnh shell read-only. Không file nào bị sửa. Dòng
+trạng thái cho biết tên file plan nó đang ghi:
+
+```text
+# Output may vary
+Planning: /Users/luatnq/.claude/plans/add-input-validation-to-enumerated-prism.md
+```
+
+⚠️ Needs verification — đường dẫn này hiện trong UI thật nhưng không có trên bất kỳ trang nào
+dưới `https://code.claude.com/docs/en/`. Hãy coi `Ctrl+G` là cách vào được hỗ trợ.
+
+**Bước 3: Đọc plan và màn hình duyệt**
+
+```text
+# Output may vary
+ Ready to code?
+ Here is Claude's plan:
+ Add divide-by-zero validation to divide()
+ Context
+ src/math.js:2 currently is a bare a / b. With a divisor of 0 JavaScript returns
+ Infinity, -Infinity, or NaN (for 0 / 0) instead of failing — a silent bad value
+ that propagates to callers. add() is explicitly out of scope and stays as is.
+ Change
+ src/math.js — guard the divisor in divide(), keeping the existing one-line style
+ …
+ Claude has written up a plan and is ready to execute. Would you like to proceed?
+ ❯ 1. Yes, and use auto mode
+   2. Yes, manually approve edits
+   3. Tell Claude what to change
+      shift+tab to approve with this feedback
+ ctrl+g to edit in Vim · ~/.claude/plans/add-input-validation-to-reflective-nova.md
+```
+
+Lựa chọn 3 chính là bước **Challenge**: trả plan về kèm "what breaks if `b` is `'0'`?" và bạn
+vẫn ở trong plan mode.
+
+**Bước 4: Duyệt, và nhìn mode đổi**
+
+Chọn 1 là duyệt và đẩy session ra khỏi plan mode.
+
+```text
+# Output may vary
+  ⎿  Updated src/math.js (+4 -1)
+      1  export function add(a, b) { return a + b; }
+      2 -export function divide(a, b) { return a / b; }
+      2 +export function divide(a, b) {
+      3 +  if (b === 0) throw new RangeError('Division by zero');
+      4 +  return a / b;
+      5 +}
+  ⎿  Updated tests/math.test.mjs (+5 -1)
+──────────────────────────────────────────────── add-divide-by-zero-validation ─
+  ⏵⏵ auto mode on (shift+tab to cycle)
+```
+
+Hai hệ quả có trong docs: mode giờ là `auto`, và session lấy tiêu đề sinh ra từ plan.
+
+**Bước 5: Kiểm chứng**
 
 ```bash
-$ claude
+# docs: common-workflows
+git diff --stat
+npm test 2>&1 | tail -5
 ```
-
-Prompt:
-```text
-Tôi cần thêm notification system hỗ trợ email (SendGrid) và push (Firebase).
-Gồm template system và rate limiting.
-
-Hiện tại: Express + TypeScript + Prisma
-Constraint: Không đổi user table schema
-
-Trước khi viết code:
-1. Phân tích file ảnh hưởng
-2. List dependency
-3. Xác định risk
-4. Tạo plan từng bước
-
-KHÔNG viết code. CHỈ plan.
-```
-
-Output mong đợi:
-```markdown
-## Execution Plan: Notification System
-
-### File Ảnh Hưởng (12 file)
-- src/services/notification/ (thư mục mới)
-- src/types/notification.ts (mới)
-- src/config/notification.config.ts (mới)
-- prisma/schema.prisma (sửa - thêm NotificationLog)
-- package.json (thêm @sendgrid/mail, firebase-admin)
-...
-
-### Dependency
-- SendGrid API key
-- Firebase service account
-- Redis cho rate limiting (optional)
-
-### Risk
-1. Firebase token expiry handling
-2. SendGrid rate limits (100/sec)
-3. Template variable injection security
-
-### Execution Steps
-1. Define notification interface và types
-2. Tạo template system với variable substitution
-3. Implement SendGrid email provider
-4. Implement Firebase push provider
-5. Thêm rate limiting middleware
-6. Tạo NotificationService orchestrator
-7. Database logging (Prisma migration)
-8. Unit test cho provider
-9. Integration test với test account
-10. Documentation và config example
-```
-
-### Bước 2: CONFIRM — Challenge và Adjust
-
-Prompt:
-```text
-Plan tốt. Ba điều chỉnh:
-1. Thêm SMS qua Twilio làm channel thứ 3
-2. Template system lên bước 2 (provider phụ thuộc vào nó)
-3. Firebase token expiry xử lý sao?
-
-Cập nhật plan.
-```
-
-Claude revise — issue bị bắt TRƯỚC khi code.
-
-### Bước 3: EXECUTE Bước 1
-
-Prompt:
-```text
-Plan approved. Implement bước 1: notification interface và types.
-```
-
-Claude generate code focused theo plan:
-```typescript
-// src/types/notification.ts
-export interface NotificationPayload {
-  channel: 'email' | 'push' | 'sms';
-  recipient: string;
-  template: string;
-  variables: Record<string, string>;
-}
-```
-
-### Bước 4: Checkpoint — Review Giữa Chừng
-
-Sau khi hoàn thành bước 1-4:
 
 ```text
-/compact
+# Output may vary
+ src/math.js           | 5 ++++-
+ tests/math.test.mjs   | 6 +++++-
+# pass 5
+# fail 0
 ```
 
-Rồi:
-```text
-Đang ở bước 5/12. Review progress so với plan.
-On track? Cần adjust gì không?
-```
-
-Claude so sánh progress vs plan, đề xuất adjustment nếu cần.
-
-### Bước 5: So Sánh Kết Quả
-
-| Approach | Thời Gian | Rework |
-|----------|-----------|--------|
-| **Không Plan Mode** | 8+ tiếng | 2+ tiếng fix requirement miss |
-| **Có Plan Mode** | 6.25h (30p plan + 15p confirm + 5.5h execute) | Zero |
+Nếu plan sai, `/rewind` (hoặc nhấn `Esc` hai lần ở ô prompt trống) khôi phục hội thoại, code,
+hoặc cả hai.
 
 ---
 
-## 4. PRACTICE — Tự Thực Hành
+## 4. PRACTICE — Tự Làm
 
-### Bài Tập 1: PCE in Action
+### Bài 1: Lên plan cho thay đổi nhiều file
 
-**Mục tiêu**: Thực hành full cycle Plan-Confirm-Execute.
+**Mục tiêu**: Dùng plan mode đúng chỗ nó có giá trị — thay đổi nhiều file, code lạ.
 
 **Hướng dẫn**:
-1. Chọn feature medium cho project (hoặc dùng: "Thêm CSV export cho user data")
-2. Viết planning prompt theo template
-3. Nhận plan Claude — ĐỪNG chấp nhận ngay
-4. Challenge: "Risk nào miss?" "Nếu export 100K row thì sao?"
-5. Refine đến khi confident
-6. Execute 3 bước đầu
-7. Đánh giá: planning tiết kiệm thời gian vs code ngay?
+1. Trong một repo thật, chạy `claude --permission-mode plan`.
+2. Yêu cầu một thay đổi buộc phải chạm ít nhất ba file.
+3. Đọc plan: nó kể tên bao nhiêu file, và có đúng file không?
+4. Duyệt bằng **Yes, manually approve edits** để vẫn thấy từng lần ghi.
 
-**Kết quả mong đợi**: Plan 6-10 bước, ít nhất 2 risk identified, 3 bước đầu implement clean.
+**Kết quả mong đợi**: Một plan bạn đã sửa trước khi có file nào đổi.
 
 <details>
-<summary>💡 Gợi ý</summary>
+<summary>✅ Lời giải</summary>
 
-Câu hỏi challenge tốt:
-- "Nếu data quá lớn cho memory?"
-- "Special character trong CSV xử lý sao?"
-- "Concurrent export request thì sao?"
-- "File generated lưu ở đâu?"
+Dấu hiệu plan mode đáng công là plan nêu ra một file bạn đã quên. Nếu plan chỉ chép lại prompt
+thì bạn chọn nhầm task — (S1) bảo bỏ qua: "If you could describe the diff in one sentence,
+skip the plan."
 </details>
 
-<details>
-<summary>✅ Đáp án</summary>
+### Bài 2: Để Claude phỏng vấn bạn thành SPEC.md
 
-**Planning prompt**:
+**Mục tiêu**: Viết spec cho một feature lớn, rồi thực thi trong session mới.
+
+**Hướng dẫn**:
+1. Vào plan mode và gửi prompt phỏng vấn trong best practices của Anthropic (S1):
+
 ```text
-Tôi cần thêm CSV export cho user data. Hỗ trợ filter theo date range
-và user status. Hiện tại: Express API với Prisma ORM.
+I want to build [brief description]. Interview me in detail using the AskUserQuestion tool.
 
-Trước khi viết code:
-1. Phân tích cần đổi gì
-2. List file ảnh hưởng
-3. Xác định risk và dependency
-4. Tạo plan từng bước
+Ask about technical implementation, UI/UX, edge cases, concerns, and tradeoffs. Don't ask
+obvious questions, dig into the hard parts I might not have considered.
 
-KHÔNG viết code. CHỈ plan.
+Keep interviewing until we've covered everything, then write a complete spec to SPEC.md.
 ```
 
-**Challenge prompt**:
-- "Nếu 100K user? Load hết vào memory không?"
-- "Unicode character trong tên xử lý sao?"
-- "Rate limit concurrent export?"
+2. Trả lời tới khi nó ngừng hỏi. Để nó ghi `SPEC.md`.
+3. Thoát, mở một session **mới**, implement từ `SPEC.md`.
 
-**Plan tốt nên có**:
-- Streaming approach cho large dataset
-- Proper CSV escaping cho special character
-- Queue system hoặc rate limiting cho export
-- Temporary file storage strategy
+**Kết quả mong đợi**: Một spec tự chứa, rồi một session sạch context.
+
+<details>
+<summary>✅ Lời giải</summary>
+
+"Once the spec is complete, start a fresh session to execute it." (S1) Spec tốt phải "name the
+files and interfaces involved, state what is out of scope, and end with an end-to-end
+verification step that proves the feature works." Ghi `SPEC.md` bản thân nó là một edit, nên
+plan mode sẽ hỏi bạn duyệt — đúng thiết kế, không phải bug.
 </details>
 
----
+### Bài 3: Challenge cái plan
 
-### Bài Tập 2: Chọn Decomposition Strategy
+**Mục tiêu**: Từ chối plan một cách có ích thay vì duyệt rồi sửa sau.
 
-**Mục tiêu**: Chọn đúng decomposition strategy.
+**Hướng dẫn**:
+1. Để Claude đề xuất một plan bất kỳ.
+2. Chọn **Tell Claude what to change** và hỏi: "Review this plan — what could go wrong in
+   production, and what did you assume about the existing code?"
+3. So plan thứ hai với plan đầu.
 
-Với mỗi feature, chọn strategy phù hợp và justify:
-
-1. **User authentication** (login, register, password reset, 2FA)
-2. **Export CSV** (single feature, transform data)
-3. **Real-time chat** (WebSocket, storage, presence)
-4. **Admin dashboard** (users, stats, settings)
+**Kết quả mong đợi**: Plan thứ hai nói rõ các giả định của nó.
 
 <details>
 <summary>💡 Gợi ý</summary>
-
-Tự hỏi:
-- Nhiều user journey? → Vertical
-- Single feature, nhiều layer? → Horizontal
-- Tech uncertainty cao? → Risk-First
-- Dependency chain rõ? → Dependency-First
+Từ chối dựa trên *giả định*, không phải style. "What did you assume?" lòi ra nhiều thứ hơn
+"làm tốt hơn đi".
 </details>
 
 <details>
-<summary>✅ Đáp án</summary>
+<summary>✅ Lời giải</summary>
 
-| Feature | Strategy | Lý Do |
-|---------|----------|-------|
-| User auth | **Vertical** | Mỗi auth feature (login, register, 2FA) là user journey hoàn chỉnh |
-| CSV export | **Horizontal** | Single feature xuyên suốt layer: API → Service → File generation |
-| Real-time chat | **Risk-First** | WebSocket scaling là unknown rủi ro — prove trước |
-| Admin dashboard | **Vertical** | Các page độc lập (users, stats, settings) ship riêng được |
+Lựa chọn 3 giữ bạn trong plan mode, nên sửa plan tốn đúng một turn — rẻ hơn nhiều so với duyệt
+rồi revert. Đó là bước Challenge, cùng ý với (S3): "The agent that wrote the code has no way
+to approve it."
 </details>
 
 ---
 
 ## 5. CHEAT SHEET
 
-### Planning Prompt Template
+| Việc | Cách làm |
+|---|---|
+| Vào plan mode | `Shift+Tab` tới `⏸ plan mode on`, hoặc `/plan <prompt>` |
+| Khởi động trong plan mode | `claude --permission-mode plan` |
+| Mặc định cho một project | `"permissions": { "defaultMode": "plan" }` trong `.claude/settings.json` |
+| Thoát mà không duyệt | `Shift+Tab` |
+| Sửa plan | `Ctrl+G` |
+| Duyệt sang auto mode | **Yes, and use auto mode** |
+| Duyệt, xem từng edit | **Yes, manually approve edits** |
+| Challenge | **Tell Claude what to change** |
+| Hoàn tác sau khi duyệt | `/rewind`, hoặc `Esc` hai lần ở prompt trống |
+| Opus lên plan, Sonnet code | `claude --model opusplan` |
 
-```text
-Tôi cần [mục tiêu].
-Hiện tại: [cái gì có]
-Constraint: [không đổi được]
-
-Trước khi viết code:
-1. Phân tích cần đổi gì
-2. List TẤT CẢ file ảnh hưởng
-3. Xác định risk và dependency
-4. Tạo execution plan từng bước
-
-KHÔNG viết code. CHỈ plan.
-```
-
-### Checkpoint Template
-
-```text
-Đang ở bước X/Y. /compact rồi review:
-- Progress so với plan?
-- Cần adjust?
-- Risk nào xuất hiện?
-```
-
-### Plan Revision Template
-
-```text
-Plan tốt. Điều chỉnh:
-1. [Thêm/bỏ/sắp lại]
-2. [Constraint mới]
-3. [Hỏi về risk]
-
-Cập nhật plan.
-```
-
-### Decomposition Decision Table
-
-| Nếu... | Dùng... |
-|--------|---------|
-| Nhiều user feature | Vertical Slicing |
-| Single feature, nhiều layer | Horizontal Slicing |
-| Tech uncertainty cao | Risk-First |
-| Dependency chain rõ | Dependency-First |
-
-### Plan Granularity Rule
-
-| Task Duration | Action |
-|---------------|--------|
-| > 2 tiếng | Full PCE cycle |
-| 30p - 2h | Quick plan, minimal confirm |
-| < 30 phút | Code luôn |
+`opusplan` "uses `opus` during plan mode, then switches to `sonnet` for execution." Banner của
+nó ghi `Opus Plan`.
 
 ---
 
-## 6. PITFALLS — Sai Lầm Thường Gặp
+## 6. PITFALLS — Lỗi Thường Gặp
 
-| ❌ Sai Lầm | ✅ Cách Đúng |
-|-----------|-------------|
-| Nhảy vào code không plan cho task >2h | LUÔN Plan-Confirm-Execute cho task đụng 3+ file |
-| Over-plan task đơn giản (thêm 1 button) | Task <30p → skip plan, code luôn |
-| Chấp nhận plan đầu tiên không challenge | CONFIRM phase bắt buộc. "Risk nào miss?" "Dependency?" |
-| Plan hết rồi execute hết cùng lúc | Execute từng bước, checkpoint mỗi 3-5 bước |
-| Không `/compact` giữa plan và execute | Sau CONFIRM, `/compact` trước EXECUTE bước 1 |
-| Bỏ plan khi execution khó | Reality khác plan → DỪNG, re-plan. Đừng ép. |
-| Claude plan không đọc codebase | Cho đọc key file TRƯỚC plan |
+| ❌ Sai | ✅ Đúng |
+|---|---|
+| Viết "do NOT write code yet" trong prompt | Plan mode cưỡng chế điều đó; prompt chỉ là xin |
+| Lên plan cho một fix một dòng | "If you could describe the diff in one sentence, skip the plan." (S1) |
+| Duyệt mà không đọc rồi revert | Dùng **Tell Claude what to change** — vẫn ở trong plan mode |
+| Tưởng plan mode còn sau khi duyệt | Duyệt là "exits plan mode". `Shift+Tab` để quay lại |
+| Tưởng nó chặn mọi lệnh | Nó cho phép đọc, và với auto mode thì cho lệnh được classifier duyệt |
+| Tin plan mode khi có bypass permissions | Trong terminal tương tác có bypass permissions, blocks của plan mode không được cưỡng chế |
+| Gõ lại plan để sửa một dòng | `Ctrl+G` |
 
 ---
 
 ## 7. REAL CASE — Câu Chuyện Thật
 
-**Bối cảnh**: Startup Việt Nam build quản lý kho e-commerce. Feature: multi-warehouse sync real-time stock update. 40+ file, 3 DB table mới, WebSocket, 2 external API.
+**Bối cảnh**: Một team KMP làm app ngân hàng Android + iOS cần chuyển phần session handling từ
+module Android sang `commonMain`. Khoảng một tá file, trong đó hai cặp `expect`/`actual` cả
+năm nay không ai đụng vào.
 
-**Không Plan Mode (lần đầu)**:
-- Ngày 1-2: Code ngay, build basic sync
-- Ngày 3: Phát hiện thiếu conflict resolution cho concurrent update
-- Ngày 5: WebSocket không scale, phải đổi Redis pub/sub
-- **Tổng: 7 ngày** (2 ngày rework)
+**Vấn đề**: Lần đầu chạy ở mode mặc định. Claude dời interface, rồi dời implementation, rồi
+bắt đầu viết lại `actual` phía iOS. Team chỉ phát hiện khi build iOS gãy — sáu file vào một
+diff chưa ai đọc.
 
-**Có Plan Mode (feature tương tự tiếp)**:
-1. **PLAN** (2h): Claude phân tích 35 file, 4 dependency, 12 bước plan, flag risk WebSocket scaling
-2. **CONFIRM** (1h): Team phát hiện 2 bước thiếu. Claude suggest CRDT cho conflict, Redis pub/sub từ đầu.
-3. **EXECUTE** (3 ngày): Từng bước, checkpoint mỗi 4 bước
+**Giải pháp**: Họ chạy lại với `claude --model opusplan --permission-mode plan` và chỉ xin
+migration plan. Plan chỉ đúng cặp `expect`/`actual` là bước rủi ro và đề nghị làm nó sau cùng,
+phía sau interface dùng chung. Team challenge một lần — "what did you assume about the iOS
+Keychain wrapper?" — và bản sửa thêm bước đọc wrapper đó trước. Sau đó họ duyệt bằng **Yes,
+manually approve edits**.
 
-**Kết quả**: 3.5 ngày vs 7 ngày. Zero rework. Team quote: "3 tiếng planning cứu 3.5 ngày coding."
+**Kết quả**: Migration xong trong một session, iOS xanh ở mọi bước. Bài học nằm ở mode, không
+phải prompt: không câu prompt nào chặn được edit đầu tiên đó; plan mode thì chặn được.
 
 ---
 
