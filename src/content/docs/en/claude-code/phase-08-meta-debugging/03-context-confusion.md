@@ -72,7 +72,7 @@ Watch for these warning signs:
 
 ### When to Use /compact
 
-```
+```text
 Is Claude referencing outdated info? → /compact
 Switching to new major topic? → /compact first
 Session > 1 hour of dense work? → Proactive /compact
@@ -88,7 +88,7 @@ Severe confusion, nothing helps? → /clear + fresh start
 
 ### Step 1: Observe Confusion Symptoms
 
-```
+```text
 You: Let's implement the payment webhook handler.
 
 Claude: I'll create the payment webhook handler. Based on our earlier
@@ -101,7 +101,7 @@ discussion, I'll use the JWT validation middleware...
 
 ### Step 2: Confirm Confusion
 
-```
+```text
 You: Wait, payment webhooks don't use JWT. They use signature verification
 with the webhook secret. We discussed JWT for user authentication, not webhooks.
 
@@ -115,12 +115,12 @@ signature verification — a MIXED approach]
 
 ### Step 3: Use /compact to Clear Confusion
 
-```
+```text
 /compact
 ```
 
 Expected output:
-```
+```text
 Context compacted. Summary retained:
 - Working on payment system integration
 - Need webhook handler for payment notifications
@@ -129,7 +129,7 @@ Context compacted. Summary retained:
 
 ### Step 4: Re-ground After Compact
 
-```
+```text
 You: To be clear for the webhook handler:
 - This is for PAYMENT webhooks (Stripe, VNPay), NOT user auth
 - Use signature verification with webhook secret
@@ -171,6 +171,33 @@ Good confusion triggers:
 Watch for: old patterns appearing in new implementation, mixed terminology.
 </details>
 
+<details>
+<summary>✅ Solution</summary>
+
+**Before `/compact` (contaminated)**:
+```text
+You: "Let's build this with GraphQL instead."
+Claude: "Here's a GraphQL resolver...
+         return res.status(200).json({ data })"  # REST leftover
+```
+REST vocabulary (`res.status`, `route`, `endpoint`) leaks into the GraphQL answer because both topics are still in context.
+
+**Fix**:
+```text
+/compact
+"New topic: GraphQL API for the same feature. We are NOT using REST anymore —
+no res.status, no routes. Use a resolver returning a typed object."
+```
+
+**After `/compact` + re-grounding (clean)**:
+```text
+Claude: "Here's the GraphQL resolver:
+         resolve: async (_, { id }) => ({ id, name, ... })"
+```
+
+**Why it works**: `/compact` drops the detailed REST discussion from context, and the explicit re-grounding statement stops Claude from re-deriving old patterns from the conversation summary.
+</details>
+
 ### Exercise 2: Proactive Compaction
 
 **Goal**: Practice preventing confusion before it happens.
@@ -182,6 +209,27 @@ Watch for: old patterns appearing in new implementation, mixed terminology.
 4. Compare: is confusion less than without proactive compaction?
 
 **Expected result**: Cleaner transitions, less contamination from previous topic.
+
+<details>
+<summary>✅ Solution</summary>
+
+**Proactive compaction sequence**:
+```text
+[30+ min of auth feature discussion/implementation]
+
+/compact
+
+"New topic: Payment processing.
+Previous topic (auth) is complete — don't reference it.
+Payment uses Stripe webhooks, no JWT/user tokens involved."
+```
+
+**Comparison**:
+- **Without proactive `/compact`**: asking about payment mid-session often produces answers referencing the auth middleware, JWT checks, or session patterns that don't apply here.
+- **With proactive `/compact` + explicit statement**: responses stay scoped to Stripe/webhook concerns, no auth vocabulary bleeding through.
+
+**Why it works**: Compacting before the pivot removes most of the old topic's detail from active context, and naming the new topic explicitly stops Claude from treating it as a continuation of the same feature.
+</details>
 
 ### Exercise 3: Re-grounding Drills
 
@@ -200,7 +248,7 @@ Watch for: old patterns appearing in new implementation, mixed terminology.
 **Most effective re-grounding patterns**:
 
 After topic switch:
-```
+```text
 Previous topic (auth) is COMPLETE. Do not reference it.
 New topic: Payment processing.
 Key facts:
@@ -210,7 +258,7 @@ Key facts:
 ```
 
 After confusion detected:
-```
+```text
 STOP. Clear your assumptions about this file.
 Current truth:
 - File: paymentWebhook.ts
@@ -243,13 +291,13 @@ Start fresh with this understanding.
 ### Re-grounding Templates
 
 After `/compact`:
-```
+```text
 "Current state: We're implementing [X] using [Y approach].
 Previous discussion about [Z] is no longer relevant.
 Continue with [specific next step]."
 ```
 
-```
+```text
 "Forget [old topic]. New focus: [new topic].
 Key constraint: [most important requirement]."
 ```
@@ -291,12 +339,12 @@ Key constraint: [most important requirement]."
 
 **Fix applied**:
 
-```
+```text
 /compact
 ```
 
 Then:
-```
+```text
 New context: We're ONLY working on ORDER service now.
 - Product catalog is DONE, don't reference it
 - Order service handles: checkout, payment, fulfillment

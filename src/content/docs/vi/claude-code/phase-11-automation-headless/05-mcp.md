@@ -31,7 +31,7 @@ Không có MCP, bạn phải export data thủ công, paste vào context, và hy
 
 ### MCP Architecture
 
-```
+```text
 Claude Code (Client) ←→ MCP Server ←→ External System
 ```
 
@@ -156,7 +156,7 @@ $ npm install -g @modelcontextprotocol/server-sqlite
 ```
 
 Expected output:
-```
+```text
 added 42 packages in 3s
 ```
 
@@ -192,7 +192,7 @@ MCP server initialize khi startup. Đóng và mở lại Claude Code.
 
 ### Step 4: Verify MCP connection
 
-```
+```text
 Bạn: Có MCP server nào available không?
 
 Claude: Tôi có access tới MCP server sau:
@@ -202,7 +202,7 @@ Claude: Tôi có access tới MCP server sau:
 
 ### Step 5: Explore database schema
 
-```
+```text
 Bạn: List tất cả table trong database
 
 Claude: [gọi sqlite.list_tables tool]
@@ -217,7 +217,7 @@ Database có 5 table:
 
 ### Step 6: Query và analyze
 
-```
+```text
 Bạn: Bao nhiêu % order bị abandoned?
 
 Claude: [gọi sqlite.query tool]
@@ -343,7 +343,7 @@ Frame câu hỏi để Claude cần cả hai source. Ví dụ: "Issue nào liên
 
 ### MCP Architecture
 
-```
+```text
 ┌─────────────┐           ┌─────────────┐           ┌──────────────┐
 │ Claude Code │  Request  │ MCP Server  │  Execute  │ External Sys │
 │  (Client)   │ ────────> │  (Adapter)  │ ────────> │ (DB/API/etc) │

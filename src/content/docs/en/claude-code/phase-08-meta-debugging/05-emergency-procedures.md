@@ -37,7 +37,7 @@ Emergencies happen. Even with all the safeguards from earlier modules. The quest
 
 Memorize this sequence:
 
-1. **STOP**: Ctrl+C immediately. Don't let Claude continue.
+1. **STOP**: Press **Esc** immediately to interrupt the current turn. Don't let Claude continue.
 2. **ASSESS**: `git status` + `git diff` — what actually changed?
 3. **CONTAIN**: `git stash` — save current state before recovering
 4. **RECOVER**: Choose recovery strategy based on severity
@@ -67,7 +67,7 @@ Memorize this sequence:
 
 ### Scenario 1: Claude Deleted Important Files
 
-**STOP** — See Claude deleting files? Press `Ctrl+C` immediately.
+**STOP** — See Claude deleting files? Press `Esc` immediately to interrupt.
 
 **ASSESS**:
 ```bash
@@ -75,7 +75,7 @@ $ git status
 ```
 
 Expected output:
-```
+```text
 Changes not staged for commit:
   deleted:    .env
   deleted:    config/production.json
@@ -88,7 +88,7 @@ $ git stash
 ```
 
 Expected output:
-```
+```text
 Saved working directory and index state WIP on main: abc1234 Last commit
 ```
 
@@ -98,7 +98,7 @@ $ git checkout .
 ```
 
 Expected output:
-```
+```text
 Updated 3 paths from the index
 ```
 
@@ -108,7 +108,7 @@ $ ls .env config/production.json
 ```
 
 Expected output:
-```
+```text
 .env  config/production.json
 ```
 
@@ -116,7 +116,7 @@ Files are back.
 
 ### Scenario 2: Claude Modified 50 Files
 
-**STOP**: Ctrl+C
+**STOP**: Press `Esc`
 
 **ASSESS**:
 ```bash
@@ -124,7 +124,7 @@ $ git diff --stat
 ```
 
 Expected output:
-```
+```text
  50 files changed, 2000 insertions(+), 500 deletions(-)
 ```
 
@@ -133,7 +133,7 @@ $ git diff --name-only
 ```
 
 Expected output:
-```
+```text
 src/api/users.ts
 src/api/products.ts
 ... (48 more files)
@@ -164,7 +164,7 @@ $ git reflog
 ```
 
 Expected output:
-```
+```text
 abc1234 HEAD@{0}: reset: moving to HEAD
 def5678 HEAD@{1}: commit: My work before disaster
 ghi9012 HEAD@{2}: commit: Earlier work
@@ -247,7 +247,7 @@ Example post-mortem:
 **Why**: Vague prompt ("clean up") + approved without reviewing
 
 **Prevention**: Add to CLAUDE.md:
-```
+```markdown
 ## Dangerous Operations
 NEVER delete without explicit approval:
 - .env files
@@ -262,7 +262,7 @@ NEVER delete without explicit approval:
 
 ### Emergency Playbook
 
-1. 🛑 **STOP**: Ctrl+C
+1. 🛑 **STOP**: Press `Esc`
 2. 🔍 **ASSESS**: `git status` + `git diff`
 3. 📦 **CONTAIN**: `git stash`
 4. 🔧 **RECOVER**: See commands below
@@ -324,7 +324,7 @@ git reset --hard <commit-hash>
 - Spent 4 hours trying to recover database
 
 **What should have happened**:
-1. STOP: Ctrl+C (or just don't approve the deletion)
+1. STOP: Press `Esc` (or just don't approve the deletion)
 2. ASSESS: `git diff --stat` would have shown migration deletions
 3. CONTAIN: `git stash`
 4. RECOVER: `git checkout db/migrations/`

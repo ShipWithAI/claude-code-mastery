@@ -117,14 +117,14 @@ $ claude
 ```
 
 **Step 2: Give the prompt**
-```
+```text
 Refactor src/utils/helpers.ts:
 - Extract validateEmail, formatDate, parseConfig to separate files
 - Update imports in helpers.ts
 ```
 
 **Step 3: First approval prompt**
-```
+```text
 Claude wants to:
   - Write src/utils/validateEmail.ts
 

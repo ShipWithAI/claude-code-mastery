@@ -98,13 +98,13 @@ $ claude
 ```
 
 **Prompt**:
-```
+```text
 Refactor src/payment/payment-service.ts to support multiple payment providers
 (Stripe, PayPal, VNPay)
 ```
 
 **Claude's response**:
-```
+```text
 I'll refactor the payment service to use the strategy pattern...
 
 [Generates code immediately]
@@ -132,7 +132,7 @@ The code compiles, but it's shallow.
 ### Step 2: WITH Think Mode — Level 2 (Step-by-Step)
 
 **Prompt**:
-```
+```text
 Think step by step about how to refactor src/payment/payment-service.ts
 to support multiple payment providers (Stripe, PayPal, VNPay).
 
@@ -144,7 +144,7 @@ Consider:
 ```
 
 **Claude's response**:
-```
+```text
 Let me think through this refactoring systematically:
 
 1. CURRENT STATE ANALYSIS
@@ -183,7 +183,7 @@ Now I'll implement this architecture...
 For the architectural decision, go deeper:
 
 **Prompt**:
-```
+```text
 Think carefully about the payment provider abstraction design.
 
 What are the trade-offs between:
@@ -195,7 +195,7 @@ Consider: maintainability, testing, provider-specific quirks, team structure.
 ```
 
 **Claude's response**:
-```
+```text
 Let me analyze these architectural approaches:
 
 OPTION 1: Pure Strategy Pattern
@@ -234,7 +234,7 @@ This allows VNPay team to iterate without touching core/Stripe/PayPal.
 ### Step 4: Combining Think + Act
 
 **Prompt**:
-```
+```text
 Good analysis. Now implement the PaymentProvider interface and the VNPayProvider
 class with proper HMAC signature verification.
 ```
@@ -252,14 +252,14 @@ Check token usage:
 ```
 
 **Without think mode**:
-```
+```text
 Input tokens:  1,200
 Output tokens: 2,500
 Total cost:    $0.04
 ```
 
 **With think mode**:
-```
+```text
 Input tokens:  1,200
 Output tokens: 4,800 (thinking) + 2,200 (code) = 7,000
 Total cost:    $0.09
@@ -278,7 +278,7 @@ Total cost:    $0.09
 **Instructions**:
 1. Start a Claude session: `claude`
 2. WITHOUT think mode, prompt:
-   ```
+   ```text
    Add caching to src/api/user-service.ts
    ```
    Note the output quality. Does it consider cache invalidation? Cache key strategy? TTL?
@@ -286,7 +286,7 @@ Total cost:    $0.09
 3. Start a NEW session (to clear context): `/clear`
 
 4. WITH think mode, prompt:
-   ```
+   ```text
    Think carefully about adding caching to src/api/user-service.ts.
 
    Consider:
@@ -462,7 +462,7 @@ The team spent 3 days fixing edge cases, doing 5 rounds of corrections. Each rou
 
 **Solution**: The team lead stopped, cleared context, and started over with think mode:
 
-```
+```text
 Think carefully about implementing a payment reconciliation system for
 a Vietnamese banking app.
 

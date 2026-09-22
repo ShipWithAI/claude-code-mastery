@@ -91,7 +91,7 @@ mkdir -p docs/prompts/{testing,refactoring,documentation,review}
 ```
 
 Output:
-```
+```text
 (directories created silently)
 ```
 
@@ -125,7 +125,7 @@ EOF
 ```
 
 Output:
-```
+```text
 File created: docs/prompts/testing/generate-unit-tests.md
 ```
 
@@ -148,7 +148,7 @@ EOF
 ```
 
 Output:
-```
+```text
 File created: docs/LESSONS_LEARNED.md
 ```
 

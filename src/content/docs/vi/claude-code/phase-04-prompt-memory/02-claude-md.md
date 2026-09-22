@@ -76,12 +76,12 @@ $ claude
 
 Trong session:
 
-```
+```text
 /init
 ```
 
 **Output**:
-```
+```text
 Created CLAUDE.md with basic template.
 ```
 
@@ -220,7 +220,7 @@ $ claude
 
 Prompt:
 
-```
+```text
 Add validation for phone number in UserService
 ```
 
@@ -335,6 +335,37 @@ Thường thiếu: **Constraints** (cái KHÔNG được làm) và **Context** (
 
 </details>
 
+<details>
+<summary>✅ Giải Pháp (Ví Dụ Audit)</summary>
+
+Audit CLAUDE.md hiện tại — ví dụ kết quả:
+
+| Section | Có? | Ghi chú |
+|---------|-----|---------|
+| Project Overview | ✅ | Đầy đủ tech stack |
+| Architecture Rules | ✅ | Có directory structure |
+| Coding Conventions | ⚠️ | Chỉ có naming, thiếu format rules |
+| Commands | ✅ | Đầy đủ |
+| **Constraints** | ❌ | Thiếu hoàn toàn |
+| **Context** | ❌ | Thiếu hoàn toàn |
+
+Test: gửi task "Thêm field mới vào User model" → Claude Code hỏi lại "Dùng ORM nào? Có convention đặt tên field không?" → xác nhận đúng 2 section đang thiếu.
+
+Bổ sung:
+```markdown
+## Constraints
+
+- ❌ KHÔNG sửa schema trực tiếp trong migration cũ (tạo migration mới)
+
+## Context
+
+- User model dùng Prisma ORM, snake_case ở DB, camelCase ở TS
+```
+
+**Why it works**: Sau khi bổ sung, gửi lại task tương tự — Claude Code follow convention ngay, không cần hỏi lại.
+
+</details>
+
 ---
 
 ## 5. CHEAT SHEET
@@ -352,7 +383,7 @@ Thường thiếu: **Constraints** (cái KHÔNG được làm) và **Context** (
 
 ### Hierarchy Ưu Tiên
 
-```
+```text
 ~/.claude/CLAUDE.md        # Global (1 lần setup)
        ↓
 ./CLAUDE.md                # Project — 90% context ở đây

@@ -83,12 +83,12 @@ Now every commit message Claude generates follows your team's standard.
 
 **Step 1: Review what changed**
 
-```
+```text
 What files have I changed? Summarize what each change does.
 ```
 
 Expected output:
-```
+```text
 Modified files (7):
 
 1. src/payment/validator.ts
@@ -121,12 +121,12 @@ Modified files (7):
 
 **Step 2: Split into logical commits**
 
-```
+```text
 Help me split these changes into logical atomic commits. Group related changes together.
 ```
 
 Expected output:
-```
+```text
 Recommended commit structure:
 
 Commit 1: Add payment validation
@@ -156,12 +156,12 @@ $ git add src/payment/validator.ts src/payment/types.ts tests/payment/validator.
 ```
 
 Then ask:
-```
+```text
 Write a commit message for these staged changes. Use Conventional Commits format.
 ```
 
 Expected output:
-```
+```text
 feat(payment): add credit card validation with Luhn algorithm
 
 - Implement card number validation using Luhn checksum
@@ -184,12 +184,12 @@ CONFLICT (content): Merge conflict in src/payment/processor.ts
 ```
 
 Ask Claude:
-```
+```text
 I have a merge conflict in src/payment/processor.ts. Show me both sides and help resolve it. Keep our new Result type error handling but integrate their updated PaymentGateway interface.
 ```
 
 Expected output:
-```
+```text
 Conflict analysis:
 
 OURS (feature/payment-processing):
@@ -212,12 +212,12 @@ Run tests to verify: npm test src/payment/
 
 **Step 5: Pre-push review**
 
-```
+```text
 Review all commits on this branch compared to main. Is the history clean? Any commits that should be squashed?
 ```
 
 Expected output:
-```
+```text
 Branch: feature/payment-processing (3 commits ahead of main)
 
 Commit history:
@@ -238,7 +238,7 @@ Ready for PR.
 
 **Step 6: Generate PR description**
 
-```
+```text
 Write a PR description for this branch. Include: summary, changes breakdown, testing done, and deployment notes.
 ```
 

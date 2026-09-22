@@ -126,7 +126,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: `## Claude Code Review\n\n${review}\n\n---\n*Automated by Claude Code v11.4*`
+              body: `## Claude Code Review\n\n${review}\n\n---\n*Automated by Claude Code*`
             });
 ```
 
@@ -134,7 +134,7 @@ jobs:
 
 Navigate to your repository on GitHub:
 
-```
+```text
 Settings → Secrets and variables → Actions → New repository secret
 ```
 
@@ -157,7 +157,7 @@ Open PR via GitHub UI.
 
 Expected output in Actions tab:
 
-```
+```text
 Run Claude review
 ✓ Install Claude Code (12s)
 ✓ Get changed files (2s)
@@ -167,14 +167,14 @@ Run Claude review
 
 Check PR — you'll see a comment from `github-actions[bot]`:
 
-```
+```markdown
 ## Claude Code Review
 
 - [src/test.js] Missing semicolon may cause ASI issues
 - [src/test.js] Console.log should be removed before production
 
 ---
-*Automated by Claude Code v11.4*
+*Automated by Claude Code*
 ```
 
 **Step 4: Chatops workflow**
@@ -225,7 +225,7 @@ jobs:
 
 Test by commenting on any PR:
 
-```
+```text
 /claude explain the purpose of src/auth.ts
 ```
 

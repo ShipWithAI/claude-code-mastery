@@ -1,0 +1,22 @@
+[
+  { "from": "brew install claude-code", "to": "brew install --cask claude-code" },
+  { "from": "claude-3-5-sonnet-20241022", "to": "sonnet" },
+  { "from": "claude-sonnet-4-20250514", "to": "sonnet" },
+  { "from": "claude-opus-4-20250514", "to": "opus" },
+  { "from": "\"claude-opus-4\"", "to": "\"opus\"" },
+  { "from": "gitleaks protect --staged", "to": "gitleaks git --pre-commit --staged" },
+  { "from": "gitleaks detect --no-git", "to": "gitleaks dir" },
+  { "from": "git filter-branch", "to": "git filter-repo" },
+  { "from": "docker-compose ", "to": "docker compose " },
+  { "from": "node:18(-alpine|-slim)?\\b", "to": "node:22$1", "regex": true },
+  { "from": "npm ci --only=production", "to": "npm ci --omit=dev" },
+  { "from": "npm install --only=production", "to": "npm install --omit=dev" },
+  { "from": "npm test pricingService.test.js", "to": "npm test -- pricingService.test.js", "files": "phase-09" },
+  { "from": "/usr/local/bin/claude", "to": "~/.local/bin/claude" },
+  { "from": "Split In Batches", "to": "Loop Over Items" },
+  { "from": "Merge By Position", "to": "Merge (Combine → Position)" },
+  { "from": "/read ", "to": "@", "files": "phase-01-foundation/03-context-basics" },
+  { "from": "/project:review", "to": "/review" },
+  { "from": "/user:my-prompt", "to": "/my-prompt" },
+  { "from": "postgresql://user:password@", "to": "postgresql://username:password@" }
+]

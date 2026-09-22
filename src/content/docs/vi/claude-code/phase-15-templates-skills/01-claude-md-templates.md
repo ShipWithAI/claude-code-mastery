@@ -81,7 +81,7 @@ Template là pre-built CLAUDE.md cho specific project type. Start với template
 
 ### Template 1: Next.js 14 (App Router)
 
-```markdown
+````markdown
 # Project: [Your Next.js App]
 
 ## Tech Stack
@@ -117,11 +117,11 @@ export async function createUser(formData: FormData) {
 - ❌ Không dùng pages/ directory
 - ❌ Không dùng getServerSideProps
 - ❌ Không dùng `any` type
-```
+````
 
 ### Template 2: Node.js API (Express + TypeScript)
 
-```markdown
+````markdown
 # Project: [Your API Name]
 
 ## Tech Stack
@@ -165,7 +165,7 @@ export class UserService {
 ## Off-Limits
 - ❌ Không để business logic trong routes
 - ❌ Không gọi DB trực tiếp ngoài repositories
-```
+````
 
 ### Template 3: Monorepo (Turborepo / Nx)
 

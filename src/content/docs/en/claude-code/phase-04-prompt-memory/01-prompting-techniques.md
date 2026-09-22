@@ -74,12 +74,12 @@ Each round builds on verified output from the previous round.
 ```bash
 $ claude
 ```
-```
+```text
 Add caching to the user service.
 ```
 
 **What happens**:
-```
+```text
 I'll add caching to the user service using a simple in-memory cache...
 
 [Claude creates generic CacheManager.kt with HashMap-based caching,
@@ -91,7 +91,7 @@ ignores your existing Redis setup, doesn't follow your naming conventions]
 ---
 
 **Step 2: Better Prompt — Adding Context + Reference**
-```
+```text
 This is a Kotlin Spring Boot backend using Clean Architecture.
 We already have Redis configured in infrastructure/cache/.
 
@@ -100,7 +100,7 @@ infrastructure/cache/ProductCacheService.kt.
 ```
 
 **What happens**:
-```
+```text
 I'll examine the ProductCacheService pattern first.
 
 [Reads ProductCacheService.kt]
@@ -113,7 +113,7 @@ I'll examine the ProductCacheService pattern first.
 ---
 
 **Step 3: Best Prompt — Full CREF**
-```
+```text
 CONTEXT: Kotlin Spring Boot backend, Clean Architecture, existing Redis setup
 
 REFERENCE:
@@ -138,7 +138,7 @@ CONSTRAINTS:
 ```
 
 **What happens**:
-```
+```text
 I'll implement the caching layer following your project patterns.
 
 [Reads ProductCacheService.kt and ProductService.kt]
@@ -156,7 +156,7 @@ All files created. Running ktlint...
 ---
 
 **Step 4: Iterative Refinement**
-```
+```text
 Review your implementation for edge cases:
 - What happens if Redis is down?
 - Are there race conditions in cache invalidation?
@@ -164,7 +164,7 @@ Review your implementation for edge cases:
 ```
 
 **What happens**:
-```
+```text
 Good catches. I'll add:
 1. Fallback to database if Redis fails
 2. Distributed lock for cache invalidation
@@ -176,13 +176,13 @@ Good catches. I'll add:
 ---
 
 **Step 5: Negative Constraints**
-```
+```text
 One more thing: ensure the public API of UserService remains unchanged.
 Other services depend on it.
 ```
 
 **What happens**:
-```
+```text
 Verified: UserService public methods unchanged.
 Caching is internal implementation detail only.
 ```
@@ -196,17 +196,17 @@ Caching is internal implementation detail only.
 Upgrade these vague prompts to CREF-quality. Assume a React + TypeScript + Vite project with existing logging in `src/utils/logger.ts`, tests in `src/__tests__/`, and Supabase for the database.
 
 **Vague Prompt 1:**
-```
+```text
 Add logging to the app
 ```
 
 **Vague Prompt 2:**
-```
+```text
 Write tests for the payment module
 ```
 
 **Vague Prompt 3:**
-```
+```text
 Refactor the database layer
 ```
 
@@ -225,7 +225,7 @@ For each prompt, identify:
 <summary>✅ Solution</summary>
 
 **Upgraded Prompt 1:**
-```
+```text
 CONTEXT: React + TypeScript project, logging exists in src/utils/logger.ts
 
 REFERENCE: Follow the pattern in src/features/auth/LoginForm.tsx (uses logger.info, logger.error)
@@ -241,7 +241,7 @@ CONSTRAINTS: Do NOT log sensitive data (passwords, tokens, PII)
 ```
 
 **Upgraded Prompt 2:**
-```
+```text
 CONTEXT: React + TypeScript + Vitest, payment module in src/features/payment/
 
 REFERENCE:
@@ -258,7 +258,7 @@ Run tests after creation to verify they pass.
 ```
 
 **Upgraded Prompt 3:**
-```
+```text
 CONTEXT: React app using Supabase, current DB layer in src/api/supabase.ts (400 lines, mixed concerns)
 
 REFERENCE: Clean separation like src/api/auth.ts (single responsibility)
@@ -301,7 +301,7 @@ Don't describe error handling. Just point Claude to files that already do it rig
 <details>
 <summary>✅ Solution</summary>
 
-```
+```text
 Add error handling to src/features/checkout/CheckoutForm.tsx.
 
 REFERENCE:

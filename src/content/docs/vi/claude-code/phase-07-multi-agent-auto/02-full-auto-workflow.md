@@ -52,7 +52,7 @@ graph LR
 Full Auto ≠ unattended. Bạn vẫn phải watch output realtime.
 
 - **Look for**: file access lạ (sao nó đọc `.env`?), error pattern, scope creep (sao nó sửa file ngoài boundary?)
-- **Ctrl+C ready**: Nếu thấy đi sai hướng, stop ngay. Đừng để chạy hết rồi mới rollback — waste token + time.
+- **Esc sẵn sàng**: Nếu thấy đi sai hướng, nhấn **Esc** để ngắt ngay — session và context vẫn giữ nguyên. Đừng để chạy hết rồi mới rollback — waste token + time.
 
 ### Phase 4: XÁC MINH
 
@@ -140,14 +140,14 @@ Summary: 5 files, 47 tests, 0 errors. Ready for checkpoint.
 **Step 3: GIÁM SÁT**
 
 Trong lúc Claude chạy, watch output:
-```
+```text
 Creating src/services/__tests__/user.service.test.ts  ← OK
 Reading src/config/database.ts                         ← Warning! Out of boundary?
   (context: need DB schema for mock)                   ← OK, read-only
 Creating src/services/user.service.ts                  ← RED FLAG! Modifying source!
 ```
 
-Nếu thấy dòng cuối → `Ctrl+C` ngay. Trong case này, Claude chỉ read config (OK), không modify source.
+Nếu thấy dòng cuối → nhấn **Esc** ngay để ngắt turn. Trong case này, Claude chỉ read config (OK), không modify source.
 
 ---
 
@@ -244,7 +244,7 @@ Nếu Claude vẫn touch `config/`, thử prompt: "HARD RULE: You are FORBIDDEN 
 | Plan | Think+Plan hoặc manual plan |
 
 ### Prompt Template
-```
+```text
 Follow this plan: [link/summary]
 Scope: [boundary - file/directory allowed]
 Stop condition: After [N items/files], show summary and WAIT
@@ -254,9 +254,9 @@ FORBIDDEN: [critical files/dirs]
 ### Emergency Stop
 | Trigger | Action |
 |---------|--------|
-| Out-of-boundary access | `Ctrl+C` ngay |
-| Unexpected error pattern | `Ctrl+C`, review plan |
-| Scope creep | `Ctrl+C`, clarify boundary |
+| Out-of-boundary access | Nhấn **Esc** ngay |
+| Unexpected error pattern | Nhấn **Esc**, review plan |
+| Scope creep | Nhấn **Esc**, clarify boundary |
 
 ### Post-Execution Checklist
 - [ ] `git diff --stat` — check file list

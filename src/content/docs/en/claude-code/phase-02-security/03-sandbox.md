@@ -133,7 +133,7 @@ CMD ["bash"]
 **Why this matters**: We use a minimal base image (node:20-slim), create a non-root user, and set /workspace as the working directory. This is where we'll mount the project.
 
 Expected output when building:
-```
+```text
 Successfully built abc123def456
 Successfully tagged claude-sandbox:latest
 ```
@@ -147,7 +147,7 @@ docker build -t claude-sandbox .
 **Why this matters**: The `-t` flag tags the image with a name you can reference later. Building takes 2-5 minutes on first run.
 
 Expected output:
-```
+```text
 [+] Building 145.2s (8/8) FINISHED
  => [internal] load build definition from Dockerfile
  => => transferring dockerfile: 512B
@@ -179,7 +179,7 @@ docker run -it --rm \
 - `--cpus=2` — limit CPU usage
 
 Expected output:
-```
+```text
 developer@a1b2c3d4e5f6:/workspace$
 ```
 
@@ -195,7 +195,7 @@ cat ~/.aws/credentials
 ```
 
 Expected output:
-```
+```text
 cat: /home/developer/.aws/credentials: No such file or directory
 ```
 
@@ -205,7 +205,7 @@ cat ~/.ssh/id_rsa
 ```
 
 Expected output:
-```
+```text
 cat: /home/developer/.ssh/id_rsa: No such file or directory
 ```
 
@@ -215,7 +215,7 @@ ls -la ~
 ```
 
 Expected output:
-```
+```text
 total 8
 drwxr-xr-x 1 developer developer 4096 Feb  1 12:00 .
 drwxr-xr-x 1 root      root      4096 Feb  1 12:00 ..
@@ -235,7 +235,7 @@ curl https://google.com
 ```
 
 Expected output:
-```
+```text
 curl: (6) Could not resolve host: google.com
 ```
 
@@ -250,7 +250,7 @@ ls /workspace
 ```
 
 Expected output:
-```
+```text
 Dockerfile  README.md  src/  package.json
 ```
 

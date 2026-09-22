@@ -140,7 +140,7 @@ Expected: Claude Code starts in interactive mode with permission system active (
 Prompt Claude Code with: "Run git status to show me the current repository state"
 
 Expected output (conceptual):
-```
+```text
 Claude Code wants to run a command:
 
   git status
@@ -161,7 +161,7 @@ Expected: Claude Code runs `git status` and shows you the output. If you ask it 
 Prompt: "Delete all files in the src directory"
 
 Expected permission prompt (conceptual):
-```
+```text
 Claude Code wants to run a command:
 
   rm -rf src/
@@ -179,7 +179,7 @@ Expected: Claude Code stops and responds with something like "I was unable to co
 Prompt: "Show me the first 10 lines of README.md"
 
 Expected permission prompt:
-```
+```text
 Claude Code wants to run a command:
 
   head -n 10 README.md
@@ -193,11 +193,13 @@ Click "Approve Always" (for demonstration only — be careful with this in real 
 
 Expected: Claude Code runs the command. Next time it wants to run `head`, it won't ask (you've approved this command type permanently for this session or project ⚠️ exact scope needs verification).
 
-**Step 6: Check Permission Settings** ⚠️ Needs verification
+**Step 6: Check Permission Settings**
 ```bash
-$ claude config show
+$ cat ~/.claude/settings.json          # user settings
+$ cat .claude/settings.json            # project settings (committed)
+$ cat .claude/settings.local.json      # project-local (gitignored)
 ```
-Expected: Configuration output showing current permission settings, allowlist, and trust level. ⚠️ The exact command and output format need verification.
+Expected: JSON showing the `permissions` block (allow/deny/ask lists). Settings are plain files — there's no CLI subcommand for viewing configuration.
 
 ---
 
@@ -238,19 +240,19 @@ If Claude Code doesn't trigger a prompt for network requests, that's important i
 **Read file**: Likely no prompt — Claude Code uses Read tool directly.
 
 **Write file**: Should trigger prompt like:
-```
+```text
 echo 'hello' > test.txt
 ```
 Approve if inside project directory.
 
 **List files**: Should trigger prompt:
-```
+```text
 ls -la
 ```
 Safe to approve — read-only operation.
 
 **Network request**: ⚠️ Behavior varies. May trigger prompt like:
-```
+```bash
 curl https://registry.npmjs.com/...
 ```
 This is a READ operation but involves network. Approve only if you trust the target and explicitly requested this action.

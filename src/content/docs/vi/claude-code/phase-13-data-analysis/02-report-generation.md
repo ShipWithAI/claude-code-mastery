@@ -96,7 +96,7 @@ Save to reports/thang-12-2023-sales.md
 
 ### Bước 2: Claude Generate Report
 
-```text
+```markdown
 Claude: [Analyze data, generate report]
 
 Đã tạo: reports/thang-12-2023-sales.md
