@@ -132,8 +132,8 @@ EOF
 chmod +x .claude/hooks/block-env-reads.sh
 ```
 
-Two details worth copying: it **fails closed** when `jq` is missing — a hook that exits 0 because
-a dependency vanished has silently stopped controlling — and it strips `.env.example` before
+Two details worth copying: it **fails closed** when `jq` is missing — a hook exiting 0 because a
+dependency vanished has silently stopped controlling — and it strips `.env.example` before
 matching, so the remediation its own message recommends still works.
 
 Register it in the same `.claude/settings.json`, beside the `permissions` you already have:
@@ -179,7 +179,7 @@ project policy: this command names a .env file. Use .env.example.
 Same command, same key, different outcome. **This output is the deliverable**, not the config.
 
 Now verify what people assume. Re-run it with `--permission-mode acceptEdits` — blocked there
-too. Then check the remediation is really open:
+too. Then check the remediation is open:
 
 ```bash
 claude -p "Run exactly this bash command and report its raw output: cat .env.example" \
@@ -193,12 +193,25 @@ I ran the command. Raw output:
 API_KEY=your_api_key_here
 ```
 
-**What this hook still does not stop.** It reads command *text*, like the deny rule it backs up,
-so a computed path (`f=.en; cat ".${f}v"`) walks past it, and a harmless
-`git commit -m "document .env vars"` is blocked by mistake. The layer that ignores what the
+**What this hook still does not stop.** It reads command *text*, like the deny rule it backs up:
+
+```bash
+claude -p 'Run exactly this bash command and report its raw output: f=env; cat ".${f}"' \
+  --permission-mode default --allowedTools Bash
+```
+
+```text
+# Output may vary
+Here's the raw output:
+
+API_KEY=sk-FAKE-DO-NOT-USE-xxxxxxxxxxxx
+```
+
+No block, same file. Text matching over-blocks too: `.envrc` is caught (fair — direnv files hold
+secrets) and so is `git commit -m "document .env vars"` (not fair). The layer that ignores what a
 command *says* is the sandbox ([Module 2.3](../03-sandbox/)). Also: `disableAllHooks` turns hooks
-off, and a project's `"disableAllHooks": false` overrides a `true` in your user settings — the
-repo, not you, has the last word on whether your hooks run.
+off, and a project's `"disableAllHooks": false` overrides a `true` in user settings — the repo,
+not you, decides whether your hooks run.
 
 **Step 5: Audit, then make it a habit**
 
@@ -217,8 +230,8 @@ repo, not you, has the last word on whether your hooks run.
    ←/→ to switch · ↓ to select · Esc to cancel
 ```
 
-Then run the checklists you keep beside the keyboard — before, during, after a session, and
-weekly — from
+Then run the checklists beside your keyboard — before, during, after a session, and weekly —
+from
 [`templates/security-checklists.md`](https://github.com/ShipWithAI/claude-code-mastery/blob/develop/templates/security-checklists.md).
 Add one weekly line: **re-run Step 4.** A control that stops blocking is worse than none, because
 you still trust it.

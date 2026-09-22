@@ -50,8 +50,8 @@ câu trả lời duy nhất cho "cái gì chặn việc này?"
 | 2.5 System control | không ai audit | lộ toàn bộ |
 
 Phải nhiều lớp thủng cùng lúc mới thành thảm hoạ — nên bỏ một lớp vì "đã có mấy lớp kia" là cách
-team kết thúc với đúng một lớp. Anthropic containment ở environment layer trước, model layer sau
-(S13). Hãy coi rule advisory là *đỉnh* của một chồng control.
+team kết thúc với một lớp. Anthropic containment ở environment layer trước, model layer sau (S13).
+Hãy coi rule advisory là *đỉnh* của một chồng control.
 
 ### Con người vẫn chịu trách nhiệm
 
@@ -133,9 +133,9 @@ chmod +x .claude/hooks/block-env-reads.sh
 
 Hai chi tiết đáng chép: nó **fail closed** khi thiếu `jq` — hook exit 0 vì mất dependency là
 control đã âm thầm ngừng kiểm soát — và bỏ `.env.example` ra trước khi so khớp, để cách khắc phục
-mà chính message của nó khuyên vẫn chạy được.
+chính message của nó khuyên vẫn chạy được.
 
-Đăng ký trong chính `.claude/settings.json`, cạnh khối `permissions` sẵn có:
+Đăng ký trong `.claude/settings.json`, cạnh khối `permissions` sẵn có:
 
 ```json
 {
@@ -155,7 +155,7 @@ mà chính message của nó khuyên vẫn chạy được.
 ```
 
 Giữ khối `permissions`: chỉ một file, dán mỗi `hooks` là xoá sạch rule. Exit 2 chặn, và hook
-*"stops the tool call before permission rules are evaluated"* — nên allow rule không đè được nó.
+*"stops the tool call before permission rules are evaluated"* — nên allow rule không đè được.
 
 **Step 4: Chạy lại lệnh vi phạm — kiểm chứng nó bị chặn**
 
@@ -177,7 +177,7 @@ project policy: this command names a .env file. Use .env.example.
 Cùng lệnh, cùng key, kết cục khác hẳn. **Output này mới là sản phẩm**, không phải file config.
 
 Giờ kiểm chứng thứ người ta hay mặc định. Chạy lại với `--permission-mode acceptEdits` — vẫn bị
-chặn. Rồi xem đường khắc phục có thật sự mở:
+chặn. Rồi xem đường khắc phục có mở không:
 
 ```bash
 claude -p "Run exactly this bash command and report its raw output: cat .env.example" \
@@ -191,12 +191,25 @@ I ran the command. Raw output:
 API_KEY=your_api_key_here
 ```
 
-**Hook này vẫn không chặn được gì.** Nó đọc *nội dung lệnh*, y như deny rule mà nó vá, nên path
-được tính toán (`f=.en; cat ".${f}v"`) đi lọt, còn lệnh vô hại
-`git commit -m "document .env vars"` lại bị chặn nhầm. Lớp bỏ qua chuyện lệnh *viết gì* là sandbox
-([Module 2.3](../03-sandbox/)). Thêm nữa: `disableAllHooks` tắt hook, và
-`"disableAllHooks": false` của project đè `true` trong user settings — repo, chứ không phải bạn,
-quyết định hook của bạn có chạy hay không.
+**Hook này vẫn không chặn được gì.** Nó đọc *nội dung lệnh*, y như deny rule mà nó vá:
+
+```bash
+claude -p 'Run exactly this bash command and report its raw output: f=env; cat ".${f}"' \
+  --permission-mode default --allowedTools Bash
+```
+
+```text
+# Output may vary
+Here's the raw output:
+
+API_KEY=sk-FAKE-DO-NOT-USE-xxxxxxxxxxxx
+```
+
+Không bị chặn, vẫn file đó. Khớp theo text cũng chặn dư: `.envrc` bị bắt (hợp lý — file direnv
+chứa secret) và `git commit -m "document .env vars"` cũng vậy (cái này thì không). Lớp bỏ
+qua chuyện lệnh *viết gì* là sandbox ([Module 2.3](../03-sandbox/)). Thêm nữa: `disableAllHooks`
+tắt hook, và `"disableAllHooks": false` của project đè `true` trong user settings — repo, chứ
+không phải bạn, quyết định hook có chạy hay không.
 
 **Step 5: Audit, rồi biến thành thói quen**
 
@@ -215,10 +228,10 @@ quyết định hook của bạn có chạy hay không.
    ←/→ to switch · ↓ to select · Esc to cancel
 ```
 
-Rồi chạy các checklist để cạnh bàn phím — trước, trong, sau session, và hằng tuần — lấy từ
+Rồi chạy các checklist cạnh bàn phím — trước, trong, sau session, và hằng tuần — lấy từ
 [`templates/security-checklists.md`](https://github.com/ShipWithAI/claude-code-mastery/blob/develop/templates/security-checklists.md).
-Thêm một dòng hằng tuần: **chạy lại Step 4.** Control ngừng chặn tệ hơn không có, vì bạn vẫn tin
-nó.
+Thêm một dòng hằng tuần: **chạy lại Step 4.** Control ngừng chặn tệ hơn không có, vì bạn vẫn
+tin.
 
 ---
 
@@ -230,7 +243,7 @@ nó.
 
 **Hướng dẫn**: viết deny rule; chạy lệnh vi phạm, xác nhận bị chặn; tìm một cách viết khác mà
 rule không bắt; bịt bằng `PreToolUse` hook; chạy lại.
-**Trước đã**: bước *thành công* in file ra transcript. Làm trên bản clone nháp, hoặc thay giá trị
+**Trước đã**: bước *thành công* in file ra transcript. Làm trên clone nháp, hoặc thay giá trị
 trong `.env` bằng dữ liệu giả. Đừng test với credential thật.
 
 **Kết quả mong đợi**: transcript trong đó vi phạm bị từ chối, kèm ghi chú phần chưa được phủ.
