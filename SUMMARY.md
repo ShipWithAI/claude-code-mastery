@@ -63,7 +63,7 @@
 
 ## Phase 11: Automation & Headless
 - [11.1 Headless Mode](en/phase-11-automation-headless/01-headless-mode.md)
-- [11.2 Claude Code SDK](en/phase-11-automation-headless/02-claude-code-sdk.md)
+- [11.2 Claude Agent SDK](en/phase-11-automation-headless/02-claude-agent-sdk.mdx)
 - [11.3 Hooks System / Hệ thống Hooks](en/phase-11-automation-headless/03-hooks-system.md)
 - [11.4 GitHub Actions](en/phase-11-automation-headless/04-github-actions.md)
 - [11.5 MCP — Model Context Protocol](en/phase-11-automation-headless/05-mcp.md)

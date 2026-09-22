@@ -287,7 +287,7 @@ src/content/docs/
   EN: Run Claude Code in headless mode for scripted automation, batch processing, and CI/CD pipelines.
   VI: Chạy Claude Code ở chế độ headless: tự động hóa không cần tương tác, pipe mode và scripting.
 
-- **Module 11.2 — SDK Integration** (EN: `02-claude-code-sdk.mdx` / VI: `02-claude-code-sdk.md`)
+- **Module 11.2 — Claude Agent SDK** (EN: `02-claude-agent-sdk.mdx` / VI: `02-claude-agent-sdk.mdx`)
   EN: Integrate Claude Code into Node.js and Python applications via SDK or subprocess for programmatic use.
   VI: Tích hợp Claude Code SDK vào ứng dụng: TypeScript/Python API, streaming và programmatic access.
 
