@@ -22,7 +22,7 @@ Mười phút trôi qua, terminal vẫn cuộn, bạn không biết Claude đang
 nó dừng và báo "xong hết rồi" — trong khi suite vẫn đỏ, hoặc cái test đang fail đã bị xoá lặng lẽ.
 
 Hai kiểu hỏng này cùng một gốc: loop không có check nào nó chạy được. Sửa chỗ đó, chặn số turn
-lại, bạn có một loop dám bỏ đi làm việc khác.
+lại, bạn dám bỏ đi làm việc khác.
 
 ---
 
@@ -60,8 +60,8 @@ và session bỏ đi được (S1). Nhóm build C compiler bằng nhiều Claude
 
 **Premature completion** là kiểu đắt nhất, vì nó trông y như thành công. `Stop` hook sinh ra cho
 việc đó: nó chạy lại check thật *sau khi* Claude tuyên bố xong, và exit code 2 đẩy Claude quay lại
-làm tiếp kèm nội dung lỗi. Hook được enforce; một câu trong prompt xin Claude đừng đụng vào test
-chỉ là lời khuyên, và Claude có thể bỏ qua khi bí.
+làm tiếp kèm nội dung lỗi. Hook được enforce; một câu prompt xin Claude đừng đụng test chỉ là lời
+khuyên, và Claude có thể bỏ qua khi bí.
 
 ### Chặn vòng lặp
 
@@ -126,13 +126,13 @@ claude -p "Make npm test pass" --permission-mode acceptEdits --max-turns 5 --out
 
 `# Output may vary` — đã rút gọn; object thật còn có `usage`, `modelUsage`, `duration_ms`. Exit
 code của shell: `1`. Đọc `permission_denials` trước: `Bash` bị từ chối, vì `acceptEdits` phủ file
-edit và vài lệnh filesystem thông dụng, **không** phủ `npm test`. Bản sửa thực ra đã vào (`git
-diff` thấy guard trong `src/math.js`) — nhưng loop không bao giờ thấy xanh và chết ở giới hạn turn.
+edit và vài lệnh filesystem thông dụng, **không** phủ `npm test`. Bản sửa đã vào (`git diff` thấy
+guard trong `src/math.js`) — nhưng loop không bao giờ thấy xanh và chết ở giới hạn turn.
 
 Trang headless có nêu `result`, `session_id`, `total_cost_usd`, `structured_output` và
-`permission_denials`. Còn `num_turns`, `subtype`, `is_error`, `terminal_reason` xuất hiện trong
-output thật ở trên nhưng **không** được nêu trên trang đó — ⚠️ Needs verification trước khi bạn
-viết tooling dựa vào chúng; exit code mới là tín hiệu an toàn.
+`permission_denials`. Còn `subtype`, `is_error`, `num_turns`, `errors` và `terminal_reason` được
+khai báo kiểu trong Agent SDK reference dưới tên `SDKResultMessage`, nơi liệt kê đủ giá trị của cả
+`subtype` lẫn `terminal_reason`. Trong shell script thì exit code vẫn là tín hiệu đơn giản nhất.
 
 **Bước 3: Đưa cho loop cái check của nó**
 
@@ -155,12 +155,12 @@ claude -p "Make npm test pass. Fix the source, not the test." \
 }
 ```
 
-`# Output may vary` — `result` đã rút gọn. Exit code `0`. Đúng một flag nữa đã biến
-`error_max_turns` thành `success`.
+`# Output may vary` — `result` đã rút gọn. Exit code `0`. Một flag đã biến `error_max_turns`
+thành `success`.
 
 **Bước 4: `Stop` gate chặn "xong sớm"**
 
-Làm hỏng **hai** thứ (`add` trả `a - b`, `divide` vẫn không throw), rồi cài gate:
+Làm hỏng **hai** thứ (`add` trả `a - b`, `divide` vẫn không throw), rồi thêm gate:
 
 ```bash
 # docs: hooks#stop
@@ -190,7 +190,7 @@ chmod +x .claude/hooks/test-gate.sh
       {
         "hooks": [
           { "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/test-gate.sh",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/test-gate.sh",
             "timeout": 120 }
         ]
       }
@@ -207,21 +207,22 @@ claude -p "Fix the failing add test in tests/math.test.mjs." --permission-mode a
 
 ```text
 # Output may vary
-Suite is green — 2 passed, 0 failed.
+Suite is green — `# pass 2`, `# fail 0`, exit 0.
 
-Two changes in `src/math.js`:
-- `add`: `a - b` → `a + b`. …
-- `divide`: added a `b === 0` guard that throws `RangeError`. …
+Two changes, both in `src/math.js`:
 
-I went past the scope you gave me on the second one because the stop gate blocks on a fully
-green suite. If you'd rather `divide` keep returning `Infinity`, the alternative is dropping
-that test instead — but I read a hand-written `assert.throws` as the intended spec, so I
-implemented the guard rather than deleting the assertion. …
+1. **`add`** (`src/math.js:1`) — restored `a + b`. … This was the actual bug you asked about.
+2. **`divide`** (`src/math.js:2`) — added a zero-divisor guard that throws `RangeError`. This
+   was the decision I'd put to you; the gate answered it, so I picked the option that keeps the
+   test's intent intact rather than relaxing the assertion to `Infinity`. …
+
+If you actually wanted `divide` to keep JS's `Infinity` semantics, the fix belongs in the test
+instead and I'll swap it over — but that means the "divide by zero throws" test goes away …
 ```
 
-Claude sửa `add`, định dừng, gate exit 2 kèm failure còn lại, và nó làm tiếp — tự nói ra bằng lời
-của nó. Để ý nửa sau: nó có cân nhắc xoá test rồi từ chối. Đó là quyết định bạn không nên để cho
-một câu prompt lo.
+Claude sửa `add`, định dừng, gate exit 2 kèm failure còn lại, và nó làm tiếp — *"the gate answered
+it"*. Để ý nửa sau: nó có cân nhắc chuyển bản sửa vào test rồi từ chối. Đó là quyết định bạn không
+nên để cho một câu prompt lo.
 
 Dọn dẹp bằng `rm -rf .claude && git checkout -- .`
 
@@ -262,8 +263,8 @@ task thật sự cần 30 turn thì nâng giới hạn lên.
 
 **Mục tiêu**: Làm cho `Stop` gate nổ.
 
-**Hướng dẫn**: cài gate ở Bước 4, làm hỏng hai thứ, yêu cầu Claude sửa một. Sau đó gỡ hook ra và
-chạy lại đúng prompt đó.
+**Hướng dẫn**: cài gate ở Bước 4, làm hỏng hai thứ, yêu cầu Claude sửa một. Sau đó gỡ hook và
+chạy lại prompt đó.
 
 **Kết quả mong đợi**: có gate, Claude làm tiếp tới xanh; không gate, nó dừng sau đúng một fix bạn
 nêu tên.
@@ -279,7 +280,8 @@ Nếu gate không nổ, fix đầu tiên đã đủ. Hãy làm hỏng thứ mà 
 
 stderr của gate chính là thứ Claude đọc, nên hãy làm nó hữu ích: tên test fail, không gì khác. Đổ
 500 dòng vào một turn bị chặn vừa tốn context vừa làm vòng sau tệ hơn. Và giữ lối thoát
-`stop_hook_active` — thiếu nó, một check không bao giờ xanh sẽ chặn mãi mãi.
+`stop_hook_active` — thiếu nó, một check không bao giờ xanh sẽ đốt tám turn trước khi Claude Code
+ghi đè hook và kết thúc turn.
 </details>
 
 ---
@@ -310,7 +312,7 @@ stderr của gate chính là thứ Claude đọc, nên hãy làm nó hữu ích:
 | Viết trong prompt là "đừng sửa test" | `Stop` hook chạy lại suite: prompt khuyên, hook ép |
 | Chạy không người canh mà không chặn turn/budget | `--max-turns` kèm `--max-budget-usd`, cả hai chỉ print mode |
 | Coi `error_max_turns` là "Claude dở" | Thường là verifier bị deny — xem `permission_denials` |
-| `Stop` hook thiếu lối thoát `stop_hook_active` | Check không bao giờ pass sẽ chặn mọi turn |
+| `Stop` hook thiếu lối thoát `stop_hook_active` | Check không bao giờ pass đốt tám turn rồi bị Claude Code ghi đè |
 
 ---
 
@@ -323,10 +325,10 @@ schema, resolver trên service layer sẵn có, test cập nhật, và một l�
 convention trôi dạt giữa các endpoint, hai dev mất ba ngày. Tệ hơn: vài endpoint được đánh dấu xong
 chỉ dựa trên lời tóm tắt — chưa ai chạy test.
 
-**Giải pháp**: Mỗi endpoint một lần chạy headless từ shell loop, chu trình viết rõ ra: schema,
+**Giải pháp**: Mỗi endpoint một lần chạy headless từ shell loop, chu trình viết rõ: schema,
 resolver, cập nhật test, chạy test, chỉ qua endpoint sau khi pass — tối đa ba lần fix, quá thì báo
-ra để người review. Lệnh test được pre-authorize bằng `--allowedTools`, turn bị chặn bằng
-`--max-turns`, và `Stop` hook chạy lại suite để "xong" buộc phải nghĩa là xanh.
+ra để review. Lệnh test được pre-authorize bằng `--allowedTools`, turn bị chặn bằng `--max-turns`,
+và `Stop` hook chạy lại suite để "xong" buộc phải nghĩa là xanh.
 
 **Kết quả**: Phần lớn endpoint hội tụ không cần canh, trong một buổi chiều. Số ít không xong được
 báo ra thay vì âm thầm coi là hoàn thành.
