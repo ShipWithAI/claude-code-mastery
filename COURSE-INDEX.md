@@ -288,8 +288,8 @@ src/content/docs/
   VI: Chạy Claude Code ở chế độ headless: tự động hóa không cần tương tác, pipe mode và scripting.
 
 - **Module 11.2 — Claude Agent SDK** (EN: `02-claude-agent-sdk.mdx` / VI: `02-claude-agent-sdk.mdx`)
-  EN: Integrate Claude Code into Node.js and Python applications via SDK or subprocess for programmatic use.
-  VI: Tích hợp Claude Code SDK vào ứng dụng: TypeScript/Python API, streaming và programmatic access.
+  EN: Run the Claude Code agent loop from TypeScript or Python with query(), restrict tools and permissions, add in-process MCP tools, and fall back to a safe claude -p subprocess.
+  VI: Chạy agent loop của Claude Code từ TypeScript/Python bằng query(), giới hạn tool và permission, thêm in-process MCP tool, và fallback sang subprocess claude -p an toàn.
 
 - **Module 11.3 — Hooks System** (`03-hooks-system.md`)
   EN: Implement Claude Code hooks for custom pre/post-action workflows, validation, and automation triggers.
@@ -516,7 +516,7 @@ src/content/docs/
     → **Module 11.5** — MCP (Model Context Protocol)
 
 28. "How to use Claude Code SDK?" / "Dùng Claude Code SDK thế nào?"
-    → **Module 11.2** — SDK Integration
+    → **Module 11.2** — Claude Agent SDK
 
 29. "How to connect Claude Code with n8n?" / "Kết nối Claude Code với n8n?"
     → **Module 12.1** — Claude Code + n8n
