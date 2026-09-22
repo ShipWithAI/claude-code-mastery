@@ -21,12 +21,12 @@ claude_version: 2.1.278
 
 Someone on the team pastes "install this plugin, it's great" with a GitHub link. It ships a
 `SessionStart` hook, a `Stop` hook and an MCP server that wants a token. Everyone installs it
-because it is popular; nobody reads it. Six weeks later that hook still runs on every prompt in a
-repo that holds bank credentials.
+because it is popular; nobody reads it. Six weeks later those hooks still run at every session start
+and every turn end in a repo that holds bank credentials.
 
 The docs are blunt: "Plugins and marketplaces are highly trusted components that can execute
-arbitrary code on your machine with your user privileges." This module is about reading before
-installing, and making that a team rule.
+arbitrary code on your machine with your user privileges." So: read before installing, as a team
+rule.
 
 ---
 
@@ -50,14 +50,14 @@ graph LR
 
 | Source | Add / install | What is there |
 |---|---|---|
-| `claude-plugins-official` | Auto-registered; browse in `/plugin` → **Discover** or claude.com/plugins | Anthropic-maintained catalogue, e.g. `/plugin install github@claude-plugins-official` |
+| `claude-plugins-official` | Auto-registered; browse in `/plugin` → **Discover** or claude.com/plugins | Anthropic's catalogue, e.g. `/plugin install github@claude-plugins-official` |
 | `anthropics/claude-plugins-community` | `/plugin marketplace add anthropics/claude-plugins-community` → `name@claude-community` | Community plugins |
 | `anthropics/claude-code` | `/plugin marketplace add anthropics/claude-code` → `claude-code-plugins` | Anthropic's own repo: `commit-commands`, `security-guidance`, `plugin-dev`, `hookify`, … |
 | `anthropics/skills` | `/plugin marketplace add anthropics/skills` → `anthropic-agent-skills` | `document-skills` (docx/pdf/pptx/xlsx), `example-skills`, `claude-api`, … many Apache 2.0 |
-| Your own repo | `/plugin marketplace add your-org/claude-plugins` | Internal skills, hooks, MCP config |
-| Curated lists | e.g. [awesome-claude-code](https://github.com/hesreallyhim/awesome-claude-code) | A list, not a review. Same checklist applies |
+| Your own repo | `/plugin marketplace add your-org/claude-plugins` | Internal plugins |
+| Curated lists | e.g. [awesome-claude-code](https://github.com/hesreallyhim/awesome-claude-code) | A list, not a review |
 
-Official or not, the docs' warning is the same: "Anthropic doesn't control what MCP servers,
+The docs' warning covers all of them: "Anthropic doesn't control what MCP servers,
 files, or other software are included in plugins and can't verify that they work as intended."
 
 ### Scopes: who gets the plugin
@@ -73,9 +73,9 @@ files, or other software are included in plugins and can't verify that they work
 
 Before `/plugin install`, open the source and answer five questions:
 
-1. **Who publishes it?** Org, commit history, a marketplace you already trust.
-2. **`hooks/hooks.json`**: which events (`SessionStart`, `UserPromptSubmit`, `Stop` fire every
-   turn) and what the scripts do.
+1. **Who publishes it?** Org, commit history, known marketplace.
+2. **`hooks/hooks.json`**: which events (`UserPromptSubmit` and `Stop` fire every turn,
+   `SessionStart` "when a session begins or resumes") and what the scripts do.
 3. **`.mcp.json`**: which endpoints, which tokens go into `headers` or `env`.
 4. **Skills**: `allowed-tools`, `` !`commands` ``, `disable-model-invocation` on side effects.
 5. **Does it need all that?** A commit helper does not need a `Stop` hook.
@@ -139,30 +139,32 @@ Clone complete, validating marketplace…
 }
 ```
 
-The marketplace name comes from its `marketplace.json`, not the repo name. Commit
-`.claude/settings.json`; teammates get it after trusting the folder.
+The name comes from the marketplace's `marketplace.json`, not the repo.
 
 **Step 3: Read before you install**
 
-The marketplace is a public repo, so read what it will run. Compare a hook-heavy plugin with a
-plain one:
+The marketplace is a public repo, so read what it will run:
 
 ```bash
 # docs: plugins-reference (hooks/hooks.json, .mcp.json layout)
 curl -s https://raw.githubusercontent.com/anthropics/claude-code/main/plugins/security-guidance/hooks/hooks.json \
   | jq -c '.hooks | keys'
-curl -s https://raw.githubusercontent.com/anthropics/claude-code/main/plugins/commit-commands/commands/commit.md \
-  | head -4
+for f in commit commit-push-pr clean_gone; do
+  echo "== $f.md"
+  curl -s https://raw.githubusercontent.com/anthropics/claude-code/main/plugins/commit-commands/commands/$f.md \
+    | grep allowed-tools
+done
 curl -s https://raw.githubusercontent.com/anthropics/claude-plugins-official/main/external_plugins/github/.mcp.json
 ```
 
 ```text
 # Output may vary
 ["PostToolUse","SessionStart","Stop","UserPromptSubmit"]
----
+== commit.md
 allowed-tools: Bash(git add:*), Bash(git status:*), Bash(git commit:*)
-description: Create a git commit
----
+== commit-push-pr.md
+allowed-tools: Bash(git checkout --branch:*), Bash(git add:*), Bash(git status:*), Bash(git push:*), Bash(git commit:*), Bash(gh pr create:*)
+== clean_gone.md
 {
   "github": {
     "type": "http",
@@ -175,8 +177,10 @@ description: Create a git commit
 ```
 
 `security-guidance` hooks four events, including every prompt and every stop: that is its job, but
-know it before it runs on a repo with secrets. `commit-commands` is three command files limited to
-`git add/status/commit`. The official `github` plugin is an HTTP MCP server that sends your
+know it before it runs on a repo with secrets. `commit-commands` is three command files: `/commit`
+can only add, status and commit; `/commit-push-pr` may also push, create branches and open PRs; and
+`/clean_gone`, which deletes local branches and worktrees, pre-approves nothing, so every command
+prompts. The official `github` plugin is an HTTP MCP server that sends your
 `GITHUB_PERSONAL_ACCESS_TOKEN` to `api.githubcopilot.com`. None of this is hidden; it is only
 unread.
 
@@ -199,9 +203,6 @@ Installing plugin "commit-commands@claude-code-plugins"...✔ Successfully insta
 }
 ```
 
-Inside a session, `/plugin install commit-commands@claude-code-plugins` asks for the scope
-instead.
-
 **Step 5: List it from inside a session**
 
 Start `claude` and type `/plugin list`:
@@ -213,9 +214,6 @@ Start `claude` and type `/plugin list`:
        • commit-commands@claude-code-plugins (v1.0.0, project) ✔ enabled
        …
 ```
-
-`/plugin` → **Installed** shows `commit-commands Plugin · claude-code-plugins · ✔ enabled · 3
-skills`, invoked as `/commit-commands:commit`.
 
 **Step 6: Remove it cleanly**
 
@@ -249,6 +247,28 @@ Removing a marketplace "also uninstalls any plugins you installed from it".
 
 **Expected result**: One sentence saying what the plugin runs and with which tools.
 
+<details>
+<summary>✅ Solution</summary>
+
+```bash
+curl -s https://raw.githubusercontent.com/anthropics/skills/main/.claude-plugin/marketplace.json \
+  | jq -c '.plugins[] | {name, skills, hooks, mcpServers}'
+```
+
+```text
+# Output may vary
+{"name":"document-skills","skills":["./skills/xlsx","./skills/docx","./skills/pptx","./skills/pdf"],"hooks":null,"mcpServers":null}
+{"name":"example-skills","skills":["./skills/algorithmic-art",…],"hooks":null,"mcpServers":null}
+{"name":"claude-api","skills":["./skills/claude-api"],"hooks":null,"mcpServers":null}
+{"name":"academy-guide","skills":["./skills/academy-guide"],"hooks":null,"mcpServers":null}
+{"name":"discernment-nudge","skills":["./skills/discernment-nudge"],"hooks":null,"mcpServers":null}
+```
+
+`document-skills`: four skills with `scripts/`, no hooks, no MCP servers, no `allowed-tools`, so
+each script goes through your normal permission flow. Their `SKILL.md` files say
+`license: Proprietary`; the README's Apache 2.0 covers other skills.
+</details>
+
 ### Exercise 2: Lock a team down
 
 **Goal**: Managed settings that allow only the official marketplace, your org's repo, and one
@@ -269,8 +289,9 @@ MCP server.
 }
 ```
 
-`strictKnownMarketplaces` works only in managed settings; `allowedMcpServers` is a rule only
-there too. Both cover plugin-provided servers.
+`strictKnownMarketplaces` is managed-only and gates marketplace sources. `allowedMcpServers`
+works in any settings file but is enforced org-wide only from managed settings, and it does cover
+servers a plugin ships.
 </details>
 
 ### Exercise 3: Publish the plugin from Module 15.5 internally
@@ -327,33 +348,33 @@ push, then `/plugin marketplace add your-org/acme-tools` and
 | ❌ Mistake | ✅ Correct Approach |
 |---|---|
 | Install counts, star counts or awesome-lists as due diligence | They say something exists and is popular. Run the five-question checklist yourself |
-| Installing at user scope for a team tool | `--scope project` writes `enabledPlugins` to `.claude/settings.json`; commit it |
-| "It's an official plugin, so it's safe" | Official plugins carry the same warning. `github@claude-plugins-official` sends a token to an HTTP server: fine if you meant that |
+| User scope for a team tool | `--scope project` writes `enabledPlugins` to `.claude/settings.json`; commit it |
+| "It's an official plugin, so it's safe" | Same warning applies. `github@claude-plugins-official` sends a token to an HTTP server: fine if you meant that |
 | Putting `strictKnownMarketplaces` in `.claude/settings.json` | It is managed-only. Project settings get `enabledPlugins` / `extraKnownMarketplaces` |
-| Treating a plugin's hook as harmless because it "only reminds" | A hook runs a script with your privileges on each event; read the script, not the description |
+| Treating a plugin's hook as harmless because it "only reminds" | It runs a script with your privileges on each event; read the script, not the description |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
 **Scenario**: A Hanoi outsourcing company runs Claude Code across a dozen client repos, some with
-banking credentials in CI. Developers added marketplaces freely; nobody could list which hooks ran
+banking credentials in CI. Developers added marketplaces freely; nobody could say which hooks ran
 where.
 
 **Problem**: A client security review asked "what third-party code executes when your engineers
 open our repo?" The honest answer was "we don't know".
 
-**Solution**: Plugins became a reviewed artefact. Every proposal is a PR to
-`your-org/claude-plugins` that copies the plugin in with a filled checklist: events in
-`hooks/hooks.json`, endpoints and tokens in `.mcp.json`, `allowed-tools` per skill. Managed
+**Solution**: Plugins became a reviewed artefact: every proposal is a PR to
+`your-org/claude-plugins` copying the plugin in with a filled checklist (events in
+`hooks/hooks.json`, endpoints and tokens in `.mcp.json`, `allowed-tools` per skill). Managed
 settings set `strictKnownMarketplaces` to the official marketplace plus that repo, and
-`allowedMcpServers` to the two internal servers. Each project's `.claude/settings.json` carries
+`allowedMcpServers` to two internal servers. Each project's `.claude/settings.json` carries
 `extraKnownMarketplaces` and `enabledPlugins`, so a checkout declares what runs in it. Same rule
-Anthropic applies to its own agents (S4): "Give every agent a single-purpose identity with the
-minimum permissions for its job".
+Anthropic applies to its agents (S4): "Give every agent a single-purpose identity with the minimum
+permissions for its job".
 
-**Result**: The client question now has a file as its answer, and a new hook cannot reach a repo
-without a PR review. Adding a plugin takes a day instead of a minute, which is the point.
+**Result**: The client question now has a file as its answer; a new hook cannot reach a repo
+without a PR review. Adding a plugin takes a day, not a minute, which is the point.
 
 ---
 

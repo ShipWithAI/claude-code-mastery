@@ -21,11 +21,12 @@ claude_version: 2.1.278
 
 Ai đó trong team dán link GitHub kèm câu "cài plugin này đi, hay lắm". Nó mang theo một hook
 `SessionStart`, một hook `Stop` và một MCP server đòi token. Cả team cài vì nó phổ biến; không ai
-đọc. Sáu tuần sau, hook đó vẫn chạy ở mỗi prompt trong một repo chứa credential ngân hàng.
+đọc. Sáu tuần sau, hai hook đó vẫn chạy ở mỗi lần mở session và mỗi cuối lượt trong một repo chứa
+credential ngân hàng.
 
 Docs nói thẳng: "Plugins and marketplaces are highly trusted components that can execute
-arbitrary code on your machine with your user privileges." Module này nói về việc đọc trước khi
-cài, và biến nó thành luật của team.
+arbitrary code on your machine with your user privileges." Vậy nên: đọc trước khi cài, như một
+luật của team.
 
 ---
 
@@ -49,14 +50,14 @@ graph LR
 
 | Nguồn | Thêm / cài | Có gì trong đó |
 |---|---|---|
-| `claude-plugins-official` | Tự đăng ký; xem trong `/plugin` → **Discover** hoặc claude.com/plugins | Catalogue do Anthropic duy trì, ví dụ `/plugin install github@claude-plugins-official` |
+| `claude-plugins-official` | Tự đăng ký; xem trong `/plugin` → **Discover** hoặc claude.com/plugins | Catalogue của Anthropic, ví dụ `/plugin install github@claude-plugins-official` |
 | `anthropics/claude-plugins-community` | `/plugin marketplace add anthropics/claude-plugins-community` → `name@claude-community` | Plugin cộng đồng |
 | `anthropics/claude-code` | `/plugin marketplace add anthropics/claude-code` → `claude-code-plugins` | Repo của chính Anthropic: `commit-commands`, `security-guidance`, `plugin-dev`, `hookify`, … |
 | `anthropics/skills` | `/plugin marketplace add anthropics/skills` → `anthropic-agent-skills` | `document-skills` (docx/pdf/pptx/xlsx), `example-skills`, `claude-api`, … phần lớn Apache 2.0 |
-| Repo của bạn | `/plugin marketplace add your-org/claude-plugins` | Skill, hook, MCP config nội bộ |
-| Danh sách tuyển chọn | ví dụ [awesome-claude-code](https://github.com/hesreallyhim/awesome-claude-code) | Là danh sách, không phải review. Checklist vẫn áp dụng |
+| Repo của bạn | `/plugin marketplace add your-org/claude-plugins` | Plugin nội bộ |
+| Danh sách tuyển chọn | ví dụ [awesome-claude-code](https://github.com/hesreallyhim/awesome-claude-code) | Là danh sách, không phải review |
 
-Official hay không, cảnh báo trong docs vẫn như nhau: "Anthropic doesn't control what MCP
+Cảnh báo trong docs áp cho tất cả: "Anthropic doesn't control what MCP
 servers, files, or other software are included in plugins and can't verify that they work as
 intended."
 
@@ -73,9 +74,9 @@ intended."
 
 Trước `/plugin install`, mở source và trả lời năm câu:
 
-1. **Ai publish?** Tổ chức, lịch sử commit, marketplace bạn đã tin.
-2. **`hooks/hooks.json`**: những event nào (`SessionStart`, `UserPromptSubmit`, `Stop` chạy mỗi
-   lượt) và script làm gì.
+1. **Ai publish?** Tổ chức, lịch sử commit, marketplace quen.
+2. **`hooks/hooks.json`**: những event nào (`UserPromptSubmit` và `Stop` chạy mỗi lượt,
+   `SessionStart` "when a session begins or resumes") và script làm gì.
 3. **`.mcp.json`**: endpoint nào, token nào đi vào `headers` hoặc `env`.
 4. **Skill**: `allowed-tools`, `` !`lệnh` ``, `disable-model-invocation` cho việc có side effect.
 5. **Nó có cần tất cả những thứ đó không?** Một helper commit không cần hook `Stop`.
@@ -139,30 +140,32 @@ Clone complete, validating marketplace…
 }
 ```
 
-Tên marketplace lấy từ `marketplace.json` của nó, không phải tên repo. Commit
-`.claude/settings.json`; đồng đội nhận được sau khi trust thư mục.
+Tên lấy từ `marketplace.json` của marketplace, không phải tên repo.
 
 **Bước 3: Đọc trước khi cài**
 
-Marketplace là repo public, nên hãy đọc thứ nó sẽ chạy. So sánh một plugin nặng hook với một
-plugin đơn giản:
+Marketplace là repo public, nên hãy đọc thứ nó sẽ chạy:
 
 ```bash
 # docs: plugins-reference (hooks/hooks.json, .mcp.json layout)
 curl -s https://raw.githubusercontent.com/anthropics/claude-code/main/plugins/security-guidance/hooks/hooks.json \
   | jq -c '.hooks | keys'
-curl -s https://raw.githubusercontent.com/anthropics/claude-code/main/plugins/commit-commands/commands/commit.md \
-  | head -4
+for f in commit commit-push-pr clean_gone; do
+  echo "== $f.md"
+  curl -s https://raw.githubusercontent.com/anthropics/claude-code/main/plugins/commit-commands/commands/$f.md \
+    | grep allowed-tools
+done
 curl -s https://raw.githubusercontent.com/anthropics/claude-plugins-official/main/external_plugins/github/.mcp.json
 ```
 
 ```text
 # Output may vary
 ["PostToolUse","SessionStart","Stop","UserPromptSubmit"]
----
+== commit.md
 allowed-tools: Bash(git add:*), Bash(git status:*), Bash(git commit:*)
-description: Create a git commit
----
+== commit-push-pr.md
+allowed-tools: Bash(git checkout --branch:*), Bash(git add:*), Bash(git status:*), Bash(git push:*), Bash(git commit:*), Bash(gh pr create:*)
+== clean_gone.md
 {
   "github": {
     "type": "http",
@@ -175,10 +178,11 @@ description: Create a git commit
 ```
 
 `security-guidance` gắn hook vào bốn event, gồm mỗi prompt và mỗi lần stop: đó là việc của nó,
-nhưng bạn cần biết trước khi nó chạy trên repo có secret. `commit-commands` là ba file command
-chỉ được `git add/status/commit`. Plugin `github` official là một MCP server HTTP gửi
-`GITHUB_PERSONAL_ACCESS_TOKEN` của bạn tới `api.githubcopilot.com`. Không có gì bị giấu; chỉ là
-chưa ai đọc.
+nhưng bạn cần biết trước khi nó chạy trên repo có secret. `commit-commands` là ba file command:
+`/commit` chỉ được add, status, commit; `/commit-push-pr` còn được push, tạo branch và mở PR; còn
+`/clean_gone`, thứ xóa branch và worktree local, không pre-approve gì nên mọi lệnh đều hỏi. Plugin
+`github` official là một MCP server HTTP gửi `GITHUB_PERSONAL_ACCESS_TOKEN` của bạn tới
+`api.githubcopilot.com`. Không có gì bị giấu; chỉ là chưa ai đọc.
 
 **Bước 4: Cài ở project scope**
 
@@ -199,9 +203,6 @@ Installing plugin "commit-commands@claude-code-plugins"...✔ Successfully insta
 }
 ```
 
-Trong session, `/plugin install commit-commands@claude-code-plugins` sẽ hỏi scope thay vì cần
-flag.
-
 **Bước 5: Liệt kê từ trong session**
 
 Mở `claude` và gõ `/plugin list`:
@@ -213,9 +214,6 @@ Mở `claude` và gõ `/plugin list`:
        • commit-commands@claude-code-plugins (v1.0.0, project) ✔ enabled
        …
 ```
-
-`/plugin` → **Installed** hiện `commit-commands Plugin · claude-code-plugins · ✔ enabled · 3
-skills`, gọi bằng `/commit-commands:commit`.
 
 **Bước 6: Gỡ sạch**
 
@@ -249,6 +247,28 @@ Gỡ marketplace thì "also uninstalls any plugins you installed from it".
 
 **Kết quả mong đợi**: Một câu nói rõ plugin chạy gì và với tool nào.
 
+<details>
+<summary>✅ Lời giải</summary>
+
+```bash
+curl -s https://raw.githubusercontent.com/anthropics/skills/main/.claude-plugin/marketplace.json \
+  | jq -c '.plugins[] | {name, skills, hooks, mcpServers}'
+```
+
+```text
+# Output may vary
+{"name":"document-skills","skills":["./skills/xlsx","./skills/docx","./skills/pptx","./skills/pdf"],"hooks":null,"mcpServers":null}
+{"name":"example-skills","skills":["./skills/algorithmic-art",…],"hooks":null,"mcpServers":null}
+{"name":"claude-api","skills":["./skills/claude-api"],"hooks":null,"mcpServers":null}
+{"name":"academy-guide","skills":["./skills/academy-guide"],"hooks":null,"mcpServers":null}
+{"name":"discernment-nudge","skills":["./skills/discernment-nudge"],"hooks":null,"mcpServers":null}
+```
+
+`document-skills`: bốn skill có `scripts/`, không hook, không MCP server, không `allowed-tools`,
+nên mỗi script đều qua permission flow bình thường của bạn. `SKILL.md` của chúng ghi
+`license: Proprietary`; Apache 2.0 trong README áp cho các skill khác.
+</details>
+
 ### Bài 2: Khóa team lại
 
 **Mục tiêu**: Managed settings chỉ cho phép marketplace official, repo của tổ chức bạn, và một
@@ -269,8 +289,9 @@ MCP server.
 }
 ```
 
-`strictKnownMarketplaces` chỉ có tác dụng trong managed settings; `allowedMcpServers` cũng chỉ
-là luật ở đó. Cả hai áp lên cả server do plugin cung cấp.
+`strictKnownMarketplaces` chỉ dành cho managed và chỉ gate nguồn marketplace. `allowedMcpServers`
+đặt được ở bất kỳ file settings nào nhưng chỉ enforce toàn tổ chức từ managed settings, và nó áp
+cả server do plugin cung cấp.
 </details>
 
 ### Bài 3: Publish plugin ở Module 15.5 trong nội bộ
@@ -327,33 +348,33 @@ Lưu thành `.claude-plugin/marketplace.json` cạnh `plugins/cc-lab-plugin/`, c
 | ❌ Sai lầm | ✅ Cách đúng |
 |---|---|
 | Lấy số lượt cài, số star hay awesome-list làm thẩm định | Chúng chỉ nói thứ đó tồn tại và phổ biến. Tự chạy checklist năm câu |
-| Cài ở user scope cho tool của team | `--scope project` ghi `enabledPlugins` vào `.claude/settings.json`; commit nó |
-| "Plugin official nên an toàn" | Plugin official mang cùng cảnh báo. `github@claude-plugins-official` gửi token tới một HTTP server: ổn nếu bạn chủ ý |
+| User scope cho tool của team | `--scope project` ghi `enabledPlugins` vào `.claude/settings.json`; commit nó |
+| "Plugin official nên an toàn" | Cảnh báo vẫn như nhau. `github@claude-plugins-official` gửi token tới một HTTP server: ổn nếu bạn chủ ý |
 | Đặt `strictKnownMarketplaces` trong `.claude/settings.json` | Key này chỉ dành cho managed. Project settings dùng `enabledPlugins` / `extraKnownMarketplaces` |
-| Coi hook của plugin là vô hại vì "chỉ nhắc nhở" | Hook chạy script với quyền của bạn ở mỗi event; đọc script, đừng đọc description |
+| Coi hook của plugin là vô hại vì "chỉ nhắc nhở" | Nó chạy script với quyền của bạn ở mỗi event; đọc script, đừng chỉ đọc description |
 
 ---
 
 ## 7. REAL CASE — Câu chuyện thực tế
 
 **Bối cảnh**: Một công ty outsourcing ở Hà Nội dùng Claude Code trên hơn chục repo của khách, vài
-repo có credential ngân hàng trong CI. Dev tự do thêm marketplace; không ai liệt kê được hook
-nào đang chạy ở đâu.
+repo có credential ngân hàng trong CI. Dev tự do thêm marketplace; không ai biết hook nào đang
+chạy ở đâu.
 
 **Vấn đề**: Đợt security review của khách hỏi "code bên thứ ba nào chạy khi kỹ sư của các bạn mở
 repo của chúng tôi?" Câu trả lời thật thà là "chúng tôi không biết".
 
-**Giải pháp**: Plugin trở thành artefact được review. Mỗi đề xuất là một PR vào
-`your-org/claude-plugins`, copy plugin vào kèm checklist đã điền: event trong `hooks/hooks.json`,
-endpoint và token trong `.mcp.json`, `allowed-tools` của từng skill. Managed settings đặt
+**Giải pháp**: Plugin trở thành artefact được review: mỗi đề xuất là một PR vào
+`your-org/claude-plugins`, copy plugin vào kèm checklist đã điền (event trong `hooks/hooks.json`,
+endpoint và token trong `.mcp.json`, `allowed-tools` từng skill). Managed settings đặt
 `strictKnownMarketplaces` gồm marketplace official và repo đó, `allowedMcpServers` gồm hai server
 nội bộ. `.claude/settings.json` của từng project mang `extraKnownMarketplaces` và
 `enabledPlugins`, nên mỗi checkout tự khai báo thứ chạy trong nó. Đúng luật Anthropic áp cho
 agent của họ (S4): "Give every agent a single-purpose identity with the minimum permissions for
 its job".
 
-**Kết quả**: Câu hỏi của khách giờ có một file làm câu trả lời, và hook mới không thể vào repo
-nếu chưa qua PR review. Thêm một plugin mất một ngày thay vì một phút; đó chính là mục đích.
+**Kết quả**: Câu hỏi của khách giờ có một file làm câu trả lời; hook mới không thể vào repo nếu
+chưa qua PR review. Thêm plugin mất một ngày thay vì một phút; đó chính là mục đích.
 
 ---
 

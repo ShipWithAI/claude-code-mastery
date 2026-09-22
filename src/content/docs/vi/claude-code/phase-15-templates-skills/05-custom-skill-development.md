@@ -1,6 +1,6 @@
 ---
 title: 'Phát triển Skill tùy chỉnh'
-description: 'Cấu trúc một skill production, đóng gói cùng hook thành plugin, validate và load bằng --plugin-dir, đo bằng claude plugin eval.'
+description: 'Đóng gói skill cùng hook và script thành plugin, validate và load bằng --plugin-dir, đo bằng claude plugin eval.'
 verified: 2026-09-22
 claude_version: 2.1.278
 ---
@@ -11,10 +11,9 @@ claude_version: 2.1.278
 >
 > **Yêu cầu trước**: Module 15.3 (Claude Code Skills), Module 15.4 (Hệ sinh thái cộng đồng)
 >
-> **Kết quả**: Sau module này, bạn sẽ cấu trúc được một skill với `scripts/` và `references/`,
-> đóng gói nó cùng một hook thành plugin trong `.claude-plugin/plugin.json`, kiểm tra bằng
-> `claude plugin validate`, load bằng `claude --plugin-dir`, và đo hiệu quả bằng
-> `claude plugin eval`.
+> **Kết quả**: Sau module này, bạn sẽ đóng gói được một skill cùng một hook và script của nó
+> thành plugin trong `.claude-plugin/plugin.json`, kiểm tra bằng `claude plugin validate`, load
+> bằng `claude --plugin-dir`, và đo hiệu quả bằng `claude plugin eval`.
 
 ---
 
@@ -202,7 +201,8 @@ Gõ `/plugin`, nhấn `Tab` sang **Installed**, rồi gõ `cc-lab` để lọc:
     Type to search · Space to toggle · f to favorite · Enter to view · Esc to go back
 ```
 
-`inline` nghĩa là "load từ `--plugin-dir`", không phải cài từ marketplace.
+Nhãn `inline` là thứ v2.1.278 hiển thị cho plugin load bằng `--plugin-dir`; docs chỉ nói plugin
+kiểu này "show in the `/plugin` interface", không có trong `/plugin list` dạng inline.
 
 **Bước 4: Chạy skill có namespace ở chế độ headless**
 
@@ -367,7 +367,7 @@ arm: both
 ---
 description: Push the current branch and open a release PR. Manual only.
 disable-model-invocation: true
-allowed-tools: Bash(git push origin *), Bash(gh pr create *)
+allowed-tools: Bash(git branch --show-current), Bash(git push origin *), Bash(gh pr create *)
 ---
 
 **Branch**: !`git branch --show-current`
@@ -377,7 +377,8 @@ Push the branch above with `git push origin <branch>`, then run
 ```
 
 `allowed-tools` hẹp nghĩa là một bước sai vẫn vấp permission prompt; invocation thủ công nghĩa
-là Claude không bao giờ tự quyết định deploy. Cần cả hai.
+là Claude không bao giờ tự quyết định deploy. Cần cả hai. Lệnh `git branch` được inject cũng
+phải liệt kê: ngoài auto mode, lệnh inject mà một rule sẽ hỏi thì làm invocation bị abort.
 </details>
 
 ---
