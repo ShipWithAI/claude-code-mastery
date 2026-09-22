@@ -21,7 +21,7 @@ claude_version: 2.1.280
 Bạn ghi `NEVER read .env` trong `CLAUDE.md`, một session sau một lệnh in API key ra transcript.
 Không phải bug — docs nói thẳng: *"Permission rules are enforced by Claude Code, not by the model.
 Instructions in your prompt or `CLAUDE.md` … don't change what Claude Code allows."* Rule trong
-settings là **control**; câu trong `CLAUDE.md` là gợi ý. Module này nói về control.
+settings là **control**; câu trong `CLAUDE.md` là gợi ý. Module này về control.
 
 ---
 
@@ -32,21 +32,20 @@ settings là **control**; câu trong `CLAUDE.md` là gợi ý. Module này nói 
 `allow` chạy không hỏi, `ask` luôn hỏi, `deny` chặn. *"Rules are evaluated in order: deny, then
 ask, then allow. The first match … determines the outcome, and rule specificity doesn't change the
 order."* `Bash(aws *)` trong deny thắng `Bash(aws s3 ls)` trong allow:
-**allow không bao giờ khoét được ngoại lệ ra khỏi deny.**
+**allow không khoét được ngoại lệ ra khỏi deny.**
 
 ### Cú pháp rule — `Tool` hoặc `Tool(specifier)`
 
 | Rule | Khớp với |
 |---|---|
-| `Read`, `Bash` | mọi lần dùng tool; là deny thì gỡ luôn tool khỏi context |
-| `Bash(npm run build)` | đúng lệnh đó, không hơn |
-| `Bash(git status:*)` | `git status` và mọi thứ phía sau; `:*` tương đương ` *` ở cuối |
-| `Read(./.env)`, `Read(~/.ssh/**)` | path đó; `//etc/**` hai gạch chéo mới là tuyệt đối |
+| `Read`, `Bash` | mọi lần dùng; là deny thì gỡ luôn tool khỏi context |
+| `Bash(npm run build)` / `Bash(git status:*)` | đúng lệnh đó / lệnh đó cộng mọi thứ phía sau (`:*` ≡ ` *` cuối) |
+| `Read(./.env)`, `Read(~/.ssh/**)` | path đó; `//etc/**` (hai gạch chéo) mới là tuyệt đối |
 | `Edit(src/**)` | allow: chỉ `<cwd>/src`; deny: `src` ở mọi độ sâu |
 | `WebFetch(domain:x.com)`, `mcp__github__*` | host, MCP server |
 
 Đặt `*` **sau subcommand**: `Bash(git log *)` chỉ cho `git log`, `Bash(git *)` cho cả `push`.
-Path dùng cú pháp gitignore, và chỉ `Read(path)` / `Edit(path)` được tra.
+Path dùng cú pháp gitignore; chỉ `Read(path)`/`Edit(path)` được tra.
 
 ### Sáu permission mode
 
@@ -61,7 +60,7 @@ Path dùng cú pháp gitignore, và chỉ `Read(path)` / `Edit(path)` được t
 
 `Shift+Tab` xoay vòng `default` → `acceptEdits` → `plan`; `--permission-mode` đặt cho một session,
 `permissions.defaultMode` đặt điểm khởi đầu. **Deny rule chặn ở mọi mode, kể cả
-`bypassPermissions`**, nơi allow rule vô tác dụng.
+`bypassPermissions`**, nơi allow rule vô dụng.
 
 ### File nào thắng
 
@@ -74,26 +73,28 @@ graph TD
 ```
 
 Managed settings nằm ở `/Library/Application Support/ClaudeCode/` (macOS), `/etc/claude-code/`
-(Linux/WSL), `C:\Program Files\ClaudeCode\` (Windows). Các list `permissions.*` được **gộp** qua
-các file, và *"If a tool is denied at any level, no other level can allow it."*
+(Linux/WSL), `C:\Program Files\ClaudeCode\` (Windows). Các list `permissions.*` được **gộp**, và
+*"If a tool is denied at any level, no other level can allow it."*
 
 ### Blast radius
 
 Ở Manual mode, *"Claude Code starts with read-only permissions"*: đọc file trong working directory
-không bao giờ hỏi — nên thứ giữ Claude tránh xa `.env` là deny rule, không phải prompt.
+mặc định không hỏi (một `Read` ask rule sẽ bật prompt trở lại) — nên thứ giữ Claude tránh xa
+`.env` là deny rule, không phải prompt.
 
-Bash rule khớp theo **nội dung lệnh**, nên `Bash(curl *)` trong deny chặn `curl https://x` nhưng
-không chặn `/usr/bin/curl https://x`. Deny cho Read/Edit phủ file tool và các lệnh file Claude Code
-nhận diện (`cat`, `sed`, `tee`, redirection) — *"They don't apply to … arbitrary subprocesses that
-read or write files indirectly, like a Python or Node script that opens files itself."* Nên xếp
-tầng: **`deny` rule** → **`PreToolUse` hook** (đọc trọn lệnh, exit 2 trước khi permission
-rule chạy — [11.3](../../phase-11-automation-headless/03-hooks-system/)) → **sandbox** (mức OS,
+Bash rule khớp theo **nội dung lệnh**: `Bash(curl *)` trong deny chặn `curl https://x`, không chặn
+`/usr/bin/curl https://x`. Deny cho Read/Edit phủ file tool và các lệnh file Claude Code nhận diện
+(`cat`, `sed`, `tee`, redirection) — *"They don't apply to … arbitrary subprocesses that read or
+write files indirectly, like a Python or Node script that opens files itself."* Nên xếp tầng:
+**`deny` rule** → **`PreToolUse` hook** (đọc trọn lệnh, exit 2 trước khi permission rule chạy —
+[11.3](../../phase-11-automation-headless/03-hooks-system/)) → **sandbox** (mức OS,
 đứng vững cả khi prompt injection thắng — [2.3](../03-sandbox/)) → **managed settings** với
-`disableBypassPermissionsMode: "disable"`.
+`{"permissions": {"disableBypassPermissionsMode": "disable"}}`, key này chạy từ bất kỳ file
+settings nào — bạn tự khoá mình cũng được.
 
-Anthropic dùng đúng thứ tự đó — environment layer trước, model layer sau — và báo cáo sandbox giảm
-**84%** số prompt nội bộ (S13). Approval fatigue là vấn đề bảo mật: pre-approve những gì thật sự
-an toàn, để còn tỉnh táo cho cái prompt đáng quan tâm.
+Anthropic dùng thứ tự đó — environment trước, model layer sau — và báo cáo sandbox giảm **84%**
+số prompt nội bộ (S13). Approval fatigue là vấn đề bảo mật: pre-approve thứ thật sự an toàn, để
+còn tỉnh táo cho cái prompt đáng quan tâm.
 
 > `(S13)`: `docs/references/anthropic-sources.md`.
 
@@ -103,7 +104,7 @@ an toàn, để còn tỉnh táo cho cái prompt đáng quan tâm.
 
 Một git repo nháp, `.env` = `API_KEY=sk-FAKE-DO-NOT-USE-xxxxxxxxxxxx`, `npm test` chạy pass.
 
-**Step 1: Viết rule**
+**Step 1: Viết rule, rồi trust thư mục**
 
 ```bash
 # docs: permissions#permission-rule-syntax
@@ -115,7 +116,12 @@ mkdir -p .claude && cat > .claude/settings.json << 'EOF'
   }
 }
 EOF
+claude   # chấp nhận workspace trust dialog một lần, rồi /exit
 ```
+
+Lần mở interactive đó quan trọng: rule `allow` của project chỉ hiệu lực sau khi bạn chấp nhận
+trust dialog, mà `claude -p` không bao giờ hiện — nên Step 3 fail trong thư mục chưa trust. Deny
+rule không cần trust, nên Step 2 chạy kiểu gì cũng được.
 
 **Step 2: Chứng minh deny rule chặn thật**
 
@@ -134,7 +140,7 @@ report. I didn't try reading the file another way.
 Bằng chứng nằm ở tool result phía sau câu trả lời:
 `Permission to use Bash with command cat .env has been denied.` `--allowedTools Bash` cho phép
 *tool*, nhưng deny `Read(./.env)` vẫn thắng vì deny xét trước. `--permission-mode default` ép hành
-vi mặc định — thiếu flag đó kết quả vẫn thế, trừ khi một file settings đặt
+vi mặc định — cũng là thứ bạn nhận được nếu không có file settings nào đặt
 `permissions.defaultMode`.
 
 **Step 3: Chứng minh allow rule xoá prompt**
@@ -156,9 +162,9 @@ ok 1 - add
 1..1
 ```
 
-Không prompt, cũng không cần flag pre-authorise: `Bash(npm test:*)` đã phủ.
+Không prompt, không cần flag pre-authorise: `Bash(npm test:*)` đã phủ.
 
-**Step 4: Audit thứ đang được nạp** — `/permissions`, rồi `→` sang tab **Deny**.
+**Step 4: Audit thứ đang được nạp** — `/permissions`, `→` sang tab **Deny**.
 
 ```text
 # Output may vary
@@ -176,9 +182,9 @@ Không prompt, cũng không cần flag pre-authorise: `Bash(npm test:*)` đã ph
    ←/→ to switch · ↓ to select · Esc to cancel
 ```
 
-Dialog liệt kê từng rule *và file nào sinh ra nó*.
+Dialog liệt kê từng rule *và file nguồn của nó*.
 
-**Step 5: Một prompt thật** — bảo session ở Manual mode chạy `touch scratch.txt`.
+**Step 5: Một prompt thật** — cho Manual mode chạy `touch scratch.txt`.
 
 ```text
 # Output may vary
@@ -197,7 +203,7 @@ Dialog liệt kê từng rule *và file nào sinh ra nó*.
  Esc to cancel · Tab to amend
 ```
 
-Lựa chọn 2 ghi một rule vào `.claude/settings.local.json`; `Tab` mở ô comment.
+Lựa chọn 2 ghi một grant vào `.claude/settings.local.json`; `Tab` mở ô comment.
 
 **Step 6: Đổi mode**
 
@@ -211,7 +217,7 @@ claude --permission-mode acceptEdits
   ⏵⏵ accept edits on (shift+tab to cycle)
 ```
 
-Manual mode hiển thị `⏸ manual mode on`. Đọc dòng đó trước khi gõ.
+Manual mode hiển thị `⏸ manual mode on`. Đọc nó trước khi gõ.
 
 **Step 7: Precedence — allow không thắng nổi deny**
 
@@ -230,7 +236,7 @@ I didn't get any output because the permission system blocked `cat .env`. This i
 rule in your Claude Code settings that protects `.env` files. I haven't tried to get around it.
 ```
 
-Vẫn bị chặn — dù allow nằm ở file **precedence cao hơn**. Xong nhớ xoá file đó.
+Vẫn bị chặn — dù allow nằm ở file **precedence cao hơn**. Xong xoá file đó.
 
 ---
 
@@ -239,12 +245,10 @@ Vẫn bị chặn — dù allow nằm ở file **precedence cao hơn**. Xong nh�
 ### Exercise 1: Rule cho một project thật
 
 **Mục tiêu**: một `.claude/settings.json` mà test và build chạy không hỏi, còn secret và rewrite
-history thì bị chặn.
+history bị chặn — lệnh được allow chạy im lặng, lệnh bị deny trả về permission error.
 
-**Hướng dẫn**: biến các lệnh bạn chạy hằng ngày thành allow rule (`*` sau subcommand); deny secret
-và rewrite history; kiểm chứng từng deny bằng một lệnh `claude -p`.
-
-**Kết quả mong đợi**: lệnh được allow chạy im lặng, lệnh bị deny trả về permission error.
+**Hướng dẫn**: biến lệnh bạn chạy hằng ngày thành allow rule (`*` sau subcommand); deny secret và
+rewrite history; kiểm chứng từng deny bằng một lệnh `claude -p`.
 
 <details>
 <summary>✅ Solution</summary>
@@ -265,7 +269,7 @@ và rewrite history; kiểm chứng từng deny bằng một lệnh `claude -p`.
 }
 ```
 
-Chạy lại Step 2. Nếu nó in ra nội dung file thì rule sai — sửa trước khi tin nó.
+Chạy lại Step 2. Nếu nó in nội dung file thì rule sai — sửa trước khi tin nó.
 
 </details>
 
@@ -275,18 +279,16 @@ Chạy lại Step 2. Nếu nó in ra nội dung file thì rule sai — sửa tr�
 
 **Mục tiêu**: hết phải duyệt tay từng edit, mà không mở toang cả máy.
 
-**Hướng dẫn**: đặt `"permissions": { "defaultMode": "acceptEdits" }`, giữ nguyên deny rule, xác
-nhận `⏵⏵ accept edits on`, rà lại bằng `git diff`.
-
-**Kết quả mong đợi**: edit vào thẳng không hỏi; `.env` và force push vẫn bị chặn.
+**Hướng dẫn**: đặt `"permissions": { "defaultMode": "acceptEdits" }`, giữ deny rule, xác nhận
+`⏵⏵ accept edits on`, rà lại bằng `git diff`. Edit vào thẳng không hỏi; `.env` và force push vẫn
+bị chặn.
 
 <details>
 <summary>✅ Solution</summary>
 
 `acceptEdits` tự duyệt edit cộng `mkdir`, `touch`, `rm`, `rmdir`, `mv`, `cp`, `sed` **chỉ trong
-working directory**; mọi thứ khác vẫn hỏi, deny rule vẫn thắng. `auto` và `bypassPermissions`
-không có hiệu lực từ project/local settings — đặt ở user/managed settings, hoặc truyền
-`--permission-mode`.
+working directory**; mọi thứ khác vẫn hỏi, deny rule vẫn thắng. `auto` và `bypassPermissions` cần
+user/managed settings, hoặc `--permission-mode`.
 
 </details>
 
@@ -294,24 +296,22 @@ không có hiệu lực từ project/local settings — đặt ở user/managed 
 
 ### Exercise 3: Audit một repo thừa kế
 
-**Mục tiêu**: biết repo bạn vừa clone được phép làm những gì.
+**Mục tiêu**: biết repo vừa clone được phép làm những gì.
 
 **Hướng dẫn**: đọc từng allow rule trong `.claude/settings.json`, đối chiếu với từng tab
-`/permissions`, rồi viết các deny rule còn thiếu và test.
-
-**Kết quả mong đợi**: một deny list đã kiểm chứng, không phải niềm tin "Claude sẽ không làm".
+`/permissions`, rồi viết các deny rule còn thiếu và test — kết thúc bằng một deny list đã kiểm
+chứng, không phải niềm tin "Claude sẽ không làm".
 
 <details>
 <summary>✅ Solution</summary>
 
-Câu trả lời của model về quyền của chính nó không phải bằng chứng. Viết rule, chạy lệnh.
+Câu trả lời của model về quyền của nó không phải bằng chứng. Viết rule, chạy lệnh.
 
 ```json
 { "permissions": { "deny": ["Read(./.env)", "Read(./secrets/**)", "Read(~/.ssh/**)"] } }
 ```
 
-Rule `permissions.allow` của repo chỉ có hiệu lực sau khi bạn chấp nhận workspace trust dialog —
-mà `claude -p` không bao giờ hiện dialog đó.
+Như Step 1: rule `permissions.allow` cần trust dialog, mà `claude -p` không bao giờ hiện.
 
 </details>
 
@@ -322,12 +322,10 @@ mà `claude -p` không bao giờ hiện dialog đó.
 | Cần gì | Viết thế này |
 |---|---|
 | lệnh chính xác / họ lệnh | `Bash(npm run build)` / `Bash(npm run *)` |
-| chặn một file hay path | `deny: ["Read(./.env)", "Read(~/.ssh/**)"]` |
+| chặn path / ép hỏi | `deny: ["Read(~/.ssh/**)"]` / `ask: ["Bash(git push *)"]` |
 | path tuyệt đối / domain | `Read(//etc/**)` / `WebFetch(domain:x.com)` |
-| ép hỏi | `ask: ["Bash(git push *)"]` |
-| khoá bypass mode | `"disableBypassPermissionsMode": "disable"` |
-| xem/sửa rule ngay trong session | `/permissions` |
-| headless đã pre-authorise | `claude -p … --allowedTools "Bash(npm test)" "Read"` |
+| khoá bypass mode | `{"permissions": {"disableBypassPermissionsMode": "disable"}}` |
+| rule trong session / headless | `/permissions` / `claude -p … --allowedTools "Bash(npm test)" "Read"` |
 
 Thứ tự: **deny → ask → allow**. File: managed → command line → `.local.json` → project → user.
 
@@ -339,18 +337,17 @@ Thứ tự: **deny → ask → allow**. File: managed → command line → `.loc
 |---|---|
 | `{"allowlist": ["ls"]}` | Không có key đó: `{"permissions": {"allow": ["Bash(ls:*)"]}}` |
 | `claude config set` để đổi permission | Không có subcommand này. Sửa file JSON hoặc dùng `/permissions` |
-| Tin câu "NEVER read .env" trong `CLAUDE.md` | Nó chỉ advisory. Thêm `deny: ["Read(./.env)"]` rồi test |
-| `allow: ["Bash(*)"]`, hay `Bash(git *)` cho "git an toàn" | Cả hai đều gồm `git push --force`. Chỉ allow mười lệnh bạn thật sự chạy |
-| `--dangerously-skip-permissions` trên máy cá nhân | Chỉ trong container; đặt `disableBypassPermissionsMode` |
-| Coi deny rule là hàng rào quanh chương trình | Nó khớp nội dung lệnh; subprocess lọt qua. Thêm hook và sandbox |
-| Ship một rule chưa từng test | Chạy lệnh vi phạm; đọc thông báo bị chặn |
+| Tin câu "NEVER read .env" trong `CLAUDE.md` | Advisory. Thêm `deny: ["Read(./.env)"]` rồi test |
+| `allow: ["Bash(*)"]` hay `Bash(git *)` cho "git an toàn" | Cả hai gồm `git push --force`. Chỉ allow những lệnh bạn thật sự chạy |
+| `--dangerously-skip-permissions` trên máy cá nhân | Chỉ trong container; đặt `permissions.disableBypassPermissionsMode` |
+| Coi deny rule là hàng rào, hoặc ship rule chưa test | Nó khớp nội dung lệnh nên subprocess lọt qua — thêm hook và sandbox, rồi chạy lệnh vi phạm và đọc thông báo bị chặn |
 
 ---
 
 ## 7. REAL CASE — Câu chuyện thực tế
 
 **Bối cảnh**: một DevOps engineer ở fintech Hà Nội dùng `--dangerously-skip-permissions` trong CI
-pipeline Docker — hợp lý — rồi dùng luôn trên máy cá nhân cho đỡ phải bấm duyệt.
+pipeline Docker — hợp lý — rồi dùng luôn trên máy cá nhân cho đỡ bấm duyệt.
 
 **Vấn đề**: cô bảo Claude "clean up the feature branches I've been working on." Nó sinh ra
 `git push --force origin main`. Tắt prompt nên lệnh chạy luôn; `main` local chậm hơn remote ba
@@ -364,10 +361,11 @@ ngày, cú push xoá sạch ba ngày công của cả team.
 
 Deny rule áp dụng ở mọi mode, kể cả `bypassPermissions`, nên flag kia không cứu được lệnh đó. Hai
 bài học: rule khớp theo nội dung lệnh, nên `git -C . push --force` cần rule riêng hoặc một hook; và
-cách sửa bền vững là `disableBypassPermissionsMode: "disable"` trong managed settings.
+cách sửa bền vững là `permissions.disableBypassPermissionsMode` đặt `"disable"` trong managed
+settings.
 
 **Kết quả**: phần lớn commit lấy lại được từ clone của đồng nghiệp. Team commit một deny list, test
-từng rule trong đó, và giờ review file này trong pull request.
+từng rule, và giờ review file này trong pull request.
 
 ---
 

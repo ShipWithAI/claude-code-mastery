@@ -12,7 +12,7 @@ claude_version: 2.1.280
 > **Prerequisite**: Module 2.1 (Threat Model)
 >
 > **Outcome**: You can write `allow` / `deny` / `ask` rules, pick a permission mode, say which
-> settings file wins, and prove a rule blocked what you meant it to block.
+> settings file wins, and prove a rule blocked what you meant it to.
 
 ---
 
@@ -20,8 +20,8 @@ claude_version: 2.1.280
 
 You put `NEVER read .env` in `CLAUDE.md`, and a session later a command printed your key into the
 transcript. Not a bug — the docs are blunt: *"Permission rules are enforced by Claude Code, not by
-the model. Instructions in your prompt or `CLAUDE.md` … don't change what Claude Code allows."* A
-settings rule is a control; a `CLAUDE.md` sentence is a suggestion. This module is the control.
+the model. Instructions in your prompt or `CLAUDE.md` … don't change what Claude Code allows."*
+A settings rule is a control; a `CLAUDE.md` line is a suggestion. This module is the control.
 
 ---
 
@@ -31,22 +31,22 @@ settings rule is a control; a `CLAUDE.md` sentence is a suggestion. This module 
 
 `allow` runs without a prompt, `ask` always prompts, `deny` blocks. *"Rules are evaluated in
 order: deny, then ask, then allow. The first match … determines the outcome, and rule specificity
-doesn't change the order."* So `Bash(aws *)` in deny beats `Bash(aws s3 ls)` in allow:
+doesn't change the order."* `Bash(aws *)` in deny beats `Bash(aws s3 ls)` in allow:
 **allow never carves an exception out of deny.**
+
 
 ### Rule syntax — `Tool` or `Tool(specifier)`
 
 | Rule | Matches |
 |---|---|
 | `Read`, `Bash` | every use; as a deny, removes the tool entirely |
-| `Bash(npm run build)` | that exact command |
-| `Bash(git status:*)` | `git status` plus anything after; `:*` equals a trailing ` *` |
-| `Read(./.env)`, `Read(~/.ssh/**)` | that path; `//etc/**`, two slashes, is absolute |
+| `Bash(npm run build)` / `Bash(git status:*)` | exact command / plus anything after (`:*` ≡ trailing ` *`) |
+| `Read(./.env)`, `Read(~/.ssh/**)` | that path; `//etc/**` (two slashes) is absolute |
 | `Edit(src/**)` | allow: only `<cwd>/src`; deny: `src` at any depth |
 | `WebFetch(domain:x.com)`, `mcp__github__*` | host, MCP server |
 
 Put the `*` **after the subcommand**: `Bash(git log *)` allows only `git log`, `Bash(git *)`
-allows `push`. Paths are gitignore patterns, and only `Read(path)` / `Edit(path)` are consulted.
+allows `push`. Paths are gitignore patterns; only `Read(path)`/`Edit(path)` are consulted.
 
 ### Six permission modes
 
@@ -59,9 +59,10 @@ allows `push`. Paths are gitignore patterns, and only `Read(path)` / `Edit(path)
 | `dontAsk` | reads and pre-approved tools; anything that would prompt is denied |
 | `bypassPermissions` | "Everything" — "Isolated containers and VMs only" |
 
+
 `Shift+Tab` cycles `default` → `acceptEdits` → `plan`; `--permission-mode` sets one session,
 `permissions.defaultMode` the start. **Deny rules block in every mode, `bypassPermissions`
-included**, where allow rules do nothing.
+included**, where allow rules do nothing at all.
 
 ### Which file wins
 
@@ -73,27 +74,29 @@ graph TD
     D --> E["5. ~/.claude/settings.json"]
 ```
 
-Managed settings live in `/Library/Application Support/ClaudeCode/` (macOS),
-`/etc/claude-code/` (Linux/WSL), `C:\Program Files\ClaudeCode\` (Windows). `permissions.*` lists
-**merge** across files, and *"If a tool is denied at any level, no other level can allow it."*
+Managed settings live in `/Library/Application Support/ClaudeCode/` (macOS), `/etc/claude-code/`
+(Linux/WSL), `C:\Program Files\ClaudeCode\` (Windows). `permissions.*` lists **merge**, and
+*"If a tool is denied at any level, no other level can allow it."*
 
 ### Blast radius
 
-In Manual mode *"Claude Code starts with read-only permissions"*: reads inside the working
-directory never prompt — which is why a deny rule, not a prompt, keeps Claude out of `.env`.
+In Manual mode *"Claude Code starts with read-only permissions"*: reads in the working directory
+don't prompt by default (a `Read` ask rule puts the prompt back) — so a deny rule, not a prompt,
+keeps Claude out of `.env`.
 
-A Bash rule matches the **command text**, so `Bash(curl *)` in deny stops `curl https://x` but not
+A Bash rule matches the **command text**: `Bash(curl *)` in deny stops `curl https://x`, not
 `/usr/bin/curl https://x`. Read and Edit denies cover the file tools and recognised file commands
 (`cat`, `sed`, `tee`, redirections) — *"They don't apply to … arbitrary subprocesses that read or
-write files indirectly, like a Python or Node script that opens files itself."* So layer it:
+write files indirectly, like a Python or Node script that opens files itself."* Layer it:
 **`deny` rule** → **`PreToolUse` hook** (reads the whole command, exits 2 before permission rules
 run — [11.3](../../phase-11-automation-headless/03-hooks-system/)) → **sandbox** (OS-level, holds
-even against prompt injection — [2.3](../03-sandbox/)) → **managed settings** with
-`disableBypassPermissionsMode: "disable"`.
+against prompt injection — [2.3](../03-sandbox/)) → **managed settings** with
+`{"permissions": {"disableBypassPermissionsMode": "disable"}}`, which works from any settings file
+— you can lock yourself out too.
 
-Anthropic uses that order — environment layer before model layer — and reports sandboxing cut
-internal prompts by **84%** (S13). Approval fatigue is a security problem: pre-approve what is
-safe, so you stay awake for the prompt that matters.
+Anthropic uses that order — environment before model layer — and reports sandboxing cut internal
+prompts by **84%** (S13). Approval fatigue is a security problem: pre-approve what is safe, so you
+stay awake for the prompt that counts.
 
 > `(S13)`: `docs/references/anthropic-sources.md`.
 
@@ -103,7 +106,7 @@ safe, so you stay awake for the prompt that matters.
 
 A scratch git repo, `.env` = `API_KEY=sk-FAKE-DO-NOT-USE-xxxxxxxxxxxx`, passing `npm test`.
 
-**Step 1: Write the rules**
+**Step 1: Write the rules, then trust the folder**
 
 ```bash
 # docs: permissions#permission-rule-syntax
@@ -115,7 +118,12 @@ mkdir -p .claude && cat > .claude/settings.json << 'EOF'
   }
 }
 EOF
+claude   # accept the workspace trust dialog once, then /exit
 ```
+
+That interactive start matters: project `allow` rules apply only once you accept the trust
+dialog, which `claude -p` never shows — so Step 3 fails in an untrusted folder. Deny rules need no
+trust, so Step 2 works either way.
 
 **Step 2: Prove the deny rule blocks**
 
@@ -134,7 +142,7 @@ report. I didn't try reading the file another way.
 The tool result behind it is the evidence:
 `Permission to use Bash with command cat .env has been denied.` `--allowedTools Bash` allowed the
 *tool*; the `Read(./.env)` deny still won, because deny goes first. `--permission-mode default`
-forces the stock behaviour — same result without it, unless a settings file sets
+forces the stock behaviour, which is what you get anyway unless a settings file sets
 `permissions.defaultMode`.
 
 **Step 3: Prove the allow rule removes the prompt**
@@ -156,9 +164,9 @@ ok 1 - add
 1..1
 ```
 
-No prompt and no pre-authorisation flag: `Bash(npm test:*)` covered it.
+No prompt, no pre-authorisation flag: `Bash(npm test:*)` covered it.
 
-**Step 4: Audit what is loaded** — `/permissions`, then `→` to the **Deny** tab.
+**Step 4: Audit what is loaded** — `/permissions`, `→` to the **Deny** tab.
 
 ```text
 # Output may vary
@@ -176,9 +184,9 @@ No prompt and no pre-authorisation flag: `Bash(npm test:*)` covered it.
    ←/→ to switch · ↓ to select · Esc to cancel
 ```
 
-The dialog lists every rule *and the file it came from*.
+The dialog lists every rule *and its source file*.
 
-**Step 5: A real prompt** — ask a Manual-mode session to run `touch scratch.txt`.
+**Step 5: A real prompt** — have Manual mode run `touch scratch.txt`.
 
 ```text
 # Output may vary
@@ -197,7 +205,7 @@ The dialog lists every rule *and the file it came from*.
  Esc to cancel · Tab to amend
 ```
 
-Option 2 writes a rule into `.claude/settings.local.json`; `Tab` opens a comment field.
+Option 2 saves a grant into `.claude/settings.local.json`; `Tab` opens a comment field.
 
 **Step 6: Switch modes**
 
@@ -211,7 +219,7 @@ claude --permission-mode acceptEdits
   ⏵⏵ accept edits on (shift+tab to cycle)
 ```
 
-Manual mode shows `⏸ manual mode on`. Read that line before you type.
+Manual mode shows `⏸ manual mode on`. Read it before you type.
 
 **Step 7: Precedence — allow cannot beat deny**
 
@@ -230,7 +238,7 @@ I didn't get any output because the permission system blocked `cat .env`. This i
 rule in your Claude Code settings that protects `.env` files. I haven't tried to get around it.
 ```
 
-Still denied — from the *higher-precedence* file. Delete it afterwards.
+Still denied, from the *higher-precedence* file. Delete it after.
 
 ---
 
@@ -239,12 +247,11 @@ Still denied — from the *higher-precedence* file. Delete it afterwards.
 ### Exercise 1: Rules for a real project
 
 **Goal**: a `.claude/settings.json` where tests and builds run unprompted while secrets and
-history rewrites stay blocked.
+history rewrites stay blocked — allowed commands silent, denied ones returning a permission
+error.
 
-**Instructions**: turn the commands you run daily into allow rules (`*` after the subcommand);
-deny secrets and history rewrites; verify each deny with one `claude -p`.
-
-**Expected result**: allowed commands run silently, denied ones return a permission error.
+**Instructions**: turn daily commands into allow rules (`*` after the subcommand); deny secrets
+and history rewrites; verify each with one `claude -p`.
 
 <details>
 <summary>✅ Solution</summary>
@@ -265,7 +272,7 @@ deny secrets and history rewrites; verify each deny with one `claude -p`.
 }
 ```
 
-Run Step 2 again. If it prints the file, the rule is wrong — fix it before you trust it.
+Run Step 2 again. If it prints the file the rule is wrong — fix it before trusting it.
 
 </details>
 
@@ -276,17 +283,15 @@ Run Step 2 again. If it prints the file, the rule is wrong — fix it before you
 **Goal**: stop approving every edit by hand without opening the whole machine.
 
 **Instructions**: set `"permissions": { "defaultMode": "acceptEdits" }`, keep the deny rules,
-confirm `⏵⏵ accept edits on`, review with `git diff`.
-
-**Expected result**: edits land without prompts, `.env` and force pushes stay blocked.
+confirm `⏵⏵ accept edits on`, review with `git diff`. Edits should land without prompts while
+`.env` and force pushes stay blocked.
 
 <details>
 <summary>✅ Solution</summary>
 
 `acceptEdits` auto-approves edits plus `mkdir`, `touch`, `rm`, `rmdir`, `mv`, `cp`, `sed`
-**inside the working directory only**; everything else prompts, deny rules still win. `auto` and
-`bypassPermissions` do not take effect from project or local settings — use user or managed
-settings, or `--permission-mode`.
+**inside the working directory only**; everything else prompts and deny rules win. `auto` and
+`bypassPermissions` need user or managed settings, or `--permission-mode`.
 
 </details>
 
@@ -294,12 +299,12 @@ settings, or `--permission-mode`.
 
 ### Exercise 3: Audit an inherited repo
 
-**Goal**: find out what a repo you cloned is allowed to do.
+**Goal**: find out what a cloned repo is allowed to do.
 
 **Instructions**: read every allow rule in `.claude/settings.json`, check each `/permissions` tab
-against it, then write the missing deny rules and test them.
+against it, then write the missing deny rules and test them — ending with a verified deny list,
+not a belief about what Claude "won't do".
 
-**Expected result**: a verified deny list, not a belief about what Claude "won't do".
 
 <details>
 <summary>✅ Solution</summary>
@@ -310,8 +315,7 @@ A model's answer about its own access is not evidence. Write the rule, run the c
 { "permissions": { "deny": ["Read(./.env)", "Read(./secrets/**)", "Read(~/.ssh/**)"] } }
 ```
 
-A repo's `permissions.allow` rules apply only after you accept the workspace trust dialog, which
-`claude -p` never shows.
+As in Step 1: `permissions.allow` rules need the trust dialog, which `claude -p` never shows.
 
 </details>
 
@@ -322,12 +326,10 @@ A repo's `permissions.allow` rules apply only after you accept the workspace tru
 | Need | Write |
 |---|---|
 | exact command / family | `Bash(npm run build)` / `Bash(npm run *)` |
-| block a file or path | `deny: ["Read(./.env)", "Read(~/.ssh/**)"]` |
+| block a path / force a prompt | `deny: ["Read(~/.ssh/**)"]` / `ask: ["Bash(git push *)"]` |
 | absolute path / domain | `Read(//etc/**)` / `WebFetch(domain:x.com)` |
-| force a prompt | `ask: ["Bash(git push *)"]` |
-| lock out bypass | `"disableBypassPermissionsMode": "disable"` |
-| rules, live | `/permissions` |
-| headless, pre-authorised | `claude -p … --allowedTools "Bash(npm test)" "Read"` |
+| lock out bypass | `{"permissions": {"disableBypassPermissionsMode": "disable"}}` |
+| rules live / headless | `/permissions` / `claude -p … --allowedTools "Bash(npm test)" "Read"` |
 
 Order: **deny → ask → allow**. Files: managed → command line → `.local.json` → project → user.
 
@@ -340,21 +342,20 @@ Order: **deny → ask → allow**. Files: managed → command line → `.local.j
 | `{"allowlist": ["ls"]}` | No such key: `{"permissions": {"allow": ["Bash(ls:*)"]}}` |
 | `claude config set` for permissions | No such subcommand. Edit the JSON or use `/permissions` |
 | Trusting `CLAUDE.md`'s "NEVER read .env" | Advisory. Add `deny: ["Read(./.env)"]`, then test it |
-| `allow: ["Bash(*)"]`, or `Bash(git *)` as "safe git" | Both include `git push --force`. Allow the ten commands you run |
-| `--dangerously-skip-permissions` locally | Containers only; set `disableBypassPermissionsMode` |
-| Treating a deny rule as a boundary | It matches command text; a subprocess slips past. Add a hook and the sandbox |
-| Shipping a rule you never tested | Run the violating command; read the denial |
+| `allow: ["Bash(*)"]` or `Bash(git *)` as "safe git" | Both include `git push --force`. Allow the commands you actually run |
+| `--dangerously-skip-permissions` locally | Containers only; set `permissions.disableBypassPermissionsMode` |
+| Treating a deny rule as a boundary, or shipping one untested | It matches command text, so a subprocess slips past — add a hook and the sandbox, then run the violation and read the denial |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
 **Scenario**: a DevOps engineer at a Hanoi fintech used `--dangerously-skip-permissions` in a
-Docker CI pipeline — legitimate — then started passing it locally too, to skip the prompts.
+Docker CI pipeline — legitimate — then locally too, to skip prompts.
 
 **Problem**: she asked Claude to "clean up the feature branches I've been working on." It produced
-`git push --force origin main`. With prompts off it ran; her local `main` was three days behind,
-so the push destroyed three days of team work.
+`git push --force origin main`. With prompts off it ran; `main` was three days behind, so the push
+destroyed three days of team work.
 
 **What would have stopped it**: one committed line.
 
@@ -362,12 +363,13 @@ so the push destroyed three days of team work.
 { "permissions": { "deny": ["Bash(git push --force:*)"] } }
 ```
 
-Deny rules apply in every mode, `bypassPermissions` included, so her flag would not have let it
-through. Two lessons: the rule matches command text, so `git -C . push --force` needs its own rule
-or a hook; and the durable fix is `disableBypassPermissionsMode: "disable"` in managed settings.
+Deny rules apply in every mode, `bypassPermissions` included, so her flag would not have helped.
+Two lessons: the rule matches command text, so `git -C . push --force` needs its own rule or a
+hook; and the durable fix is `permissions.disableBypassPermissionsMode` set to `"disable"` in
+managed settings.
 
 **Result**: most commits came back from a teammate's clone. The team committed a deny list, tested
-every rule in it, and now reviews that file in pull requests.
+every rule, and reviews it in pull requests.
 
 ---
 
