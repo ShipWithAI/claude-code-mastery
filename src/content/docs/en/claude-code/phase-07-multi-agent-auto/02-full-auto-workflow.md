@@ -1,6 +1,8 @@
 ---
 title: 'Full Auto Workflow'
-description: 'Run Claude Code in Full Auto mode safely with pre-flight checks, guardrails, and post-execution verification.'
+description: 'Run long autonomous tasks safely: enforce boundaries with deny rules, hooks, worktrees and --max-turns, interrupt with Esc, rewind with checkpoints, verify with a check Claude can run.'
+verified: 2026-09-22
+claude_version: 2.1.278
 ---
 
 # Module 7.2: Full Auto Workflow
@@ -9,240 +11,277 @@ description: 'Run Claude Code in Full Auto mode safely with pre-flight checks, g
 >
 > **Prerequisite**: Module 7.1 (Auto Coding Levels), Module 6.3 (Think+Plan Combo)
 >
-> **Outcome**: After this module, you will have a complete workflow for using Full Auto mode safely — from pre-flight checks through post-execution verification. You'll know exactly when Full Auto is appropriate and how to set guardrails.
+> **Outcome**: After this module, you will run a hands-off task through
+> **PREPARE → EXECUTE → MONITOR → VERIFY** with boundaries Claude Code *enforces*
+> (`permissions.deny`, hooks, `--worktree`, `--max-turns`), and recover with `Esc` and `/rewind`.
 
 ---
 
 ## 1. WHY — Why This Matters
 
-You're either avoiding Full Auto (missing massive productivity gains) or using it recklessly (causing hours of damage). There's no middle ground because no one taught you the actual workflow.
+The old way to keep Claude out of `src/legacy/` was a sentence in the prompt: "please don't touch
+X". That is a request, not a boundary. The docs say it plainly: *"Instructions in your prompt or
+`CLAUDE.md` shape what Claude tries to do, but they don't change what Claude Code allows."*
 
-Full Auto isn't a button — it's a protocol with specific steps. Like a pilot's pre-flight checklist, skipping steps leads to crashes. This module gives you that checklist.
+Full auto is a protocol, not a flag. The four phases below are the same as before; what changed
+is that every boundary now has a mechanism behind it.
 
 ---
 
 ## 2. CONCEPT — Core Ideas
 
-Full Auto mode gives AI maximum autonomy — decisions, edits, commands without permission at every step. But autonomy without process is chaos.
-
-**The Full Auto Workflow** has four mandatory phases:
-
 ```mermaid
 graph LR
-    A[1. PREPARE] --> B[2. EXECUTE]
-    B --> C[3. MONITOR]
-    C --> D[4. VERIFY]
-    D -->|Issues found| A
-    D -->|Success| E[Done]
+    A["1. PREPARE<br/>spec + enforced boundaries"] --> B["2. EXECUTE<br/>acceptEdits / auto in a worktree"]
+    B --> C["3. MONITOR<br/>Esc · /rewind"]
+    C --> D["4. VERIFY<br/>a check Claude can run"]
+    D -->|fails| A
+    D -->|passes| E[Merge]
 ```
 
-### Phase 1: PREPARE (Critical — Never Skip)
+### PREPARE — the spec and the fences
 
-Most failures happen here. Always:
-- **Think+Plan First**: Complete Module 6.3 workflow. You need an approved plan defining scope and success criteria.
-- **Create Safety Net**: Create a git branch. Full Auto without backup is reckless.
-- **Define Boundaries**: Specify exactly which files/directories Claude can touch.
+Anthropic's advice for larger features: *"have Claude interview you first"* using the
+`AskUserQuestion` tool, write the result to `SPEC.md`, then *"start a fresh session to execute
+it"*. *"Time spent making the spec precise pays off more than time spent watching the
+implementation."* (S1)
 
-### Phase 2: EXECUTE
+Then fence the run with things Claude Code enforces:
 
-Start with the right prompt structure:
-- Reference the Think+Plan output explicitly
-- Specify stop conditions (when to ask for help)
-- Include progress checkpoints for large tasks
+| Boundary | Mechanism | Enforced by |
+|---|---|---|
+| Paths Claude may not edit | `"permissions": {"deny": ["Edit(./src/legacy/**)"]}` | Claude Code, every mode incl. `bypassPermissions` |
+| Commands with custom logic | `PreToolUse` hook, exit 2 ([Module 11.3](../../phase-11-automation-headless/03-hooks-system/)) | Runs before the permission check |
+| Your working tree | `claude --worktree <name>` → `.claude/worktrees/<name>` | Separate checkout, own branch |
+| Runaway loops (headless) | `--max-turns N` — "Exits with an error when the limit is reached" | Print mode only |
+| Spend (headless) | `--max-budget-usd` | Print mode only |
 
-### Phase 3: MONITOR
+A `Bash(git push *)` deny stops `git push origin main` but not `git -C . push` — for
+command-text-independent enforcement use the sandbox (Module 2.3).
 
-Full Auto doesn't mean unattended. Watch for unexpected file access, error messages, and scope creep. Keep **Esc** ready to interrupt the current turn.
+### EXECUTE
 
-### Phase 4: VERIFY
+`acceptEdits` for edits you'll review in `git diff`; `auto` when the run is long and the
+classifier's prompt-reduction is worth it. Never `bypassPermissions` outside a container.
 
-After completion:
-- Review all changes (`git diff`)
-- Run tests
-- Verify plan goals achieved
+### MONITOR
 
-### Full Auto Eligibility Checklist
+- **`Esc`** interrupts the current turn; the session and context stay. (`Ctrl+C` twice *exits*.)
+- **`/rewind`**, or `Esc` `Esc` on an empty input, opens the checkpoint menu: restore code,
+  conversation, or both, per prompt you sent. Checkpoints hold the last 100 turns.
+- Limitation (S15): *"Checkpointing does not track files modified by Bash commands"* (`rm`, `mv`,
+  `cp`), and edits made by subagents aren't restored — use git for those.
 
-Not every task qualifies for Full Auto. Use this checklist:
+### VERIFY
 
-- ✅ Task is well-defined with clear scope
-- ✅ Think+Plan has been completed and approved
-- ✅ Changes are reversible (git backup exists)
-- ✅ You can actively monitor for at least the first 5-10 minutes
-- ✅ Failure won't cause permanent damage (production databases, deployed systems are off-limits)
+*"Give Claude a check it can run: tests, a build, a screenshot to compare."* (S1) Then confirm the
+fence held: `git diff --stat -- <forbidden path>` must print nothing.
 
-If ANY checkbox is unchecked → use Semi-Auto or Manual mode instead.
+> `(S1)`, `(S15)`: `docs/references/anthropic-sources.md`.
 
 ---
 
 ## 3. DEMO — Step by Step
 
-**Scenario**: You have `src/services/` with 15 service files (~50 functions total) that lack unit tests. You want to generate comprehensive Jest tests.
+Run in `~/cc-lab`. Task: add `subtract` to `src/math.js` with a test, without touching
+`src/legacy/`.
 
-**Step 1: PREPARE — Create Safety and Plan**
+**Step 1: PREPARE — spec first (interactive)**
+
+```text
+I want to add a subtract function to src/math.js. Interview me in detail using the
+AskUserQuestion tool. Keep interviewing until we've covered everything, then write a complete
+spec to SPEC.md.
+```
+
+Answer the questions, review `SPEC.md`, then leave this session — the execution run starts fresh.
+
+**Step 2: PREPARE — a fence Claude Code enforces**
 
 ```bash
-$ git checkout -b auto/generate-service-tests
-$ git status
+# docs: permissions#read-and-edit
+mkdir -p src/legacy && printf 'export function old(x) { return x; }\n' > src/legacy/old.js
+mkdir -p .claude && cat > .claude/settings.json << 'EOF'
+{
+  "permissions": {
+    "deny": ["Edit(./src/legacy/**)"]
+  }
+}
+EOF
 ```
 
-Expected output:
-```text
-On branch auto/generate-service-tests
-nothing to commit, working tree clean
-```
-
-Now start Claude and run Think+Plan first:
+Prove it. Ask for a violation on purpose:
 
 ```bash
-$ claude
+claude -p "Rename the function in src/legacy/old.js to legacyOld" --permission-mode acceptEdits
+git diff --stat src/legacy
 ```
 
 ```text
-Think carefully about generating unit tests for all services in src/services/.
-Consider: test framework (Jest), mocking strategy for dependencies,
-edge cases, error conditions.
-Create a detailed execution plan. Don't write any code yet.
+# Output may vary
+I can't make this edit — `src/legacy/` is blocked by your permission settings (the Edit tool was denied on that directory).
+…
+If you want me to apply it, either allow edits to `src/legacy/` in your settings (or `.claude/settings.local.json`), or make the one-line change yourself.
 ```
 
-Claude outputs a plan covering test structure, mocking approach, coverage goals, and file organization. Review it, then compact:
+`git diff --stat src/legacy` prints nothing. `acceptEdits` auto-approves edits, and the deny
+rule still won.
 
-```text
-/compact
-```
-
-**Step 2: EXECUTE — Start Full Auto with Guardrails**
-
-Now activate Full Auto mode. ⚠️ Needs verification on exact flag syntax:
-
-```text
-Execute the test generation plan you created.
-
-Boundaries:
-- Only create new files in src/services/__tests__/
-- Do NOT modify any existing service files
-- Do NOT touch package.json or jest.config.js
-
-Stop conditions:
-- Stop if you encounter a function that requires manual business logic knowledge
-- Stop if more than 3 tests fail in a row (suggests wrong approach)
-
-Checkpoints:
-- After every 5 service files, summarize: files completed, tests created, any issues
-```
-
-**Step 3: MONITOR — Watch Progress**
-
-Terminal shows checkpoint progress. Watch for files created outside `__tests__/`, repeated errors, or service file modifications. Keep **Esc** ready to interrupt the current turn.
-
-**Step 4: VERIFY — Check Everything**
+**Step 3: EXECUTE — in a worktree, at Level 2**
 
 ```bash
-$ git diff --stat
-# Shows 15 new test files, 847 insertions
-
-$ git diff src/services/*.ts
-# No output = service files untouched
-
-$ npm test
-# All 15 test suites pass, 47 tests total
+# docs: cli-reference --worktree · common-workflows#run-parallel-sessions-with-worktrees
+claude --worktree auto-demo --permission-mode acceptEdits -p "Add a subtract(a, b) function to src/math.js and a test for it in tests/math.test.mjs, then run npm test and report the result."
+git worktree list
 ```
 
-**Result**: 50 functions tested in 15 minutes vs. 2-3 hours manually. Zero rollbacks needed.
+```text
+# Output may vary
+Done. Followed red → green:
+
+- `src/math.js:2` — added `export function subtract(a, b) { return a - b; }`
+- `tests/math.test.mjs:5` — added `test('subtract', () => assert.equal(subtract(5, 3), 2))`
+
+**Result of `npm test`:** 2 tests, 2 pass, 0 fail (`add` and `subtract`). …
+
+Changes are uncommitted in the `auto-demo` worktree.
+/Users/luatnq/cc-lab                              90c242f [main]
+/Users/luatnq/cc-lab/.claude/worktrees/auto-demo  90c242f [worktree-auto-demo] locked
+```
+
+Why: the run happened on branch `worktree-auto-demo` in a separate checkout. Your `main` tree is
+untouched — `git diff --stat src/math.js` in `~/cc-lab` prints nothing.
+
+**Step 4: MONITOR — interrupt and rewind**
+
+Start an interactive session and make an edit, then open the checkpoint menu:
+
+```bash
+# docs: checkpointing#rewind-and-summarize
+claude --permission-mode acceptEdits
+```
+
+```text
+Add a multiply(a, b) function to src/math.js without running any commands
+/rewind
+```
+
+```text
+# Output may vary
+   Rewind
+   Restore the code and/or conversation to the point before…
+   ❯ Add a multiply(a, b) function to src/math.js without running any commands
+     math.js +1
+     (current)
+   Enter to continue · Esc to cancel
+```
+
+Select the prompt, then choose an action:
+
+```text
+# Output may vary
+   The conversation will be unchanged.
+   The code will be restored -1 in math.js.
+     1. Restore code and conversation
+     2. Restore conversation
+   ❯ 3. Restore code
+     4. Summarize from here
+   ↓ 5. Summarize up to here
+   ⚠ Rewinding does not affect files edited manually or via bash.
+```
+
+After **Restore code**, `git diff src/math.js` is empty. If a turn is going wrong *while* it
+runs, press `Esc` first — Claude answers `Interrupted · What should Claude do instead?` and waits.
+
+**Step 5: VERIFY — a check Claude can run, plus the fence**
+
+```bash
+# docs: best-practices — "Give Claude a check it can run"
+(cd .claude/worktrees/auto-demo && npm test 2>&1 | grep -E '^# (pass|fail)')
+git -C .claude/worktrees/auto-demo diff --stat
+git -C .claude/worktrees/auto-demo diff --stat -- src/legacy/
+```
+
+```text
+# Output may vary
+# pass 2
+# fail 0
+ src/math.js         | 1 +
+ tests/math.test.mjs | 3 ++-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
+```
+
+The last command prints nothing — the forbidden path is clean. Merge the branch, then clean up:
+`git worktree remove .claude/worktrees/auto-demo && git branch -D worktree-auto-demo`,
+`rm -rf src/legacy .claude/settings.json`.
 
 ---
 
 ## 4. PRACTICE — Try It Yourself
 
-### Exercise 1: Build Your Pre-Flight Checklist
+### Exercise 1: Fence, then try to break it
 
-**Goal**: Create a personalized pre-flight checklist for Full Auto.
-
+**Goal**: Write a deny rule and a `PreToolUse` hook, and watch both hold under `acceptEdits`.
 **Instructions**:
-1. Pick a suitable task (e.g., add JSDoc, convert callbacks to async/await).
-2. Define: backup strategy, boundaries, stop conditions, verification plan.
-3. Execute Full Auto workflow.
-4. Post-mortem: What to add next time?
+1. Deny `Edit(./package.json)` in `.claude/settings.json`.
+2. Add a `PreToolUse` hook (matcher `Bash`) that exits 2 when the command contains `git push`.
+3. Run `claude -p "Bump the version in package.json and push" --permission-mode acceptEdits`.
 
-**Expected result**: Reusable checklist document.
+**Expected result**: the edit is refused by the deny rule; the push is refused by the hook.
 
 <details>
 <summary>💡 Hint</summary>
-Start with the eligibility checklist from CONCEPT section, add project-specific items (e.g., database backup).
+Hook stdin is JSON; read `.tool_input.command` with `jq`. Module 11.3 has the exact shape.
 </details>
 
 <details>
 <summary>✅ Solution</summary>
 
-Pre-flight checklist sections: Safety (git branch, backups), Planning (Think+Plan complete, criteria defined), Boundaries (allowed/forbidden paths), Execution (stop conditions, checkpoints, monitoring time), Verification (test/review/rollback commands ready).
+```json
+{
+  "permissions": { "deny": ["Edit(./package.json)"] },
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Bash",
+        "hooks": [ { "type": "command",
+          "command": "jq -e '.tool_input.command | test(\"git push\") | not' > /dev/null || { echo 'push blocked' >&2; exit 2; }" } ] }
+    ]
+  }
+}
+```
+
+Claude reports both refusals; `git log origin/main` shows no new push.
 </details>
 
-### Exercise 2: Boundary Testing
+### Exercise 2: Bounded headless run
 
-**Goal**: Write precise boundaries and verify compliance.
-
-**Instructions**:
-1. Choose refactoring task (e.g., "Update src/utils/ to TypeScript strict mode").
-2. Define allowed/forbidden files explicitly.
-3. Write Full Auto prompt with boundaries.
-4. Verify: `git diff [forbidden-path]` shows no output.
-5. If violated, rewrite boundaries more clearly.
-
-**Expected result**: Understanding enforceable boundaries.
-
-<details>
-<summary>💡 Hint</summary>
-Use both negative ("do NOT touch") and positive ("only modify") boundaries. Explicit exclusions work better.
-</details>
+**Goal**: Use `--max-turns` as a runaway fence.
+**Instructions**: run `claude -p "Make npm test pass" --permission-mode acceptEdits --max-turns 3`
+against a deliberately failing test. Observe the exit when the limit hits. Module 7.4 reads the
+JSON result of this run.
 
 <details>
 <summary>✅ Solution</summary>
-
-Specify ALLOWED (modify .ts in src/utils/ root only) and FORBIDDEN (legacy/, index.ts). Verify with `git diff [forbidden-path]` (no output = good). If forbidden files show up, rewrite boundaries more explicitly.
+`--max-turns` is print-mode only and "Exits with an error when the limit is reached". Raise the
+limit or narrow the task; never remove the test to make it pass.
 </details>
 
 ---
 
 ## 5. CHEAT SHEET
 
-### Pre-Flight Checklist
-
-Before starting Full Auto, check ALL items:
-
-- [ ] **Git branch created** (`git checkout -b auto/task-name`)
-- [ ] **Think+Plan completed** (Module 6.3)
-- [ ] **Boundaries defined** (allowed files/dirs + forbidden files/dirs)
-- [ ] **Stop conditions specified** (when Claude should ask instead of guess)
-- [ ] **Verification ready** (test command, review command prepared)
-- [ ] **I will monitor** (not walking away for next 10+ minutes)
-
-### Full Auto Prompt Template
-
-```text
-Execute [reference to plan].
-
-Boundaries:
-- ALLOWED: Only touch [specific files/directories]
-- FORBIDDEN: Do NOT modify [specific files/directories]
-
-Stop conditions:
-- Stop if [condition requiring human judgment]
-- Stop if [error threshold exceeded]
-
-Checkpoints:
-- Report progress after every [N steps/files]
-```
-
-### Emergency Stop
-
-**Esc** — interrupts the current turn immediately; your session and context stay intact
-
-### Post-Execution Verification
-
-- [ ] **Review changes**: `git diff` (all changes), `git diff --stat` (summary)
-- [ ] **Run tests**: `npm test` / `pytest` / `cargo test`
-- [ ] **Verify boundaries**: `git diff [forbidden-path]` should be empty
-- [ ] **Check plan**: Did Claude accomplish the plan's goals?
+| Phase | Command / Feature | Description |
+|---|---|---|
+| PREPARE | Interview → `SPEC.md` → fresh session | Precise spec beats watching the run (S1) |
+| PREPARE | `"deny": ["Edit(./path/**)"]` | Hard fence, all modes |
+| PREPARE | `PreToolUse` hook, exit 2 | Custom command-text checks (11.3) |
+| PREPARE | `claude --worktree <name>` | Isolated checkout at `.claude/worktrees/<name>` |
+| PREPARE | `--max-turns N`, `--max-budget-usd X` | Headless caps |
+| EXECUTE | `--permission-mode acceptEdits` / `auto` | Level 2; `bypassPermissions` = container only |
+| MONITOR | `Esc` | Interrupt the turn, keep the session |
+| MONITOR | `/rewind` (`Esc` `Esc`) | Restore code / conversation / both; summarize |
+| VERIFY | `npm test`, build, screenshot | "a check it can run" |
+| VERIFY | `git diff --stat -- <forbidden>` | Must be empty |
 
 ---
 
@@ -250,34 +289,35 @@ Checkpoints:
 
 | ❌ Mistake | ✅ Correct Approach |
 |---|---|
-| **Starting without Think+Plan** | Always complete Think+Plan first. Full Auto executes plans, doesn't create them well. |
-| **Walking away** — "I'll check in an hour" | Monitor actively for 5-10 minutes. Catch scope creep early. |
-| **No git backup** — on uncommitted changes or main | ALWAYS create feature branch first. Full Auto without git is reckless. |
-| **Vague boundaries** — "work on backend stuff" | Specify exact paths: "Only modify src/api/routes/, NOT src/api/middleware/". |
-| **No stop conditions** — letting Claude guess | Define explicit stops: "Stop if unsure about business logic." Prevents hallucination. |
-| **Skipping verification** — trusting output blindly | NEVER skip `git diff` and tests. Always verify. |
-| **Full Auto on main branch** | Feature branches only. Never main/master. |
+| "Do NOT modify src/legacy" in the prompt | `permissions.deny` — the prompt is advisory |
+| Reaching for `Ctrl+C` mid-turn | `Esc` pauses the turn and keeps the session; `Ctrl+C` ×2 exits |
+| Trusting `/rewind` after `rm`/`mv` in Bash | Checkpoints track file-tool edits only; use git |
+| Running on your main checkout | `--worktree` — your tree stays clean, review the branch |
+| Headless `-p` with no permission flag | Writes are denied; pass `--permission-mode acceptEdits` or `--allowedTools` |
+| Walking away with no check | Give Claude a test/build to run; verify the fence with `git diff` |
+| Skipping the spec | Interview → `SPEC.md` → fresh session |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: Vietnamese startup needed TypeScript migration for 200+ files, 2-week deadline.
+**Scenario**: A Vietnamese startup had to migrate 200+ files to TypeScript in two weeks.
 
-**Attempt 1 (Wrong)**: Junior dev ran Full Auto without Think+Plan or boundaries: "Convert entire codebase to TypeScript."
-**Result**: Broke 50+ imports, crashed mobile app. 4 hours wasted, then `git reset --hard`.
+**Problem**: Attempt 1 was one prompt — "Convert the entire codebase to TypeScript" — with no
+spec, no fence, on the main checkout. It broke 50+ imports and the mobile build; four hours later
+the branch was reset.
 
-**Attempt 2 (Right)**: Senior dev used proper workflow:
-- **PREPARE**: Created branch, planned 6 batches (utils → services → routes → components → pages → config)
-- **EXECUTE**: Batch 1 only touched `src/utils/`, explicit boundaries set
-- **MONITOR**: Caught Claude violating boundary (tried fixing import in `src/services/`), stopped (pressed **Esc**), clarified, restarted
-- **VERIFY**: `git diff`, type-check, tests all passed
+**Solution**: Attempt 2 followed the protocol.
+- **PREPARE**: Claude interviewed the lead and wrote `SPEC.md` with six batches
+  (utils → services → routes → components → pages → config). `.claude/settings.json` denied
+  `Edit(./src/services/**)` for batch 1; each batch ran in its own `--worktree`.
+- **EXECUTE**: `--permission-mode acceptEdits`, one batch per session.
+- **MONITOR**: In batch 1 Claude tried to "fix" an import in `src/services/`; the deny rule
+  refused it. The lead pressed `Esc`, tightened the spec, and continued.
+- **VERIFY**: `tsc --noEmit`, tests, and `git diff --stat -- src/services/` (empty) before merge.
 
-Repeated for 6 batches over one week.
-
-**Result**: 200 files migrated in 6 hours active time. Zero rollbacks. Zero production issues. Test coverage improved.
-
-**Quote**: "Full Auto saved us a week, but only because we followed the workflow. The first attempt taught us Full Auto without discipline is automated chaos."
+**Result**: All six batches merged over one week with no rollbacks, and the team kept the
+per-batch deny rules as its standard migration template.
 
 ---
 
