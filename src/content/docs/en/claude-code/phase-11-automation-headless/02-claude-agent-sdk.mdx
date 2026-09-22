@@ -25,7 +25,7 @@ runs *in your code*, or typed messages instead of parsed stdout. That is the **C
 the same engine as Claude Code, embedded in your process.
 
 Two naming traps. In September 2025 the "Claude Code SDK" became the **Claude Agent SDK**; the
-packages `@anthropic-ai/claude-code` (npm) and `claude-code-sdk` (pip) are retired. And it is not
+packages `@anthropic-ai/claude-code` and `claude-code-sdk` are retired. And it is not
 **Managed Agents**: with the SDK *you* run the process; Managed Agents run the loop in an
 Anthropic-hosted sandbox, configured through the Claude API.
 
@@ -46,17 +46,17 @@ graph LR
     B -->|"assistant · user · result"| D[message stream]
 ```
 
-Options used here (TypeScript names; Python uses `snake_case`):
+Options used here (TypeScript names; Python: `snake_case`):
 
 | Option | Type | What it does |
 |---|---|---|
 | `allowedTools` | `string[]` | Auto-approve listed tools; others stay visible and fall through to `permissionMode`. Scoped rules like `Bash(git diff *)` work. |
-| `permissionMode` | `'default' \| 'acceptEdits' \| 'plan' \| 'dontAsk' \| 'bypassPermissions' \| 'auto'` | Baseline for unresolved calls. `dontAsk` denies; `bypassPermissions` approves everything. |
+| `permissionMode` | `'default' \| 'acceptEdits' \| 'plan' \| 'dontAsk' \| 'bypassPermissions' \| 'auto'` | Baseline for unresolved calls. `dontAsk` denies; `bypassPermissions` approves the rest (critical-path `rm` and ask rules still prompt). |
 | `systemPrompt` | `string \| { type: 'preset', preset: 'claude_code', append?: string }` | Default is minimal, *not* Claude Code's prompt; use the preset. |
 | `mcpServers` | `Record<string, McpServerConfig>` | External or in-process servers; key → `mcp__<key>__<tool>`. |
 | `hooks` | `Partial<Record<HookEvent, HookCallbackMatcher[]>>` | `PreToolUse`, `PostToolUse`, `Stop`… (Module 11.3). |
 | `agents` | `Record<string, AgentDefinition>` | Subagents defined in code. |
-| `settingSources` | `('user' \| 'project' \| 'local')[]` | Settings files to load. Omitted = all (like the CLI); `[]` = isolated. |
+| `settingSources` | `('user' \| 'project' \| 'local')[]` | Settings files to load. Omitted = all (like the CLI); `[]` = none (policy, `~/.claude.json`, auto memory still load). |
 | `maxTurns` | `number` | Cap on tool-use round trips. No default. |
 | `outputFormat` | `{ type: 'json_schema', schema }` | Validated JSON in `result.structured_output`. |
 
@@ -86,8 +86,8 @@ added 103 packages, and audited 104 packages in 3s
 found 0 vulnerabilities
 ```
 
-The package bundles a Claude Code binary; the SDK version tracks it. Set `ANTHROPIC_API_KEY` in
-the process environment — the SDK does not read `.env` files.
+The package bundles a Claude Code binary. Set `ANTHROPIC_API_KEY` in the process environment —
+the SDK does not read `.env` files.
 
 **Step 2: Minimal `query()`, read-only**
 
@@ -107,9 +107,9 @@ for await (const message of query({
     for (const block of message.message.content) {
       if (block.type === 'tool_use') console.log(`[tool] ${block.name}`, block.input);
     }
-  } else if (message.type === 'result') {
+  } else if (message.type === 'result' && message.subtype === 'success') {
     console.log(`[${message.subtype}] turns=${message.num_turns} cost=$${message.total_cost_usd.toFixed(4)}`);
-    console.log(message.result);
+    console.log(message.result);          // only the success subtype carries result
   }
 }
 ```
@@ -117,20 +117,20 @@ for await (const message of query({
 ```text
 # Output may vary
 $ cd ~/cc-lab && node sdk-demo/list-exports.mjs
-[tool] Grep { pattern: '^\\s*(export\\s+…', path: '/Users/luatnq/cc-lab/src/math.js', output_mode: 'content' }
-[success] turns=2 cost=$0.4578
+[tool] Grep { pattern: '^(export|module\\.exports|exports\\.)', path: '/Users/luatnq/cc-lab/src/math.js', output_mode: 'content' }
+[success] turns=2 cost=$0.0965
 `src/math.js` exports two functions:
 
 - `add(a, b)` — returns `a + b`
 - `divide(a, b)` — returns `a / b`
 ```
 
-Claude used `Grep`, not in `allowedTools` — read-only calls need no approval. And $0.46 for a
-two-line file? Without `settingSources` the SDK loaded this machine's `~/.claude` (plugins,
-CLAUDE.md, MCP servers). With `settingSources: []` the same script cost `$0.0873`. Every script
-below sets it.
+Claude used `Grep`, not in `allowedTools` — read-only calls need no approval. And $0.10 for a
+two-line file? Without `settingSources` the SDK loaded this machine's `~/.claude` (user
+settings, CLAUDE.md, skills). With `settingSources: []` the same script cost `$0.0567`; numbers
+move with prompt caching, the gap holds. Every script below sets it.
 
-**Step 3: Let it edit — `acceptEdits`**
+**Step 3: Editing with `acceptEdits`**
 
 ```javascript
 // sdk-demo/add-function.mjs   docs: agent-sdk/permissions
@@ -149,9 +149,9 @@ for await (const message of query({
     for (const block of message.message.content) {
       if (block.type === 'tool_use') console.log(`[tool] ${block.name}`, block.input.file_path ?? '');
     }
-  } else if (message.type === 'result') {
+  } else if (message.type === 'result' && message.subtype === 'success') {
     console.log(`[${message.subtype}] turns=${message.num_turns} cost=$${message.total_cost_usd.toFixed(4)}`);
-    console.log(message.result);
+    console.log(message.result);          // only the success subtype carries result
   }
 }
 ```
@@ -161,7 +161,7 @@ for await (const message of query({
 $ node sdk-demo/add-function.mjs && git diff src/math.js
 [tool] Read /Users/luatnq/cc-lab/src/math.js
 [tool] Edit /Users/luatnq/cc-lab/src/math.js
-[success] turns=3 cost=$0.1974
+[success] turns=3 cost=$0.0347
 Added `export function multiply(a, b) { return a * b; }` to `src/math.js`, matching the existing one-line style of `add` and `divide`. No other files were changed.
 diff --git a/src/math.js b/src/math.js
 @@ -1,2 +1,3 @@
@@ -170,7 +170,7 @@ diff --git a/src/math.js b/src/math.js
 +export function multiply(a, b) { return a * b; }
 ```
 
-Undo: `git checkout src/math.js`.
+Undo with `git checkout src/math.js`.
 
 **Step 4: An in-process tool with `tool()` + `createSdkMcpServer()`**
 
@@ -219,8 +219,8 @@ for await (const message of query({
 No — the latest main build (#1842) is failing on the `unit-tests` job.
 ```
 
-The handler runs inside your Node process. `ToolSearch` is tool search (on by default) loading
-the deferred schema.
+The handler runs inside your Node process. `ToolSearch` is tool search (default on) loading the
+deferred schema.
 
 **Step 5: Python equivalent**
 
@@ -247,8 +247,8 @@ async def main():
             for block in message.content:
                 if isinstance(block, ToolUseBlock):
                     print(f"[tool] {block.name} {block.input}")
-        elif isinstance(message, ResultMessage):
-            print(f"[{message.subtype}] turns={message.num_turns} cost=${message.total_cost_usd:.4f}")
+        elif isinstance(message, ResultMessage) and message.subtype == "success":
+            print(f"[{message.subtype}] turns={message.num_turns} cost=${message.total_cost_usd or 0:.4f}")
             print(message.result)
 
 
@@ -258,8 +258,8 @@ asyncio.run(main())
 ```text
 # Output may vary
 $ cd ~/cc-lab && sdk-demo/.venv/bin/python sdk-demo/list_exports.py
-[tool] Read {'file_path': '/Users/luatnq/cc-lab/src/math.js'}
-[success] turns=2 cost=$0.0890
+[tool] Grep {'pattern': '^(export|module\\.exports|exports\\.)', 'path': '/Users/luatnq/cc-lab/src/math.js', 'output_mode': 'content'}
+[success] turns=2 cost=$0.0533
 `src/math.js` exports two functions:
 
 - `add(a, b)` — returns `a + b`
@@ -269,7 +269,7 @@ $ cd ~/cc-lab && sdk-demo/.venv/bin/python sdk-demo/list_exports.py
 **Step 6: Safe subprocess fallback**
 
 Other languages: run the CLI as a subprocess. Two rules: arguments as an **array** (never a
-shell string built from the prompt), and `--output-format json` plus `--json-schema` for output.
+shell string), and `--output-format json` plus `--json-schema`.
 
 ```javascript
 // sdk-demo/subprocess-fallback.mjs   docs: headless, cli-reference
@@ -329,7 +329,7 @@ install you get the same result without it unless `settings.json` sets `permissi
 <summary>💡 Hint</summary>
 
 The space before `*` in `Bash(git diff *)` matters. `dontAsk` turns any other prompt-worthy call
-into a denial listed in `permission_denials`, instead of hanging on a prompt nobody answers.
+into a denial listed in `permission_denials` instead of a prompt nobody answers.
 
 </details>
 
@@ -357,7 +357,7 @@ for await (const message of query({
     }
   } else if (message.type === 'result') {
     console.log(`[${message.subtype}] denied=${message.permission_denials.length}`);
-    console.log(message.result);
+    if (message.subtype === 'success') console.log(message.result);
   }
 }
 ```
@@ -366,22 +366,24 @@ for await (const message of query({
 # Output may vary
 [tool] Bash git diff main --stat && git diff main
 [success] denied=0
-The diff adds two functions to `src/math.js`:
+Reviewed the diff against `main` — two new functions in `src/math.js`:
+
+**`average(xs)`**
+- **Empty array returns `NaN`**: `[].reduce(..., 0) / 0` → `0 / 0` → `NaN`. Callers likely expect a thrown error or a defined sentinel, not a silent `NaN` that propagates.
+- **No input validation**: `average(null)` / `average(undefined)` throws `TypeError` on `.reduce`; …
+- **Sparse arrays**: `reduce` skips holes but `.length` counts them, so `average([1, , 3])` → `4 / 3`, not `2`.
 …
-- **`average([])` returns `NaN`** — `reduce` with initial `0` yields `0`, then `0 / 0` is `NaN`.
-- **`average` with `null`/`undefined` argument throws a `TypeError`** …
-- **No tests added** — neither new function has coverage …
 ```
 
 </details>
 
 ### Exercise 2: Retry + bounded concurrency on `query()`
 
-**Goal**: Process N files, max 2 sessions at a time, 3 attempts with exponential backoff.
+**Goal**: Process N files, 2 sessions at a time, 3 attempts with backoff.
 
 **Instructions**:
 1. `runOnce(prompt)` runs one `query()` and throws unless `result.subtype === 'success'`.
-2. `withRetry(prompt, retries = 3)` with 1s / 2s / 4s backoff.
+2. `withRetry(prompt, retries = 3)` with 1s, then 2s backoff.
 3. Chunk prompts with `Promise.all`; print a summary.
 
 **Expected result**: `Summary: 3 succeeded, 0 failed`.
@@ -422,7 +424,7 @@ async function withRetry(prompt, retries = 3) {
     } catch (err) {
       console.error(`attempt ${attempt}/${retries} failed: ${err.message}`);
       if (attempt === retries) return { ok: false, attempts: attempt, error: err.message };
-      await sleep(2 ** (attempt - 1) * 1000);   // 1s, 2s, 4s
+      await sleep(2 ** (attempt - 1) * 1000);   // 1s, then 2s
     }
   }
 }
@@ -458,7 +460,7 @@ Summary: 3 succeeded, 0 failed
 **Goal**: Which functions in `src/math.js` can return `NaN`/`Infinity`? Get a typed list.
 
 **Instructions**: copy Step 6, change the schema to `{ risky: [{ name, reason }] }`, and fail hard
-if `is_error` is true or `structured_output` is missing.
+if `is_error` or no `structured_output`.
 
 <details>
 <summary>✅ Solution</summary>
@@ -540,15 +542,15 @@ needs `ANTHROPIC_API_KEY`. Option table: §2.
 | `permissionMode: 'bypassPermissions'` in a server — `allowedTools` does not constrain it | Narrow `allowedTools` + `dontAsk` (or `acceptEdits`), inside a sandbox |
 | No `maxTurns` — a confused agent loops until the budget is gone | `maxTurns` on every `query()`; `maxBudgetUsd` for money |
 | Hard-coded dated model ID | Aliases: `'sonnet'`, `'opus'`, `'haiku'` |
-| Expecting Claude Code's system prompt / CLAUDE.md by default | `systemPrompt: { type: 'preset', preset: 'claude_code' }`; `settingSources` with `'project'` |
+| Expecting Claude Code's system prompt by default — or CLAUDE.md after `settingSources: []` | `systemPrompt: { type: 'preset', preset: 'claude_code' }`; put `'project'` back in `settingSources` |
 | Mixing up the Agent SDK and the Client SDK / Messages API (Module 12.3) | Client SDK: you write the tool loop. Agent SDK: loop, tools, permissions built in |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: A fintech team in Ho Chi Minh City runs an internal PR-review service: every pull
-request on their Kotlin backend gets an automated first pass before a human reviewer.
+**Scenario**: A fintech team in Ho Chi Minh City runs an internal PR-review service: every Kotlin
+backend pull request gets an automated first pass before a human reviewer.
 
 **Problem**: Version one was a Node script that interpolated the prompt into a shell command
 string and ran `JSON.parse` on stdout. PR titles with quotes broke the command; one malformed
@@ -556,15 +558,15 @@ answer took the pipeline down. Reviewers stopped trusting it.
 
 **Solution**: Rebuilt on the Agent SDK: `query()` per PR, `allowedTools: ['Read', 'Grep',
 'Bash(git diff *)']`, `permissionMode: 'dontAsk'`, `maxTurns: 8`, `settingSources: ['project']` so
-the repo's CLAUDE.md applies and nothing from the runner's home directory leaks in. Findings come
-back through `outputFormat` as JSON the GitHub bot posts directly. Two in-process tools,
-`get_ci_status` and `get_ticket`, replaced a pile of prompt text; the team kept the tool count small
-and wrote each description as if onboarding a new hire (S9). As in Anthropic's C-compiler write-up,
+the repo's CLAUDE.md and `.claude/` load but the runner's `~/.claude` settings do not
+(`~/.claude.json` and auto memory still load; not a multi-tenant isolation boundary).
+Findings come back through `outputFormat` as JSON the GitHub bot posts. Two in-process tools,
+`get_ci_status` and `get_ticket`, replaced prompt text; the team kept tools few and described each
+as if onboarding a new hire (S9). As in Anthropic's C-compiler write-up,
 tools write the full CI log to a file and return only the failing lines in context (S14).
 
-**Result**: No shell-injection surface, schema-validated output, per-PR cost visible in
-`total_cost_usd`. No published accuracy numbers; what changed is that reviewers read the bot's
-comments again.
+**Result**: No shell-injection surface, schema-validated output, per-PR cost in `total_cost_usd`.
+No published accuracy numbers; reviewers read the bot's comments again.
 
 ---
 

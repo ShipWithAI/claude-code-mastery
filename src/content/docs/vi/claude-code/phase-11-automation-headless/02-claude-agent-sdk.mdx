@@ -24,7 +24,7 @@ khi bạn cần loop nhiều turn bên trong một service, một tool do bạn 
 *trong code của bạn* thay vì trong shell, hay message có type thay vì parse stdout. Đó là việc của
 **Claude Agent SDK**: cùng engine với Claude Code, nhúng thẳng vào process của bạn.
 
-Hai cái bẫy tên gọi. Tháng 9/2025, "Claude Code SDK" đổi tên thành **Claude Agent SDK**; package
+Hai bẫy tên gọi. Tháng 9/2025, "Claude Code SDK" đổi tên thành **Claude Agent SDK**; package
 `@anthropic-ai/claude-code` (npm) và `claude-code-sdk` (pip) đã ngừng. Và nó không phải
 **Managed Agents**: với SDK, *bạn* chạy process; Managed Agents chạy agent loop trong sandbox do
 Anthropic host, cấu hình qua Claude API.
@@ -46,17 +46,17 @@ graph LR
     B -->|"assistant · user · result"| D[message stream]
 ```
 
-Các option dùng trong module này (tên TypeScript; Python dùng `snake_case`):
+Option dùng ở đây (tên TypeScript; Python dùng `snake_case`):
 
 | Option | Kiểu | Tác dụng |
 |---|---|---|
 | `allowedTools` | `string[]` | Tự duyệt tool được liệt kê; tool khác vẫn hiện diện và rơi xuống `permissionMode`. Rule có scope như `Bash(git diff *)` dùng được. |
-| `permissionMode` | `'default' \| 'acceptEdits' \| 'plan' \| 'dontAsk' \| 'bypassPermissions' \| 'auto'` | Mức nền cho call chưa được rule nào quyết. `dontAsk` từ chối; `bypassPermissions` duyệt tất cả. |
+| `permissionMode` | `'default' \| 'acceptEdits' \| 'plan' \| 'dontAsk' \| 'bypassPermissions' \| 'auto'` | Mức nền cho call chưa được rule nào quyết. `dontAsk` từ chối; `bypassPermissions` duyệt phần còn lại (`rm` đường dẫn critical và ask rule vẫn hỏi). |
 | `systemPrompt` | `string \| { type: 'preset', preset: 'claude_code', append?: string }` | Mặc định là prompt tối giản, *không* phải prompt của Claude Code; dùng preset để lấy lại. |
 | `mcpServers` | `Record<string, McpServerConfig>` | Server ngoài hoặc in-process; key → `mcp__<key>__<tool>`. |
 | `hooks` | `Partial<Record<HookEvent, HookCallbackMatcher[]>>` | `PreToolUse`, `PostToolUse`, `Stop`… (Module 11.3). |
 | `agents` | `Record<string, AgentDefinition>` | Subagent định nghĩa trong code. |
-| `settingSources` | `('user' \| 'project' \| 'local')[]` | File settings nào được nạp. Bỏ trống = tất cả (như CLI); `[]` = cô lập. |
+| `settingSources` | `('user' \| 'project' \| 'local')[]` | File settings nào được nạp. Bỏ trống = tất cả (như CLI); `[]` = không file nào (policy, `~/.claude.json`, auto memory vẫn nạp). |
 | `maxTurns` | `number` | Trần số vòng gọi tool. Không có mặc định. |
 | `outputFormat` | `{ type: 'json_schema', schema }` | JSON đã validate trong `result.structured_output`. |
 
@@ -86,8 +86,8 @@ added 103 packages, and audited 104 packages in 3s
 found 0 vulnerabilities
 ```
 
-Package đi kèm binary Claude Code; version SDK bám theo version binary. Đặt `ANTHROPIC_API_KEY`
-trong environment của process — SDK không tự đọc file `.env`.
+Package đi kèm binary Claude Code. Đặt `ANTHROPIC_API_KEY` trong environment của process — SDK
+không tự đọc file `.env`.
 
 **Bước 2: `query()` tối thiểu, chỉ đọc**
 
@@ -107,9 +107,9 @@ for await (const message of query({
     for (const block of message.message.content) {
       if (block.type === 'tool_use') console.log(`[tool] ${block.name}`, block.input);
     }
-  } else if (message.type === 'result') {
+  } else if (message.type === 'result' && message.subtype === 'success') {
     console.log(`[${message.subtype}] turns=${message.num_turns} cost=$${message.total_cost_usd.toFixed(4)}`);
-    console.log(message.result);
+    console.log(message.result);          // chỉ subtype success mới có result
   }
 }
 ```
@@ -117,18 +117,18 @@ for await (const message of query({
 ```text
 # Output may vary
 $ cd ~/cc-lab && node sdk-demo/list-exports.mjs
-[tool] Grep { pattern: '^\\s*(export\\s+…', path: '/Users/luatnq/cc-lab/src/math.js', output_mode: 'content' }
-[success] turns=2 cost=$0.4578
+[tool] Grep { pattern: '^(export|module\\.exports|exports\\.)', path: '/Users/luatnq/cc-lab/src/math.js', output_mode: 'content' }
+[success] turns=2 cost=$0.0965
 `src/math.js` exports two functions:
 
 - `add(a, b)` — returns `a + b`
 - `divide(a, b)` — returns `a / b`
 ```
 
-Claude dùng `Grep`, không nằm trong `allowedTools` — call chỉ đọc không cần duyệt. Và $0.46 cho
-một file hai dòng? Không có `settingSources`, SDK nạp cả `~/.claude` của máy này (plugin,
-CLAUDE.md, MCP server). Cùng script đó với `settingSources: []` chỉ tốn `$0.0873`. Mọi script
-bên dưới đều đặt nó.
+Claude dùng `Grep`, không nằm trong `allowedTools` — call chỉ đọc không cần duyệt. Và $0.10 cho
+một file hai dòng? Không có `settingSources`, SDK nạp cả `~/.claude` của máy này (user
+settings, CLAUDE.md, skill). Cùng script đó với `settingSources: []` chỉ tốn `$0.0567`; số tuyệt
+đối đổi theo caching, khoảng cách thì không. Mọi script bên dưới đều đặt nó.
 
 **Bước 3: Cho phép sửa file — `acceptEdits`**
 
@@ -149,9 +149,9 @@ for await (const message of query({
     for (const block of message.message.content) {
       if (block.type === 'tool_use') console.log(`[tool] ${block.name}`, block.input.file_path ?? '');
     }
-  } else if (message.type === 'result') {
+  } else if (message.type === 'result' && message.subtype === 'success') {
     console.log(`[${message.subtype}] turns=${message.num_turns} cost=$${message.total_cost_usd.toFixed(4)}`);
-    console.log(message.result);
+    console.log(message.result);          // chỉ subtype success mới có result
   }
 }
 ```
@@ -161,7 +161,7 @@ for await (const message of query({
 $ node sdk-demo/add-function.mjs && git diff src/math.js
 [tool] Read /Users/luatnq/cc-lab/src/math.js
 [tool] Edit /Users/luatnq/cc-lab/src/math.js
-[success] turns=3 cost=$0.1974
+[success] turns=3 cost=$0.0347
 Added `export function multiply(a, b) { return a * b; }` to `src/math.js`, matching the existing one-line style of `add` and `divide`. No other files were changed.
 diff --git a/src/math.js b/src/math.js
 @@ -1,2 +1,3 @@
@@ -247,8 +247,8 @@ async def main():
             for block in message.content:
                 if isinstance(block, ToolUseBlock):
                     print(f"[tool] {block.name} {block.input}")
-        elif isinstance(message, ResultMessage):
-            print(f"[{message.subtype}] turns={message.num_turns} cost=${message.total_cost_usd:.4f}")
+        elif isinstance(message, ResultMessage) and message.subtype == "success":
+            print(f"[{message.subtype}] turns={message.num_turns} cost=${message.total_cost_usd or 0:.4f}")
             print(message.result)
 
 
@@ -258,8 +258,8 @@ asyncio.run(main())
 ```text
 # Output may vary
 $ cd ~/cc-lab && sdk-demo/.venv/bin/python sdk-demo/list_exports.py
-[tool] Read {'file_path': '/Users/luatnq/cc-lab/src/math.js'}
-[success] turns=2 cost=$0.0890
+[tool] Grep {'pattern': '^(export|module\\.exports|exports\\.)', 'path': '/Users/luatnq/cc-lab/src/math.js', 'output_mode': 'content'}
+[success] turns=2 cost=$0.0533
 `src/math.js` exports two functions:
 
 - `add(a, b)` — returns `a + b`
@@ -269,7 +269,7 @@ $ cd ~/cc-lab && sdk-demo/.venv/bin/python sdk-demo/list_exports.py
 **Bước 6: Fallback subprocess an toàn**
 
 Ngôn ngữ khác thì chạy CLI như subprocess. Hai luật: tham số truyền dạng **mảng** (không bao giờ
-ghép prompt vào chuỗi shell), và `--output-format json` cộng `--json-schema` cho output.
+ghép chuỗi shell), và `--output-format json` cộng `--json-schema`.
 
 ```javascript
 // sdk-demo/subprocess-fallback.mjs   docs: headless, cli-reference
@@ -357,7 +357,7 @@ for await (const message of query({
     }
   } else if (message.type === 'result') {
     console.log(`[${message.subtype}] denied=${message.permission_denials.length}`);
-    console.log(message.result);
+    if (message.subtype === 'success') console.log(message.result);
   }
 }
 ```
@@ -366,22 +366,24 @@ for await (const message of query({
 # Output may vary
 [tool] Bash git diff main --stat && git diff main
 [success] denied=0
-The diff adds two functions to `src/math.js`:
+Reviewed the diff against `main` — two new functions in `src/math.js`:
+
+**`average(xs)`**
+- **Empty array returns `NaN`**: `[].reduce(..., 0) / 0` → `0 / 0` → `NaN`. Callers likely expect a thrown error or a defined sentinel, not a silent `NaN` that propagates.
+- **No input validation**: `average(null)` / `average(undefined)` throws `TypeError` on `.reduce`; …
+- **Sparse arrays**: `reduce` skips holes but `.length` counts them, so `average([1, , 3])` → `4 / 3`, not `2`.
 …
-- **`average([])` returns `NaN`** — `reduce` with initial `0` yields `0`, then `0 / 0` is `NaN`.
-- **`average` with `null`/`undefined` argument throws a `TypeError`** …
-- **No tests added** — neither new function has coverage …
 ```
 
 </details>
 
 ### Bài 2: Retry + giới hạn concurrency trên `query()`
 
-**Mục tiêu**: Xử lý N file, tối đa 2 session cùng lúc, 3 lần thử với exponential backoff.
+**Mục tiêu**: Xử lý N file, 2 session cùng lúc, 3 lần thử có backoff.
 
 **Hướng dẫn**:
 1. `runOnce(prompt)` chạy một `query()` và throw nếu `result.subtype !== 'success'`.
-2. `withRetry(prompt, retries = 3)` với backoff 1s / 2s / 4s.
+2. `withRetry(prompt, retries = 3)` với backoff 1s, rồi 2s.
 3. Chia prompt thành chunk với `Promise.all`; in tổng kết.
 
 **Kết quả mong đợi**: `Summary: 3 succeeded, 0 failed`.
@@ -422,7 +424,7 @@ async function withRetry(prompt, retries = 3) {
     } catch (err) {
       console.error(`attempt ${attempt}/${retries} failed: ${err.message}`);
       if (attempt === retries) return { ok: false, attempts: attempt, error: err.message };
-      await sleep(2 ** (attempt - 1) * 1000);   // 1s, 2s, 4s
+      await sleep(2 ** (attempt - 1) * 1000);   // 1s, then 2s
     }
   }
 }
@@ -458,7 +460,7 @@ Summary: 3 succeeded, 0 failed
 **Mục tiêu**: Hàm nào trong `src/math.js` có thể trả `NaN`/`Infinity`? Lấy về danh sách có type.
 
 **Hướng dẫn**: copy Bước 6, đổi schema thành `{ risky: [{ name, reason }] }`, và fail ngay nếu
-`is_error` là true hoặc thiếu `structured_output`.
+`is_error` hoặc thiếu `structured_output`.
 
 <details>
 <summary>✅ Lời giải</summary>
@@ -516,7 +518,7 @@ turns=3
 |---|---|---|
 | `npm install @anthropic-ai/claude-agent-sdk` | `pip install claude-agent-sdk` | `@anthropic-ai/claude-code` / `claude-code-sdk` cũ đã ngừng |
 | `import { query } from '@anthropic-ai/claude-agent-sdk'` | `from claude_agent_sdk import query, ClaudeAgentOptions` | |
-| `for await (const m of query({ prompt, options }))` | `async for m in query(prompt=…, options=…)` | Async iterator |
+| `for await (const m of query({ prompt, options }))` | `async for m in query(prompt=…, options=…)` | |
 | `m.type === 'assistant'` → `m.message.content` | `isinstance(m, AssistantMessage)` → `m.content` | `tool_use` / `ToolUseBlock` |
 | `m.type === 'result'` → `subtype`, `result`, `num_turns`, `total_cost_usd`, `structured_output`, `permission_denials` | `isinstance(m, ResultMessage)` → cùng field | `subtype`: `success`, `error_max_turns`, … |
 | `tool(name, desc, zodShape, handler, { annotations })` | `@tool(name, desc, {"arg": type})` | Trả `{ content: [{ type: 'text', text }] }` |
@@ -540,7 +542,7 @@ Flag subprocess (`claude -p`): `--output-format json` (`result`, `session_id`, `
 | `permissionMode: 'bypassPermissions'` trong server — `allowedTools` không ràng buộc được nó | `allowedTools` hẹp + `dontAsk` (hoặc `acceptEdits`), chạy trong sandbox |
 | Không đặt `maxTurns` — agent lú là loop tới khi hết tiền | `maxTurns` cho mọi `query()`; `maxBudgetUsd` cho tiền |
 | Model ID có ngày tháng cứng | Alias: `'sonnet'`, `'opus'`, `'haiku'` |
-| Tưởng mặc định có system prompt / CLAUDE.md của Claude Code | `systemPrompt: { type: 'preset', preset: 'claude_code' }`; `settingSources` có `'project'` |
+| Tưởng mặc định có system prompt của Claude Code — hay còn CLAUDE.md sau khi đặt `settingSources: []` | `systemPrompt: { type: 'preset', preset: 'claude_code' }`; thêm lại `'project'` vào `settingSources` |
 | Lẫn Agent SDK với Client SDK / Messages API (Module 12.3) | Client SDK: bạn tự viết tool loop. Agent SDK: loop, tool, permission có sẵn |
 
 ---
@@ -556,15 +558,15 @@ thôi tin nó.
 
 **Giải pháp**: Viết lại trên Agent SDK: `query()` cho mỗi PR, `allowedTools: ['Read', 'Grep',
 'Bash(git diff *)']`, `permissionMode: 'dontAsk'`, `maxTurns: 8`, `settingSources: ['project']` để
-CLAUDE.md của repo có hiệu lực và không có gì từ home directory của runner lọt vào. Kết quả trả
-về qua `outputFormat` dạng JSON để bot GitHub đăng thẳng. Hai in-process tool, `get_ci_status` và
-`get_ticket`, thay cho cả đống prompt text; team giữ số tool ít và viết mô tả từng tool như đang
-onboard new hire (S9). Như bài viết C compiler của Anthropic, tool ghi toàn bộ CI log ra file và
+CLAUDE.md và `.claude/` của repo được nạp còn settings trong `~/.claude` của runner thì không
+(`~/.claude.json` và auto memory vẫn nạp; không phải ranh giới cô lập multi-tenant). Kết quả
+trả về qua `outputFormat` dạng JSON để bot GitHub đăng. Hai in-process tool, `get_ci_status` và
+`get_ticket`, thay cho prompt text; team giữ ít tool và mô tả từng tool như đang onboard new hire
+(S9). Như bài viết C compiler của Anthropic, tool ghi toàn bộ CI log ra file và
 chỉ trả vài dòng lỗi vào context (S14).
 
-**Kết quả**: Không còn bề mặt shell injection, output đã validate theo schema, chi phí mỗi PR đọc
-được từ `total_cost_usd`. Team không công bố con số độ chính xác; điều thay đổi là reviewer đọc
-lại comment của bot.
+**Kết quả**: Không còn bề mặt shell injection, output đã validate theo schema, chi phí mỗi PR nằm
+ở `total_cost_usd`. Không công bố con số độ chính xác; reviewer đọc lại comment của bot.
 
 ---
 
