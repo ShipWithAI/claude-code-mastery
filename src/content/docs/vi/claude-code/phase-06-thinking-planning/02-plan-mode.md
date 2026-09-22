@@ -11,21 +11,19 @@ claude_version: 2.1.278
 >
 > **Yêu cầu trước**: Module 6.1 (Think Mode)
 >
-> **Kết quả**: Sau module này bạn vào được plan mode native của Claude Code, đọc và sửa được
-> kế hoạch nó đề xuất, duyệt kế hoạch vào đúng permission mode bạn muốn, và biết khi nào
-> planning không đáng.
+> **Kết quả**: Sau module này bạn vào được plan mode native, đọc và sửa được plan nó đề xuất,
+> duyệt plan vào đúng permission mode bạn muốn, và biết khi nào planning không đáng.
 
 ---
 
 ## 1. WHY — Tại Sao Quan Trọng
 
-Bạn bảo "extract notification logic ra service riêng." Claude edit ngay lập tức. Hai mươi phút
-sau có mười một file đã đổi, hai file sai, và bạn đang đọc diff để đoán xem nó hiểu ý bạn thế
-nào.
+Bạn bảo "extract notification logic ra service riêng." Claude edit ngay. Hai mươi phút sau có
+mười một file đã đổi, hai file sai, và bạn đang đọc diff để đoán nó hiểu ý bạn thế nào.
 
-Plan mode lật ngược điều đó. Nó **không phải** một câu prompt — nó là một permission mode chặn
-mọi edit cho tới khi bạn đọc xong ý định của Claude. Bạn quyết định một lần, với cả thiết kế
-trước mặt, thay vì mười một lần trong lúc diff phình ra.
+Plan mode lật ngược điều đó. Nó **không phải** một câu prompt — nó là một permission mode
+chặn edit, ở mọi loại session trừ một, cho tới khi bạn đọc xong ý định của Claude. Bạn quyết
+định một lần, với thiết kế trước mặt, thay vì mười một lần.
 
 ---
 
@@ -33,30 +31,30 @@ trước mặt, thay vì mười một lần trong lúc diff phình ra.
 
 Plan mode là một permission mode, và docs định nghĩa rất rõ: "Plan mode tells Claude to
 research and propose changes without making them. Claude reads files, runs shell commands to
-explore, and writes a plan, but does not edit your source." Edit "stay blocked until you
-approve the plan."
+explore, and writes a plan, but does not edit your source." Kèm theo đúng một điều kiện:
+"**Except in interactive terminal sessions with bypass permissions available**, edits stay
+blocked until you approve the plan." Ở mọi nơi khác — lượt `-p`, Agent SDK, panel chat của VS
+Code — "plan mode keeps its blocks".
 
-Ba cách vào:
+Ba cách vào: `Shift+Tab` cho tới khi status bar hiện `⏸ plan mode on`; thêm tiền tố `/plan`
+cho một prompt; hoặc `claude --permission-mode plan`, mà `defaultMode: "plan"` trong
+`.claude/settings.json` biến thành mặc định của project.
 
-- `Shift+Tab` cho tới khi status bar hiện `⏸ plan mode on`
-- thêm tiền tố `/plan` cho một prompt
-- `claude --permission-mode plan`, hoặc `defaultMode: "plan"` trong `.claude/settings.json`
-
-`Shift+Tab` lần nữa là thoát plan mode mà không duyệt gì. Còn duyệt thì "exits plan mode and
-switches the session to the permission mode each approve option describes" — bạn chọn luôn
-bán kính ảnh hưởng ngay lúc chấp nhận thiết kế.
+`Shift+Tab` lần nữa là thoát mà không duyệt. Còn duyệt thì "exits plan mode and switches the
+session to the permission mode each approve option describes" — bạn chọn luôn bán kính ảnh
+hưởng ngay lúc chấp nhận thiết kế.
 
 **Vòng PCE** của khóa học — Plan, Challenge, Execute — ánh xạ thẳng vào bốn pha trong docs
 (Explore → Plan → Implement → Commit):
 
 | Bước PCE | Cơ chế native |
 |---|---|
-| **Plan** | Plan mode: khám phá read-only rồi viết plan; `Ctrl+G` để sửa plan |
+| **Plan** | Khám phá read-only rồi viết plan; `Ctrl+G` để sửa |
 | **Challenge** | "Review this plan — what could go wrong?" trước khi duyệt |
 | **Execute** | Duyệt (hoặc `Shift+Tab`) để rời plan mode, rồi implement |
 
-Challenge không phải thủ tục cho có. AI-native SDLC playbook nói thẳng: "The agent that wrote
-the code has no way to approve it." (S3) Với plan cũng vậy.
+Challenge không phải thủ tục cho có. AI-native SDLC playbook: "The agent that wrote the code
+has no way to approve it." (S3) Với plan cũng vậy.
 
 Và planning không miễn phí: "Planning is most useful when you're uncertain about the approach,
 when the change modifies multiple files, or when you're unfamiliar with the code being
@@ -84,7 +82,9 @@ Nhấn `Shift+Tab` tới khi status bar báo. <!-- docs: permission-modes -->
 
 ```text
 # Output may vary
-  [OMC#4.5.1] | session:0m | ctx:0%
+────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────
   ⏸ plan mode on (shift+tab to cycle)
 ```
 
@@ -99,15 +99,18 @@ is 0. Leave add() alone. Write the plan.
 ```
 
 Claude đọc file, liệt kê thư mục, chạy một lệnh shell read-only. Không file nào bị sửa. Dòng
-trạng thái cho biết tên file plan nó đang ghi:
+trạng thái cho biết tên file plan:
 
 ```text
 # Output may vary
 Planning: /Users/luatnq/.claude/plans/add-input-validation-to-enumerated-prism.md
 ```
 
-⚠️ Needs verification — đường dẫn này hiện trong UI thật nhưng không có trên bất kỳ trang nào
-dưới `https://code.claude.com/docs/en/`. Hãy coi `Ctrl+G` là cách vào được hỗ trợ.
+Slug được sinh theo từng plan nên nó khác với màn hình duyệt bên dưới; cả hai capture đều
+thật, từ hai lần chạy cùng một walkthrough.
+
+⚠️ Needs verification — đường dẫn này hiện trong UI thật nhưng không có trên trang nào dưới
+`https://code.claude.com/docs/en/`. Hãy coi `Ctrl+G` là cách vào được hỗ trợ.
 
 **Bước 3: Đọc plan và màn hình duyệt**
 
@@ -131,12 +134,12 @@ dưới `https://code.claude.com/docs/en/`. Hãy coi `Ctrl+G` là cách vào đ�
  ctrl+g to edit in Vim · ~/.claude/plans/add-input-validation-to-reflective-nova.md
 ```
 
-Lựa chọn 3 chính là bước **Challenge**: trả plan về kèm "what breaks if `b` is `'0'`?" và bạn
-vẫn ở trong plan mode.
+Lựa chọn 3 là bước **Challenge**: trả plan về kèm "what breaks if `b` is `'0'`?" và bạn vẫn
+ở trong plan mode.
 
 **Bước 4: Duyệt, và nhìn mode đổi**
 
-Chọn 1 là duyệt và đẩy session ra khỏi plan mode.
+Chọn 1 để duyệt và đẩy session ra khỏi plan mode.
 
 ```text
 # Output may vary
@@ -152,14 +155,13 @@ Chọn 1 là duyệt và đẩy session ra khỏi plan mode.
   ⏵⏵ auto mode on (shift+tab to cycle)
 ```
 
-Hai hệ quả có trong docs: mode giờ là `auto`, và session lấy tiêu đề sinh ra từ plan.
+Hai hệ quả có trong docs: mode giờ là `auto`, và session lấy tiêu đề sinh từ plan.
 
 **Bước 5: Kiểm chứng**
 
 ```bash
 # docs: common-workflows
-git diff --stat
-npm test 2>&1 | tail -5
+git diff --stat && npm test 2>&1 | tail -5
 ```
 
 ```text
@@ -170,8 +172,8 @@ npm test 2>&1 | tail -5
 # fail 0
 ```
 
-Nếu plan sai, `/rewind` (hoặc nhấn `Esc` hai lần ở ô prompt trống) khôi phục hội thoại, code,
-hoặc cả hai.
+Nếu plan sai, `/rewind` (hoặc `Esc` hai lần ở ô prompt trống) khôi phục hội thoại, code, hoặc
+cả hai.
 
 ---
 
@@ -192,9 +194,9 @@ hoặc cả hai.
 <details>
 <summary>✅ Lời giải</summary>
 
-Dấu hiệu plan mode đáng công là plan nêu ra một file bạn đã quên. Nếu plan chỉ chép lại prompt
-thì bạn chọn nhầm task — (S1) bảo bỏ qua: "If you could describe the diff in one sentence,
-skip the plan."
+Dấu hiệu plan mode đáng công là plan nêu ra file bạn đã quên. Nếu nó chỉ chép lại prompt thì
+bạn chọn nhầm task — (S1) bảo bỏ qua: "If you could describe the diff in one sentence, skip
+the plan."
 </details>
 
 ### Bài 2: Để Claude phỏng vấn bạn thành SPEC.md
@@ -248,9 +250,9 @@ Từ chối dựa trên *giả định*, không phải style. "What did you assu
 <details>
 <summary>✅ Lời giải</summary>
 
-Lựa chọn 3 giữ bạn trong plan mode, nên sửa plan tốn đúng một turn — rẻ hơn nhiều so với duyệt
-rồi revert. Đó là bước Challenge, cùng ý với (S3): "The agent that wrote the code has no way
-to approve it."
+Lựa chọn 3 giữ bạn trong plan mode, nên sửa plan tốn một turn — rẻ hơn duyệt rồi revert. Đó
+là bước Challenge, cùng ý với (S3): "The agent that wrote the code has no way to approve
+it."
 </details>
 
 ---
@@ -260,8 +262,8 @@ to approve it."
 | Việc | Cách làm |
 |---|---|
 | Vào plan mode | `Shift+Tab` tới `⏸ plan mode on`, hoặc `/plan <prompt>` |
-| Khởi động trong plan mode | `claude --permission-mode plan` |
-| Mặc định cho một project | `"permissions": { "defaultMode": "plan" }` trong `.claude/settings.json` |
+| Khởi động sẵn | `claude --permission-mode plan` |
+| Mặc định của project | `"permissions": { "defaultMode": "plan" }` trong `.claude/settings.json` |
 | Thoát mà không duyệt | `Shift+Tab` |
 | Sửa plan | `Ctrl+G` |
 | Duyệt sang auto mode | **Yes, and use auto mode** |
@@ -291,13 +293,13 @@ nó ghi `Opus Plan`.
 
 ## 7. REAL CASE — Câu Chuyện Thật
 
-**Bối cảnh**: Một team KMP làm app ngân hàng Android + iOS cần chuyển phần session handling từ
-module Android sang `commonMain`. Khoảng một tá file, trong đó hai cặp `expect`/`actual` cả
-năm nay không ai đụng vào.
+**Bối cảnh**: Một team KMP làm app ngân hàng Android + iOS cần chuyển session handling từ
+module Android sang `commonMain`. Một tá file, trong đó hai cặp `expect`/`actual` cả năm nay
+không ai đụng.
 
-**Vấn đề**: Lần đầu chạy ở mode mặc định. Claude dời interface, rồi dời implementation, rồi
-bắt đầu viết lại `actual` phía iOS. Team chỉ phát hiện khi build iOS gãy — sáu file vào một
-diff chưa ai đọc.
+**Vấn đề**: Lần đầu chạy ở mode mặc định. Claude dời interface, dời implementation, rồi viết
+lại `actual` phía iOS. Team chỉ phát hiện khi build iOS gãy — sáu file vào một diff chưa ai
+đọc.
 
 **Giải pháp**: Họ chạy lại với `claude --model opusplan --permission-mode plan` và chỉ xin
 migration plan. Plan chỉ đúng cặp `expect`/`actual` là bước rủi ro và đề nghị làm nó sau cùng,
@@ -306,7 +308,7 @@ Keychain wrapper?" — và bản sửa thêm bước đọc wrapper đó trướ
 manually approve edits**.
 
 **Kết quả**: Migration xong trong một session, iOS xanh ở mọi bước. Bài học nằm ở mode, không
-phải prompt: không câu prompt nào chặn được edit đầu tiên đó; plan mode thì chặn được.
+phải prompt: không prompt nào chặn được edit đầu tiên; plan mode thì chặn.
 
 ---
 

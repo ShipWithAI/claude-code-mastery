@@ -19,9 +19,9 @@ claude_version: 2.1.278
 
 ## 1. WHY — Tại Sao Quan Trọng
 
-Module 6.1 cho bạn một cái núm (effort), Module 6.2 cho bạn một cái cổng (plan mode). Phần lớn
-người dùng sau đó chốt một setting cho mọi thứ: lúc nào cũng `max`, lúc nào cũng plan mode,
-hoặc chẳng bao giờ dùng cái nào. Cả hai thói quen đều tốn.
+Module 6.1 cho bạn một cái núm (effort), Module 6.2 một cái cổng (plan mode). Phần lớn người
+dùng sau đó chốt một setting cho mọi thứ: lúc nào cũng `max`, lúc nào cũng plan mode, hoặc
+chẳng bao giờ dùng. Cả hai thói quen đều tốn.
 
 Lúc nào cũng plan là bỏ năm phút lên kế hoạch cho một lỗi chính tả. Không bao giờ plan là
 những diff mười một file bạn chưa đọc. Kỹ năng ở đây không phải "dùng Think + Plan" — mà là
@@ -103,8 +103,9 @@ git diff src/math.js
  export function divide(a, b) {
 ```
 
-`--permission-mode acceptEdits` và `--allowedTools "Edit"` đều bắt buộc: lượt headless có ghi
-file phải cấp quyền ghi trước, và `Edit` là tất cả task này cần.
+Lượt headless có ghi file phải cấp quyền trước — `--permission-mode acceptEdits` hoặc một
+`--allowedTools` bao được nó. Đưa cả hai là bản chặt nhất: mode cho edit qua, `Edit` là tool
+duy nhất nó có.
 
 **Bước 2: Thay đổi không mô tả nổi trong một câu — lên plan**
 
@@ -123,8 +124,8 @@ claude --model opusplan --permission-mode plan
   ⏸ plan mode on (shift+tab to cycle)
 ```
 
-`Opus Plan` trên banner chính là `opusplan` đang chạy: Opus lo phần lên kế hoạch, Sonnet lo
-phần code. Bạn chỉ trả giá Opus cho đoạn mà suy nghĩ thật sự quan trọng.
+`Opus Plan` trên banner là `opusplan` đang chạy: Opus lên kế hoạch, Sonnet code. Bạn chỉ trả
+giá Opus cho đoạn suy nghĩ thật sự quan trọng.
 
 **Bước 3: Đổ effort vào chỗ có quyết định, không đổ khắp nơi**
 
@@ -143,12 +144,12 @@ Nâng núm cho đoạn khó rồi hạ xuống sau, ngay trong cùng session:
    ←/→ to adjust · Enter to confirm · s for this session only · Esc to cancel
 ```
 
-Nhấn `s` để chỉ áp dụng cho session này. Nếu chỉ có đúng một câu hỏi khó, giữ nguyên session
-và đặt `ultrathink` vào riêng prompt đó.
+Nhấn `s` để chỉ áp dụng cho session này. Nếu chỉ có một câu hỏi khó, giữ nguyên session và
+đặt `ultrathink` vào riêng prompt đó.
 
 **Bước 4: Duyệt vào mode hẹp nhất đủ để xong việc**
 
-Duyệt là cái núm cuối. **Yes, manually approve edits** giữ bạn trong vòng lặp ở từng lần ghi;
+Duyệt là núm cuối. **Yes, manually approve edits** giữ bạn trong vòng lặp ở từng lần ghi;
 **Yes, and use auto mode** giao phần còn lại cho classifier. Chọn theo mức bạn tin vào plan —
 sai thì `/rewind` khôi phục code, hội thoại, hoặc cả hai.
 
@@ -210,7 +211,8 @@ do ma trận có nhiều dòng thay vì một đáp án.
 
 | Câu hỏi | Setting | Giá trị |
 |---|---|---|
-| Suy luận nặng cỡ nào? | `/effort`, `--effort`, `effortLevel` | `low`, `medium`, `high`, `xhigh`, `max`, `ultracode` |
+| Suy luận nặng cỡ nào? | `/effort`, `--effort` | `low`, `medium`, `high`, `xhigh`, `max`, `ultracode` |
+| …làm default đã lưu? | `effortLevel`, `modelSettings` | chỉ `low`, `medium`, `high`, `xhigh` — `ultracode` có key riêng |
 | Chỉ đúng lượt này? | `ultrathink` trong prompt | — |
 | Có cần plan trước không? | `Shift+Tab`, `/plan`, `--permission-mode plan` | diff một câu → không |
 | Ai lên plan, ai code? | `--model opusplan` | Opus plan, Sonnet execute |
@@ -243,10 +245,9 @@ hơn một câu; thêm `xhigh` hoặc `ultrathink` chỉ ở chỗ có ngã rẽ
 VNPay, Momo và một card gateway. Interface provider, một DB enum, job đối soát và một webhook
 route đều phải sửa — cộng thêm một cặp `expect`/`actual` trong app mobile.
 
-**Vấn đề**: Style nội bộ của họ đã thành "lúc nào cũng plan, lúc nào cũng `max`". Một thay đổi
-enum hai dòng phải nằm chờ sau một turn planning bốn phút, còn phần đối soát — phần duy nhất
-không ai hiểu rõ — lại được đối xử y hệt cái enum, nên bước rủi ro trong plan bị chôn giữa một
-danh sách toàn việc vặt.
+**Vấn đề**: Style nội bộ của họ đã thành "lúc nào cũng plan, lúc nào cũng `max`". Một thay
+đổi enum hai dòng phải chờ sau turn planning bốn phút, còn phần đối soát — phần không ai hiểu
+rõ — bị đối xử y hệt, nên bước rủi ro bị chôn giữa toàn việc vặt.
 
 **Giải pháp**: Họ chia việc theo ma trận thay vì theo lịch. Enum và webhook route đi qua các
 lượt headless với `--permission-mode acceptEdits` và `--allowedTools` thu hẹp, không plan. Job

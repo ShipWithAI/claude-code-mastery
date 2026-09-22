@@ -20,31 +20,39 @@ claude_version: 2.1.278
 ## 1. WHY — Tại Sao Quan Trọng
 
 Một nửa lời khuyên về Claude Code trên mạng bảo bạn gõ "think step by step" hoặc "think
-harder" để mở một chế độ sâu hơn. Những câu đó **không làm gì cả**. Docs nói thẳng: Claude
-Code "passes other phrases such as 'think', 'think hard', and 'think more' through as ordinary
-prompt text and doesn't recognize them as keywords" — chúng đi thẳng vào prompt như text
-thường.
+harder" để mở chế độ sâu hơn. Những câu đó **không làm gì cả**: Claude Code "passes other
+phrases such as 'think', 'think hard', and 'think more' through as ordinary prompt text and
+doesn't recognize them as keywords".
 
-Nghĩa là bạn trả tiền cho câu thần chú, trong khi hai thứ thật sự xoay được cái núm — **effort
-level** và keyword **`ultrathink`** — thì nằm không. Tệ hơn: extended thinking đã bật sẵn từ
-đầu. Module này thay folklore bằng bốn công tắc thật.
+Nghĩa là bạn trả tiền cho câu thần chú, còn hai thứ xoay được núm — **effort level** và
+keyword **`ultrathink`** — thì nằm không. Tệ hơn: extended thinking đã bật sẵn từ đầu. Module
+này thay folklore bằng bốn công tắc thật.
 
 ---
 
 ## 2. CONCEPT — Ý Tưởng Cốt Lõi
 
-**Extended thinking bật mặc định.** Không có "mode" nào để vào. Thứ bạn điều khiển là: Claude
-suy luận *nhiều bao nhiêu* (effort level, phạm vi cả session), một lượt có được thêm không
-(`ultrathink`), có suy luận hay không (`Option+T`), và bạn có thấy nó không (`Ctrl+O`). Bốn
-công tắc độc lập, không chồng lên nhau.
+**Extended thinking bật mặc định.** Không có "mode" nào để vào. Bạn điều khiển: Claude suy
+luận *nhiều bao nhiêu* (effort level, cả session), một lượt có được thêm không (`ultrathink`),
+có suy luận hay không (`Option+T`), và bạn có thấy nó không (`Ctrl+O`).
 
-Effort level là núm chính: `low`, `medium`, `high`, `xhigh`, `max`, `ultracode`. `high` là
-"the default on every model except Opus 4.7" — model đó mặc định `xhigh`. `max` không phải
-bản nâng cấp miễn phí: nó "may show diminishing returns and is prone to overthinking".
+Effort level là núm chính, và docs gán cho mỗi level một việc. Đây chính là ma trận
+think-vs-act cũ, đổi trục sang những level có thật:
 
-`ultrathink` là keyword duy nhất Claude Code thật sự nhận ra, và chỉ có tác dụng một lượt:
-"Include `ultrathink` anywhere in your prompt to request deeper reasoning on that turn without
-changing your session effort setting… The effort level sent to the API is unchanged."
+| Task thuộc dạng… | Effort |
+|---|---|
+| "short, scoped, latency-sensitive… not intelligence-sensitive" | `low` |
+| nhạy chi phí, "can trade off some intelligence" | `medium` |
+| code hằng ngày: "balances token usage and intelligence" | `high`, mặc định |
+| đáng "deeper reasoning at higher token spend" | `xhigh` |
+| nặng, nhưng "prone to overthinking" — "test before adopting broadly" | `max` |
+| đủ lớn để điều phối: "`xhigh` … cộng dynamic workflows" | `ultracode` |
+
+`high` là "the default on every model except Opus 4.7" — model đó mặc định `xhigh`.
+
+`ultrathink` là keyword duy nhất Claude Code nhận ra, chỉ tác dụng một lượt: "Include
+`ultrathink` anywhere in your prompt to request deeper reasoning on that turn without changing
+your session effort setting… The effort level sent to the API is unchanged."
 
 ```mermaid
 graph TD
@@ -61,11 +69,11 @@ graph TD
 
 ## 3. DEMO — Từng Bước
 
-Mọi bước chạy trong một lab repo nhỏ có `src/math.js` và một file test.
+Mọi bước chạy trong lab repo có `src/math.js` và một file test.
 
-**Bước 1: Đọc effort level bạn đang dùng**
+**Bước 1: Đọc effort level đang dùng**
 
-Chạy `claude` và nhìn dòng ngay trên ô prompt. {/* docs: model-config */}
+Chạy `claude` và nhìn ngay trên ô prompt. {/* docs: model-config */}
 
 ```text
 # Output may vary
@@ -93,8 +101,8 @@ Gõ `/effort` rồi Enter. {/* docs: model-config */}
    ←/→ to adjust · Enter to confirm · s for this session only · Esc to cancel
 ```
 
-Mọi level trong docs đều nằm trên slider. `/effort <level>` đặt thẳng; `/effort auto` xóa
-level đã lưu cho model đang chạy.
+Slider hiện các level mà model này có — Opus 4.6 và Sonnet 4.6 không có `xhigh`.
+`/effort <level>` đặt thẳng; `/effort auto` xóa level đã lưu cho model đó.
 
 **Bước 3: Xem công tắc bật/tắt với `Option+T`**
 
@@ -109,8 +117,8 @@ Nhấn `Option+T` (macOS) hoặc `Alt+T` (Windows/Linux). {/* docs: interactive-
   Enter to confirm · Esc to cancel
 ```
 
-Enabled đã được tick sẵn. `/config` lưu lựa chọn này vĩnh viễn thành `alwaysThinkingEnabled`
-trong `~/.claude/settings.json`.
+Enabled đã tick sẵn. `/config` lưu nó thành `alwaysThinkingEnabled` trong
+`~/.claude/settings.json`.
 
 **Bước 4: Dùng keyword duy nhất có tác dụng**
 
@@ -127,8 +135,7 @@ ultrathink: does the guard in divide() in src/math.js also reject -0? Answer in 
   unlike Object.is), so divide(1, -0) also throws instead of returning -Infinity.
 ```
 
-`Thought for 2s` là tất cả những gì bạn thấy mặc định: "Claude Code collapses thinking output
-by default."
+`Thought for 2s` là tất cả bạn thấy: "Claude Code collapses thinking output by default."
 
 **Bước 5: Mở reasoning bằng `Ctrl+O`**
 
@@ -147,7 +154,7 @@ Nhấn `Ctrl+O` để bật transcript viewer. {/* docs: model-config, interacti
 
 Dòng `∴` là thinking summary. Capture này dùng `{ "showThinkingSummaries": true }` trong
 `.claude/settings.json`, vì "interactive sessions on the Anthropic API receive redacted
-thinking blocks by default."
+thinking blocks by default".
 
 **Bước 6: Đo chênh lệch bằng headless**
 
@@ -159,11 +166,11 @@ claude --effort high -p "List the edge cases divide() in src/math.js does not ha
   --output-format json --permission-mode default --allowedTools "Read"
 ```
 
-Cả hai lượt chỉ đọc file nên `--allowedTools "Read"` là toàn bộ quyền cần cấp. Hai object JSON
-với cùng prompt, cùng repo: `result` dài 1.399 ký tự ở `low` và 2.494 ở `high`; `num_turns`
-2 so với 4; `duration_ms` 10.615 so với 40.056; `total_cost_usd` 0.381219 so với 0.479397.
-Output may vary — đây là một cặp run trên một máy. So độ dài, số turn và nội dung, **đừng bao
-giờ** so token count của thinking: Claude Code không in ra con số đó.
+Cả hai lượt chỉ đọc file nên `--allowedTools "Read"` là toàn bộ quyền cần cấp. Hai object
+JSON cùng prompt, cùng repo: `result` 1.399 ký tự ở `low` so với 2.494 ở `high`; `num_turns`
+2 so với 4; `duration_ms` 10.615 so với 40.056. Output may vary — một cặp run trên một máy.
+So độ dài, số turn và nội dung, **đừng bao giờ** so token count của thinking: Claude Code
+không in con số đó.
 
 ---
 
@@ -219,9 +226,10 @@ unchanged." `ultrathink` mua cho bạn một lượt sâu hơn; câu thần chú
 <details>
 <summary>✅ Lời giải</summary>
 
-Với task cơ học, `low` thường hòa `high`, nên hãy ghim theo model bằng `modelSettings` thay vì
-nâng default toàn cục. Lưu ý `effortLevel` "accepts `low`, `medium`, `high`, or `xhigh`. `max`
-is not accepted here" — muốn `max` thì phải qua `/effort` hoặc `--effort`.
+Với task cơ học, `low` thường hòa `high`, nên ghim theo model bằng `modelSettings`. Docs nói
+rất rõ: "set `effortLevel` to `low`, `medium`, `high`, or `xhigh` as the default for models
+without one. `max` isn't accepted as a level in either key, and `ultracode` has its own
+`ultracode` key." Vậy `max` phải đến từ `/effort` hoặc `--effort`.
 </details>
 
 ---
@@ -230,12 +238,10 @@ is not accepted here" — muốn `max` thì phải qua `/effort` hoặc `--effor
 
 | Control | Ở đâu | Làm gì |
 |---|---|---|
-| `/effort` | Session | Mở slider; `s` = chỉ session này |
-| `/effort <level>` | Session | `low`, `medium`, `high`, `xhigh`, `max`, `ultracode` |
-| `/effort auto` | Session | Xóa level đã lưu cho model đang chạy |
-| `--effort <level>` | CLI | Cùng bộ level; không persist |
-| `effortLevel` | settings.json | Default cho model chưa có level riêng (không nhận `max`) |
-| `modelSettings` | settings.json | Effort level lưu theo từng model |
+| `/effort` · `/effort auto` | Session | Mở slider (`s` = chỉ session này) · xóa level đã lưu |
+| `/effort <level>`, `--effort <level>` | Session, CLI | `low`, `medium`, `high`, `xhigh`, `max`, `ultracode` |
+| `effortLevel`, `modelSettings` | settings.json | Default, và theo từng model: chỉ `low`–`xhigh` |
+| `ultracode` | settings.json | Key riêng — `xhigh` cộng dynamic workflows |
 | `ultrathink` | Trong prompt | Suy luận sâu hơn, chỉ lượt đó |
 | `Option+T` / `Alt+T` | Session | Bật/tắt extended thinking |
 | `alwaysThinkingEnabled` | settings.json | Tắt thinking cho mọi session |
@@ -256,7 +262,7 @@ model Fable.
 | Trích con số "thinking tokens: 2,768" | Claude Code không in con số đó. So độ dài, số turn, chi phí |
 | Tưởng `ultrathink` nâng effort level | "The effort level sent to the API is unchanged" |
 | Để mọi thứ ở `max` | `max` "may show diminishing returns and is prone to overthinking" |
-| `"effortLevel": "max"` trong settings.json | Không được nhận. Dùng `/effort max` hoặc `--effort max` |
+| `"effortLevel": "max"` trong settings.json | "`max` isn't accepted as a level in either key". Dùng `/effort max` hoặc `--effort max` |
 | Trông chờ `Option+T` có tác dụng trên Fable | "You can't turn thinking off on Fable models" |
 | Tưởng reasoning thu gọn là miễn phí | "You are charged for all thinking tokens generated, even when collapsed or redacted" |
 

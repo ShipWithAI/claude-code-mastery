@@ -11,21 +11,21 @@ claude_version: 2.1.278
 >
 > **Prerequisite**: Module 6.1 (Think Mode)
 >
-> **Outcome**: After this module, you will be able to enter Claude Code's native plan mode,
-> read and edit the plan it proposes, approve it into the permission mode you want, and tell
-> when planning is not worth it.
+> **Outcome**: After this module you can enter Claude Code's native plan mode, read and edit
+> the plan it proposes, approve it into the permission mode you want, and tell when planning
+> is not worth it.
 
 ---
 
 ## 1. WHY — Why This Matters
 
-You ask for "extract the notification logic into its own service." Claude starts editing
-immediately. Twenty minutes later there are eleven changed files, two of them wrong, and you
-are reading a diff to work out what it thought you meant.
+You ask for "extract the notification logic into its own service." Claude starts editing at
+once. Twenty minutes later there are eleven changed files, two wrong, and you are reading a
+diff to work out what it thought you meant.
 
-Plan mode inverts that. It is not a prompt — it is a permission mode that blocks edits until
-you have read what Claude intends. You decide once, with the whole design in front of you,
-instead of eleven times while the diff grows.
+Plan mode inverts that. It is not a prompt — it is a permission mode that blocks edits, in
+all but one session type, until you have read what Claude intends. You decide once, with the
+design in front of you, instead of eleven times.
 
 ---
 
@@ -33,30 +33,30 @@ instead of eleven times while the diff grows.
 
 Plan mode is a permission mode, and the docs define it exactly: "Plan mode tells Claude to
 research and propose changes without making them. Claude reads files, runs shell commands to
-explore, and writes a plan, but does not edit your source." Edits "stay blocked until you
-approve the plan."
+explore, and writes a plan, but does not edit your source." One condition is attached:
+"**Except in interactive terminal sessions with bypass permissions available**, edits stay
+blocked until you approve the plan." Elsewhere — `-p` runs, the Agent SDK, the VS Code chat
+panel — "plan mode keeps its blocks".
 
-Three ways in:
+Three ways in: `Shift+Tab` until the status bar shows `⏸ plan mode on`; prefix one prompt
+with `/plan`; or `claude --permission-mode plan`, which `defaultMode: "plan"` in
+`.claude/settings.json` makes the project default.
 
-- `Shift+Tab` until the status bar shows `⏸ plan mode on`
-- prefix one prompt with `/plan`
-- `claude --permission-mode plan`, or `defaultMode: "plan"` in `.claude/settings.json`
+`Shift+Tab` again leaves without approving. Approving "exits plan mode and switches the
+session to the permission mode each approve option describes" — you pick the blast radius as
+you accept the design.
 
-`Shift+Tab` again leaves plan mode without approving. Approving instead "exits plan mode and
-switches the session to the permission mode each approve option describes" — you pick the
-blast radius as you accept the design.
-
-The course's **PCE loop** — Plan, Challenge, Execute — maps onto the docs' four phases
-(Explore → Plan → Implement → Commit):
+The course's **PCE loop** — Plan, Challenge, Execute — maps onto the docs' four phases,
+Explore → Plan → Implement → Commit:
 
 | PCE step | Native mechanism |
 |---|---|
-| **Plan** | Plan mode: explore read-only, then a written plan; `Ctrl+G` edits it |
+| **Plan** | Explore read-only, then a written plan; `Ctrl+G` edits it |
 | **Challenge** | "Review this plan — what could go wrong?" before approving |
 | **Execute** | Approve (or `Shift+Tab`) to leave plan mode, then implement |
 
-Challenge is not ceremony. The AI-native SDLC playbook puts it plainly: "The agent that wrote
-the code has no way to approve it." (S3) The same holds for the plan.
+Challenge is not ceremony. The AI-native SDLC playbook: "The agent that wrote the code has no
+way to approve it." (S3) Nor for the plan.
 
 Planning is not free either: "Planning is most useful when you're uncertain about the
 approach, when the change modifies multiple files, or when you're unfamiliar with the code
@@ -76,7 +76,7 @@ graph LR
 
 ## 3. DEMO — Step by Step
 
-A lab repo: `src/math.js` (`add`, `divide`) and one test file.
+Lab repo: `src/math.js` (`add`, `divide`) and one test file.
 
 **Step 1: Enter plan mode**
 
@@ -84,14 +84,16 @@ Press `Shift+Tab` until the status bar says so. <!-- docs: permission-modes -->
 
 ```text
 # Output may vary
-  [OMC#4.5.1] | session:0m | ctx:0%
+────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────
   ⏸ plan mode on (shift+tab to cycle)
 ```
 
 The cycle runs `default` → `acceptEdits` → `plan`; from `auto` the first press goes to
 `default`. Or start there: `claude --permission-mode plan`.
 
-**Step 2: Ask for the change**
+**Step 2: Ask**
 
 ```text
 Add input validation to divide() in src/math.js: throw a RangeError when the divisor
@@ -99,17 +101,20 @@ is 0. Leave add() alone. Write the plan.
 ```
 
 Claude reads the file, lists the directory, runs a read-only shell command. Nothing is
-edited. The status line names the plan file it writes:
+edited. The status line names the plan file:
 
 ```text
 # Output may vary
 Planning: /Users/luatnq/.claude/plans/add-input-validation-to-enumerated-prism.md
 ```
 
-⚠️ Needs verification — that path shows in the live UI but is not on any page under
+The slug is generated per plan, so it differs from the approval screen below; both captures
+are real, from two runs of this walkthrough.
+
+⚠️ Needs verification — that path shows in the live UI but is on no page under
 `https://code.claude.com/docs/en/`. Treat `Ctrl+G` as the supported way in.
 
-**Step 3: Read the plan and the approval prompt**
+**Step 3: The plan and the approval prompt**
 
 ```text
 # Output may vary
@@ -131,12 +136,12 @@ Planning: /Users/luatnq/.claude/plans/add-input-validation-to-enumerated-prism.m
  ctrl+g to edit in Vim · ~/.claude/plans/add-input-validation-to-reflective-nova.md
 ```
 
-Option 3 is the **Challenge** step: send it back with "what breaks if `b` is `'0'`?" and you
+Option 3 is the **Challenge** step: send it back with "what breaks if `b` is `'0'`?" and
 stay in plan mode.
 
 **Step 4: Approve, and watch the mode change**
 
-Choosing option 1 approves and switches the session out of plan mode.
+Option 1 approves and switches the session out of plan mode.
 
 ```text
 # Output may vary
@@ -152,15 +157,14 @@ Choosing option 1 approves and switches the session out of plan mode.
   ⏵⏵ auto mode on (shift+tab to cycle)
 ```
 
-Two documented side effects: the mode is now `auto`, and the session took a title from the
+Two documented side effects: the mode is `auto` now, and the session took a title from the
 plan.
 
 **Step 5: Verify**
 
 ```bash
 # docs: common-workflows
-git diff --stat
-npm test 2>&1 | tail -5
+git diff --stat && npm test 2>&1 | tail -5
 ```
 
 ```text
@@ -171,8 +175,8 @@ npm test 2>&1 | tail -5
 # fail 0
 ```
 
-If the plan was wrong, `/rewind` (or `Esc` twice on an empty prompt) restores the
-conversation, the code, or both.
+If the plan was wrong, `/rewind` (or `Esc` twice on an empty prompt) restores conversation,
+code, or both.
 
 ---
 
@@ -184,18 +188,18 @@ conversation, the code, or both.
 
 **Instructions**:
 1. In a real repo, run `claude --permission-mode plan`.
-2. Ask for a change that must touch at least three files.
-3. Read the plan: how many files does it name, and are they the right ones?
-4. Approve with **Yes, manually approve edits** so you still see each write.
+2. Ask for a change touching at least three files.
+3. Read the plan: how many files does it name, and are they right?
+4. Approve with **Yes, manually approve edits** so you see each write.
 
-**Expected result**: A plan you corrected before any file changed.
+**Expected result**: A plan corrected before any file changed.
 
 <details>
 <summary>✅ Solution</summary>
 
-The tell that plan mode earned its keep is a plan naming a file you had forgotten. If the
-plan just restates your prompt, you picked a task (S1) says to skip: "If you could describe
-the diff in one sentence, skip the plan."
+The tell that plan mode earned its keep is a plan naming a file you forgot. If it restates
+your prompt, you picked a task (S1) says to skip: "If you could describe the diff in
+one sentence, skip the plan."
 </details>
 
 ### Exercise 2: Let Claude interview you into a SPEC.md
@@ -203,7 +207,7 @@ the diff in one sentence, skip the plan."
 **Goal**: Produce a spec for a larger feature, then execute it in a fresh session.
 
 **Instructions**:
-1. Start in plan mode and send the interview prompt from Anthropic's best practices (S1):
+1. In plan mode, send the interview prompt from Anthropic's best practices (S1):
 
 ```text
 I want to build [brief description]. Interview me in detail using the AskUserQuestion tool.
@@ -214,7 +218,7 @@ obvious questions, dig into the hard parts I might not have considered.
 Keep interviewing until we've covered everything, then write a complete spec to SPEC.md.
 ```
 
-2. Answer until it stops asking. Let it write `SPEC.md`.
+2. Answer until it stops asking; let it write `SPEC.md`.
 3. Quit, start a **fresh** session, implement from `SPEC.md`.
 
 **Expected result**: A self-contained spec, then a clean session.
@@ -225,32 +229,33 @@ Keep interviewing until we've covered everything, then write a complete spec to 
 "Once the spec is complete, start a fresh session to execute it." (S1) A good spec should
 "name the files and interfaces involved, state what is out of scope, and end with an
 end-to-end verification step that proves the feature works." Writing `SPEC.md` is itself an
-edit, so plan mode will ask you to approve it — working as designed.
+edit, so plan mode asks you to approve it — working as designed.
 </details>
 
 ### Exercise 3: Challenge the plan
 
-**Goal**: Reject a plan productively instead of accepting and fixing later.
+**Goal**: Reject a plan productively instead of fixing it later.
 
 **Instructions**:
 1. Get any plan proposed.
-2. Choose **Tell Claude what to change** and ask: "Review this plan — what could go wrong in
+2. Choose **Tell Claude what to change**: "Review this plan — what could go wrong in
    production, and what did you assume about the existing code?"
-3. Compare the second plan with the first.
+3. Compare it with the first.
 
 **Expected result**: A second plan with its assumptions made explicit.
 
 <details>
 <summary>💡 Hint</summary>
-Reject on *assumptions*, not style. "What did you assume?" surfaces more than "make it better".
+Reject on *assumptions*, not style. "What did you assume?" surfaces more than "make it
+better".
 </details>
 
 <details>
 <summary>✅ Solution</summary>
 
-Option 3 keeps you in plan mode, so a revision costs one turn — far cheaper than approving
-and reverting. That is the Challenge step, and the same idea as (S3)'s "The agent that wrote
-the code has no way to approve it."
+Option 3 keeps you in plan mode, so a revision costs one turn — cheaper than approving and
+reverting. That is the Challenge step, and (S3)'s "The agent that wrote the code has no way
+to approve it."
 </details>
 
 ---
@@ -260,8 +265,8 @@ the code has no way to approve it."
 | Action | How |
 |---|---|
 | Enter plan mode | `Shift+Tab` until `⏸ plan mode on`, or `/plan <prompt>` |
-| Start in plan mode | `claude --permission-mode plan` |
-| Default for a project | `"permissions": { "defaultMode": "plan" }` in `.claude/settings.json` |
+| Start there | `claude --permission-mode plan` |
+| Project default | `"permissions": { "defaultMode": "plan" }` in `.claude/settings.json` |
 | Leave without approving | `Shift+Tab` |
 | Edit the plan | `Ctrl+G` |
 | Approve into auto mode | **Yes, and use auto mode** |
@@ -270,7 +275,7 @@ the code has no way to approve it."
 | Undo after approving | `/rewind`, or `Esc` twice on an empty prompt |
 | Opus plans, Sonnet builds | `claude --model opusplan` |
 
-`opusplan` "uses `opus` during plan mode, then switches to `sonnet` for execution." Its banner
+`opusplan` "uses `opus` during plan mode, then switches to `sonnet` for execution"; its banner
 reads `Opus Plan`.
 
 ---
@@ -279,12 +284,12 @@ reads `Opus Plan`.
 
 | ❌ Mistake | ✅ Correct Approach |
 |---|---|
-| Writing "do NOT write code yet" in the prompt | Plan mode enforces it; a prompt only asks |
+| "do NOT write code yet" in the prompt | Plan mode enforces it; a prompt only asks |
 | Planning a one-line fix | "If you could describe the diff in one sentence, skip the plan." (S1) |
-| Approving unread, then reverting | Use **Tell Claude what to change** — it stays in plan mode |
+| Approving unread, then reverting | **Tell Claude what to change** keeps you in plan mode |
 | Expecting plan mode to persist after approval | Approving "exits plan mode". `Shift+Tab` back |
 | Assuming it blocks every command | It permits reads and, with auto mode, classifier-approved commands |
-| Trusting it under bypass permissions | In interactive terminals with bypass permissions available, plan mode's blocks are not enforced |
+| Trusting it under bypass permissions | In interactive terminals with bypass permissions available, the blocks are not enforced |
 | Retyping the plan to fix a line | `Ctrl+G` |
 
 ---
@@ -292,21 +297,21 @@ reads `Opus Plan`.
 ## 7. REAL CASE — Production Story
 
 **Scenario**: A KMP team shipping an Android + iOS banking client had to move session
-handling out of the Android module into `commonMain`. Roughly a dozen files, two of them
+handling from the Android module into `commonMain`. A dozen files, two of them
 `expect`/`actual` pairs nobody had touched in a year.
 
-**Problem**: The first attempt ran in the default mode. Claude moved the interfaces, then the
+**Problem**: The first attempt ran in the default mode. Claude moved the interfaces, the
 implementations, then began rewriting the iOS `actual`. The team noticed when the iOS build
 broke, six files into a diff they had not read.
 
 **Solution**: They restarted with `claude --model opusplan --permission-mode plan` and asked
-for the migration plan only. The plan named the `expect`/`actual` pair as the risky step and
+for the migration plan only. It named the `expect`/`actual` pair as the risky step and
 proposed doing it last, behind the shared interface. They challenged it once — "what did you
 assume about the iOS Keychain wrapper?" — and the revision added a step to read that wrapper
 first. Then they approved with **Yes, manually approve edits**.
 
 **Result**: The migration landed in one session, iOS green at every step. The takeaway was
-the mode, not the prompt: no prompt would have blocked that first edit; plan mode did.
+the mode, not the prompt: no prompt blocks that first edit; plan mode does.
 
 ---
 

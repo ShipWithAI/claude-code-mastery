@@ -19,13 +19,12 @@ claude_version: 2.1.278
 
 ## 1. WHY — Why This Matters
 
-Module 6.1 gave you a dial (effort) and Module 6.2 gave you a gate (plan mode). Most people
-then pick one setting and use it for everything: always `max`, always plan mode, or never
-either. Both habits cost you.
+Module 6.1 gave you a dial (effort), Module 6.2 a gate (plan mode). Most people then pick one
+setting for everything: always `max`, always plan mode, or never either. Both habits cost you.
 
 Always planning means a five-minute plan for a typo fix. Never planning means eleven-file
 diffs you did not read. The skill is not "use Think + Plan" — it is reading a task in ten
-seconds and knowing which of the three dials it deserves.
+seconds and knowing which dials it deserves.
 
 ---
 
@@ -103,8 +102,9 @@ git diff src/math.js
  export function divide(a, b) {
 ```
 
-`--permission-mode acceptEdits` and `--allowedTools "Edit"` are both required: a headless run
-that writes files must pre-authorize the write, and `Edit` alone is all this task needs.
+A headless run that writes has to pre-authorize the write — `--permission-mode acceptEdits`
+or a covering `--allowedTools`. Passing both is the tight version: the mode lets edits
+through, `Edit` is the only tool it gets.
 
 **Step 2: A change you cannot describe in one sentence — plan it**
 
@@ -123,8 +123,8 @@ claude --model opusplan --permission-mode plan
   ⏸ plan mode on (shift+tab to cycle)
 ```
 
-`Opus Plan` in the banner is `opusplan` at work: Opus does the planning, Sonnet the execution.
-You pay Opus prices only for the part where the thinking matters.
+`Opus Plan` in the banner is `opusplan` at work: Opus plans, Sonnet executes. You pay Opus
+prices only where the thinking matters.
 
 **Step 3: Spend effort where the decision is, not everywhere**
 
@@ -143,15 +143,14 @@ Raise the dial for the hard stretch and drop it afterwards, inside the same sess
    ←/→ to adjust · Enter to confirm · s for this session only · Esc to cancel
 ```
 
-Press `s` to apply it to this session only. For a single hard question instead, keep the
-session where it is and put `ultrathink` in that one prompt.
+Press `s` to apply it to this session only. For a single hard question, keep the session
+where it is and put `ultrathink` in that one prompt.
 
 **Step 4: Approve into the narrowest mode that finishes the job**
 
 Approval is the last dial. **Yes, manually approve edits** keeps you in the loop on every
 write; **Yes, and use auto mode** hands the rest to the classifier. Choose by how much of the
-plan you actually believe — and if you were wrong, `/rewind` restores code, conversation, or
-both.
+plan you believe — if you were wrong, `/rewind` restores code, conversation, or both.
 
 ---
 
@@ -212,7 +211,8 @@ which is exactly why the matrix has rows instead of one answer.
 
 | Question | Setting | Values |
 |---|---|---|
-| How hard should it reason? | `/effort`, `--effort`, `effortLevel` | `low`, `medium`, `high`, `xhigh`, `max`, `ultracode` |
+| How hard should it reason? | `/effort`, `--effort` | `low`, `medium`, `high`, `xhigh`, `max`, `ultracode` |
+| …as a saved default? | `effortLevel`, `modelSettings` | `low`, `medium`, `high`, `xhigh` only — `ultracode` has its own key |
 | Just this one turn? | `ultrathink` in the prompt | — |
 | Should it plan first? | `Shift+Tab`, `/plan`, `--permission-mode plan` | one-sentence diff → no |
 | Who plans, who builds? | `--model opusplan` | Opus plans, Sonnet executes |
@@ -220,8 +220,8 @@ which is exactly why the matrix has rows instead of one answer.
 | What may it call? | `--allowedTools` | e.g. `"Edit"`, `"Bash(npm test)"` |
 | Undo | `/rewind`, `Esc` twice | conversation, code, or both |
 
-Rules of thumb: default to `high` + `acceptEdits`; add plan mode when the diff needs more than
-one sentence; add `xhigh` or `ultrathink` only where a decision forks.
+Rules of thumb: default to `high` + `acceptEdits`; add plan mode when the diff needs more
+than one sentence; add `xhigh` or `ultrathink` only where a decision forks.
 
 ---
 
@@ -246,9 +246,8 @@ VNPay, Momo and a card gateway. The provider interface, a DB enum, the reconcili
 a webhook route all had to change — plus an `expect`/`actual` pair in the mobile client.
 
 **Problem**: Their house style had become "always plan, always `max`". A two-line enum
-addition sat behind a four-minute planning turn, and the reconciliation change — the one part
-nobody understood — got the same treatment as the enum, so the plan's risky step was buried
-in a list of trivial ones.
+addition sat behind a four-minute planning turn, and the reconciliation change — the part
+nobody understood — got the same treatment, so the risky step was buried among trivial ones.
 
 **Solution**: They split the work by the matrix instead of the calendar. The enum and the
 webhook route went through headless runs with `--permission-mode acceptEdits` and a scoped
@@ -257,9 +256,9 @@ webhook route went through headless runs with `--permission-mode acceptEdits` an
 question, and a challenge round before approval. They approved that one with **Yes, manually
 approve edits**.
 
-**Result**: The trivial parts landed in minutes rather than sitting behind planning turns, and
-the risky part got a plan that named the settlement-window assumption out loud. The rule they
-kept was the one-sentence test — everything else followed from it. For the automation side of
+**Result**: The trivial parts landed in minutes instead of behind planning turns, and the
+risky part got a plan that named the settlement-window assumption out loud. The rule they
+kept was the one-sentence test; everything else followed. For the automation side of
 this, see [Module 7.2: Full Auto
 Workflow](../../phase-07-multi-agent-auto/02-full-auto-workflow/); to make a check
 non-optional, see [Module 11.3: Hooks
