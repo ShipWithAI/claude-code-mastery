@@ -184,6 +184,7 @@ not print one.
 1. In a repo of yours, run `claude` and ask a question prefixed with `think step by step:`.
 2. Press `Ctrl+O` and note the reasoning.
 3. Ask the same question prefixed with `ultrathink:`. Press `Ctrl+O` again.
+4. Compare the two transcripts.
 
 **Expected result**: Both turns think, because thinking is on by default. Only the
 `ultrathink` turn got an extra instruction.
@@ -197,10 +198,10 @@ Do not look for a "mode" indicator. Compare reasoning length in the transcript v
 <details>
 <summary>✅ Solution</summary>
 
-The first prompt is indistinguishable from any other — Claude Code "passes other phrases such
-as 'think', 'think hard', and 'think more' through as ordinary prompt text." The second is
-recognized: it "adds an in-context instruction. The effort level sent to the API is
-unchanged." `ultrathink` buys a deeper turn; the folk phrases buy only tokens.
+The first prompt is like any other — Claude Code "passes other phrases such as 'think',
+'think hard', and 'think more' through as ordinary prompt text." The second is recognized: it
+"adds an in-context instruction. The effort level sent to the API is unchanged." `ultrathink`
+buys a deeper turn; the folk phrases buy only tokens.
 </details>
 
 ### Exercise 2: Find your own effort floor
