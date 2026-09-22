@@ -213,10 +213,10 @@ in Bash), since the hook is a deliberate guardrail.
 ```
 
 Vì sao: exit 2 chặn `Read`; stderr thành lý do Claude nêu. `--permission-mode default` ép hành
-vi mặc định; máy mới cài cho cùng kết quả mà không cần flag này, trừ khi `settings.json` đặt
-`permissions.defaultMode`. Thiếu nó, mode `auto` trên máy này để Claude `cat .env` qua **Bash**
-— tool mà matcher này không thấy. `@`-reference cũng bỏ qua tool; thêm deny rule `Read`
-(Module 2.2).
+vi mặc định; trên gói Pro, Max và Team, starting mode built-in là `auto`, và
+`permissions.defaultMode` ghi đè nó. Thiếu nó, mode `auto` trên máy này để Claude `cat .env`
+qua **Bash** — tool mà matcher này không thấy. `@`-reference cũng bỏ qua tool; thêm deny rule
+`Read` (Module 2.2).
 
 **Bước 4: Từ chối `git push --force` bằng JSON**
 
