@@ -95,7 +95,7 @@ $ claude
 ```
 
 Prompt đầu tiên:
-```
+```text
 Tôi cần refactor auth từ session-based sang JWT. 8 files bị ảnh hưởng.
 
 Kế hoạch phase:
@@ -122,12 +122,12 @@ Chú ý các yếu tố priming:
 **Bước 3: Phase 1 hoàn thành + Compact**
 
 Sau khi Claude phân tích:
-```
+```text
 /compact
 ```
 
 Kết quả:
-```
+```text
 Context compacted. Key information preserved:
 - Auth hiện tại dùng Express sessions + Passport
 - User passwords hash với bcrypt
@@ -150,14 +150,14 @@ Kết quả: File jwt.js hoàn chỉnh được tạo trực tiếp. Không cầ
 **Bước 5: Task Decomposition — Từng File**
 
 Quay lại main session (đã compacted):
-```
+```text
 Phase 3: Thực thi. Cập nhật từng file.
 
 File 1/8: Update middleware/auth.js để dùng JWT thay vì session.
 ```
 
 Claude cập nhật file. Sau đó:
-```
+```text
 /compact
 ```
 
@@ -166,7 +166,7 @@ Lặp lại cho mỗi file. Mỗi lần `/compact` xóa chi tiết file trước
 **Bước 6: Context Recycling — Lưu phân tích**
 
 Sau Phase 2 (Lập kế hoạch), lưu kiến trúc:
-```
+```text
 Lưu thiết kế kiến trúc JWT vào docs/jwt-migration.md để tham khảo sau này.
 ```
 
@@ -188,12 +188,12 @@ Giờ context này là permanent, tái sử dụng được, và không tiêu t�
 **Bước 7: Review chi phí cuối cùng**
 
 Sau Phase 4:
-```
+```text
 /cost
 ```
 
 Kết quả:
-```
+```text
 Session Cost Summary:
 - Input tokens: 28,450
 - Output tokens: 12,300
@@ -239,7 +239,7 @@ Prompt đầu tiên nên bao gồm:
 <summary>✅ Lời giải</summary>
 
 Ví dụ prompt đầu tiên:
-```
+```text
 Refactor payment processing để hỗ trợ nhiều gateway (Stripe, PayPal, Chuyển khoản ngân hàng).
 Hiện tại hard-coded Stripe trong 6 files.
 
@@ -253,7 +253,7 @@ Phase 1: Phân tích services/stripe.js, controllers/payment.js, models/transact
 ```
 
 Sau phân tích và `/compact`:
-```
+```text
 Context compacted. Key information preserved:
 - Stripe API calls ở 8 locations
 - Hard-coded API keys trong services/stripe.js
@@ -325,7 +325,7 @@ Thời gian: ~3-4 phút. Tokens: ~800 input, ~2500 output tổng (vs. 3000+ inpu
 
 ### Template Session Phase
 
-```
+```text
 Phase 1: Hiểu
 - Đọc files liên quan (tối đa 3-5)
 - Đặt câu hỏi làm rõ
@@ -370,7 +370,7 @@ Format: [EXPORT_STYLE, COMMENTS, v.v.]"
 
 ### Flowchart quyết định /compact
 
-```
+```text
 Task hoàn thành hoặc tại phase boundary?
   CÓ → /compact
   KHÔNG ↓
@@ -420,7 +420,7 @@ Tiếp tục mà không compact
    - Phase 4: Integration tests + docs
 
 2. **Context Priming**: Prompt đầu tiên cho mỗi service:
-   ```
+   ```text
    Extracting [SERVICE_NAME] service. Monolith files: [3-5 key files].
    Target: Standalone service với REST API, own DB, async events.
    Phase 1: Phân tích domain logic trong monolith.

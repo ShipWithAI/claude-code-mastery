@@ -71,7 +71,7 @@ When inside an interactive REPL session, these shortcuts speed up your workflow:
 
 - **Multi-line input**: `\` + Enter, or `Shift+Enter` (run `/terminal-setup` first)
 - **Cancel generation**: `Escape`
-- **Exit**: `Ctrl+C` or `/exit`
+- **Exit**: `Ctrl+C` twice (or `Ctrl+D`), or `/exit`
 - **Paste image**: `Ctrl+V` (NOT `Cmd+V` on macOS)
 - **Switch model**: `Option+P` / `Alt+P`
 - **Toggle thinking**: `Option+T` / `Alt+T`
@@ -111,7 +111,7 @@ session.
 
 **Step 2: Have a multi-turn conversation**
 
-```
+```text
 > What's the best way to handle errors in TypeScript?
 
 Claude explains try/catch, Result types, error boundaries, etc.
@@ -127,12 +127,12 @@ Claude refactors the previous example, maintaining context.
 
 **Step 3: Use slash commands**
 
-```
+```text
 /help
 ```
 
 Output shows available commands:
-```
+```text
 # Output may vary
 Available commands:
   /help     - Show this help
@@ -175,7 +175,7 @@ $ claude -p "What is the difference between let and const in JavaScript?"
 ```
 
 Expected output:
-```
+```text
 # Output may vary
 In JavaScript, `let` and `const` both declare block-scoped variables, but:
 
@@ -234,7 +234,7 @@ $ git diff HEAD~1 | claude -p "Summarize these changes"
 ```
 
 Expected output:
-```
+```text
 # Output may vary
 This diff shows:
 1. Added error handling to the fetchUser function
@@ -269,7 +269,7 @@ $ git log --oneline -10 | claude -p "Which of these commits are bug fixes?"
 3. Ask Claude for a fix
 4. Ask a follow-up: "How would I add TypeScript types to this?"
 5. Run `/cost` to see your token usage
-6. Exit with `/exit` or Ctrl+C
+6. Exit with `/exit`, or Ctrl+C twice (or Ctrl+D)
 
 **Expected result**: You have a multi-turn conversation where each response
 builds on previous context, and you see the accumulated token cost.
@@ -404,7 +404,7 @@ $ claude -p "What changed?" < <(git diff HEAD~1)
 | **Clear conversation** | `/clear` | Resets context in REPL |
 | **Compress context** | `/compact` | Reduces token usage |
 | **Show token usage** | `/cost` | Shows usage for session |
-| **Exit REPL** | `/exit` or Ctrl+C | Ends interactive session |
+| **Exit REPL** | `/exit`, or Ctrl+C twice (or Ctrl+D) | Ends interactive session |
 
 ### Mode Selection Quick Reference
 

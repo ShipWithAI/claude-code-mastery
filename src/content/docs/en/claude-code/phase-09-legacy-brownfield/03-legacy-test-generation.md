@@ -97,7 +97,7 @@ Claude: [Generates test file with 6 test cases]
 ### Step 3: Run and Verify
 
 ```bash
-$ npm test pricingService.test.js
+$ npm test -- pricingService.test.js
 ```
 
 Output:

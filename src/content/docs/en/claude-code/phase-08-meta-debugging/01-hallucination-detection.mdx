@@ -77,7 +77,7 @@ graph LR
 You ask Claude: "What's the best package for fast image loading in React Native?"
 
 Claude responds:
-```
+```text
 I recommend using `react-native-fast-image-loader`. It provides
 automatic caching, lazy loading, and placeholder support.
 
@@ -96,7 +96,7 @@ $ npm view react-native-fast-image-loader
 ```
 
 Expected output if it doesn't exist:
-```
+```text
 npm error code E404
 npm error 404 Not Found - GET https://registry.npmjs.org/react-native-fast-image-loader
 npm error 404 'react-native-fast-image-loader@latest' is not in this registry.
@@ -108,14 +108,14 @@ npm error 404 'react-native-fast-image-loader@latest' is not in this registry.
 
 Go back to Claude with evidence:
 
-```
+```text
 That package doesn't exist in npm (I verified with `npm view`).
 What are REAL alternatives? Provide the exact npm package names
 that I can verify exist.
 ```
 
 Claude's corrected response might be:
-```
+```text
 You're right, I apologize. Here are real alternatives:
 
 1. `react-native-fast-image` - Most popular option
@@ -264,6 +264,27 @@ fs.readFile('file.txt', 'utf8', (err, data) => {
 Configuration paths vary by installation method and OS. Check with `ls -la ~/.config/`, `ls -la ~/Library/Application\ Support/`, and the official Claude Code docs.
 </details>
 
+<details>
+<summary>✅ Solution</summary>
+
+**Paths to check**:
+```bash
+ls -la ~/.claude/config.json            # verify
+ls -la ~/.config/claude/settings.json   # verify
+ls -la ~/.claude/                       # verify
+```
+
+**Verification**:
+```bash
+ls -la ~/.claude/
+# settings.json is present — this is the real global config file
+```
+
+**Real config location**: Claude Code stores global settings in `~/.claude/settings.json` (project-level overrides live in `.claude/settings.json` inside the repo, with `.claude/settings.local.json` for personal, gitignored overrides). Paths like `~/.claude/config.json` or `~/.config/claude/settings.json` are plausible-sounding but don't match what's actually on disk.
+
+**Lesson**: Confirm with `ls -la` on your own machine — never trust a suggested path without checking it yourself.
+</details>
+
 ---
 
 ## 5. CHEAT SHEET
@@ -403,7 +424,7 @@ Never trust AI for external API structures without verification.
 
 ---
 
-## Key Takeaways
+### Key Takeaways
 
 1. **Hallucinations are normal AI behavior** — not a bug, but a fundamental characteristic of how LLMs work
 2. **Confidence doesn't correlate with accuracy** — Claude sounds equally sure whether right or wrong

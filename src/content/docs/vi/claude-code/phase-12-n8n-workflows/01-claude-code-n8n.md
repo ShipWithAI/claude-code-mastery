@@ -41,7 +41,7 @@ Key feature:
 
 ### n8n + Claude Code Architecture
 
-```
+```text
 [Trigger] → [n8n Workflow] → [Execute Claude Code] → [Process Output] → [Action]
     │             │                  │                     │              │
   Email      Visual Editor        claude -p            Parse JSON      Slack
@@ -87,7 +87,7 @@ $ n8n start
 ```
 
 Expected output:
-```
+```text
 n8n ready on port 5678
 Editor is now accessible via: http://localhost:5678
 ```
@@ -363,7 +363,7 @@ return [{ json: { result: output } }];
 
 | ❌ Sai | ✅ Đúng |
 |--------|---------|
-| Claude CLI không trong PATH của n8n | Dùng full path: `/usr/local/bin/claude` |
+| Claude CLI không trong PATH của n8n | Dùng full path: `~/.local/bin/claude` |
 | API key không available | Set `ANTHROPIC_API_KEY` trước khi start n8n |
 | Không timeout cho Claude call | Set timeout trong Execute Command (60000ms+) |
 | Quote làm hỏng prompt | Dùng Set node prepare prompt phức tạp |
@@ -381,7 +381,7 @@ return [{ json: { result: output } }];
 
 **n8n + Claude Solution**:
 
-```
+```text
 [Email Trigger] → [Claude: Extract] → [Claude: Suggest] → [Google Sheets]
                                                               ↓
                                           [Slack] ← [Trello: Create Card]

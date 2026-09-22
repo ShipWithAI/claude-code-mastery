@@ -37,7 +37,7 @@ Emergency xảy ra. Dù có tất cả safeguard từ module trước. Question 
 
 Memorize sequence này:
 
-1. **STOP**: `Ctrl+C` ngay. Đừng để Claude continue.
+1. **STOP**: Nhấn `Esc` ngay để ngắt turn hiện tại. Đừng để Claude continue.
 2. **ASSESS**: `git status` + `git diff` — actually changed gì?
 3. **CONTAIN**: `git stash` — save current state trước khi recover
 4. **RECOVER**: Chọn recovery strategy theo severity
@@ -67,7 +67,7 @@ Memorize sequence này:
 
 ### Scenario 1: Claude Deleted Important File
 
-**STOP** — Thấy Claude đang delete file? Press `Ctrl+C` ngay.
+**STOP** — Thấy Claude đang delete file? Nhấn `Esc` ngay để ngắt.
 
 **ASSESS**:
 ```bash
@@ -75,7 +75,7 @@ $ git status
 ```
 
 Output:
-```
+```text
 Changes not staged for commit:
   deleted:    .env
   deleted:    config/production.json
@@ -88,7 +88,7 @@ $ git stash
 ```
 
 Output:
-```
+```text
 Saved working directory and index state WIP on main: abc1234 Last commit
 ```
 
@@ -98,7 +98,7 @@ $ git checkout .
 ```
 
 Output:
-```
+```text
 Updated 3 paths from the index
 ```
 
@@ -108,7 +108,7 @@ $ ls .env config/production.json
 ```
 
 Output:
-```
+```text
 .env  config/production.json
 ```
 
@@ -116,7 +116,7 @@ File đã về.
 
 ### Scenario 2: Claude Modified 50 File
 
-**STOP**: `Ctrl+C`
+**STOP**: Nhấn `Esc`
 
 **ASSESS**:
 ```bash
@@ -124,7 +124,7 @@ $ git diff --stat
 ```
 
 Output:
-```
+```text
  50 files changed, 2000 insertions(+), 500 deletions(-)
 ```
 
@@ -133,7 +133,7 @@ $ git diff --name-only
 ```
 
 Output:
-```
+```text
 src/api/users.ts
 src/api/products.ts
 ... (48 file nữa)
@@ -164,7 +164,7 @@ $ git reflog
 ```
 
 Output:
-```
+```text
 abc1234 HEAD@{0}: reset: moving to HEAD
 def5678 HEAD@{1}: commit: My work before disaster
 ghi9012 HEAD@{2}: commit: Earlier work
@@ -247,7 +247,7 @@ Example post-mortem:
 **Tại sao**: Vague prompt ("clean up") + approve không review
 
 **Prevention**: Add vào CLAUDE.md:
-```
+```markdown
 ## Dangerous Operation
 NEVER delete không có explicit approval:
 - .env file
@@ -262,7 +262,7 @@ NEVER delete không có explicit approval:
 
 ### Emergency Playbook
 
-1. 🛑 **STOP**: `Ctrl+C`
+1. 🛑 **STOP**: Nhấn `Esc`
 2. 🔍 **ASSESS**: `git status` + `git diff`
 3. 📦 **CONTAIN**: `git stash`
 4. 🔧 **RECOVER**: Xem command bên dưới
@@ -324,7 +324,7 @@ git reset --hard <commit-hash>
 - Mất 4 giờ cố recover database
 
 **Nên làm**:
-1. STOP: `Ctrl+C` (hoặc đừng approve deletion)
+1. STOP: Nhấn `Esc` (hoặc đừng approve deletion)
 2. ASSESS: `git diff --stat` sẽ show migration deletion
 3. CONTAIN: `git stash`
 4. RECOVER: `git checkout db/migrations/`

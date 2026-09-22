@@ -110,7 +110,7 @@ $ npm run lint
 ```
 
 Expected output:
-```
+```text
 No errors found.
 ```
 
@@ -119,7 +119,7 @@ $ tsc --noEmit
 ```
 
 Expected output:
-```
+```text
 No errors.
 ```
 
@@ -128,7 +128,7 @@ $ npm test
 ```
 
 Expected output:
-```
+```text
 PASS src/services/userService.test.ts
   ✓ should search users by name
   ✓ should return empty array for no matches
@@ -143,7 +143,7 @@ $ git diff --stat
 ```
 
 Expected output:
-```
+```text
  src/services/userService.ts | 100 +++++++++++++++++++++++++++++
  src/routes/users.ts         |  20 ++++++
  2 files changed, 120 insertions(+)
@@ -153,7 +153,7 @@ Review the actual code. Notice: Large function, no pagination, no rate limiting.
 
 ### Step 4: Ask Claude for Self-Review
 
-```
+```text
 You: Review the search implementation you just wrote.
 What would a senior dev criticize?
 
@@ -177,7 +177,7 @@ Categorize the issues:
 | No rate limiting | MEDIUM | Fix later |
 | No caching | LOW | Premature optimization |
 
-```
+```text
 You: Good feedback. Please add:
 1. Pagination (limit 50 per page)
 2. Query sanitization
@@ -275,7 +275,7 @@ git diff          # Review changes
 
 ### Self-Review Prompts
 
-```
+```text
 "What would a senior dev criticize about this?"
 "What edge cases might fail?"
 "Is there a simpler approach?"

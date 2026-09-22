@@ -25,7 +25,7 @@ Workflow pattern là "công thức" của automation. Giống như software desi
 
 ### Pattern 1: Sequential Pipeline
 
-```
+```text
 [Input] → [Claude: Step 1] → [Claude: Step 2] → [Claude: Step 3] → [Output]
 ```
 
@@ -34,7 +34,7 @@ Workflow pattern là "công thức" của automation. Giống như software desi
 
 ### Pattern 2: Parallel Fan-Out/Fan-In
 
-```
+```text
          ┌→ [Claude: Task A] →┐
 [Input] ─┼→ [Claude: Task B] →┼→ [Merge] → [Output]
          └→ [Claude: Task C] →┘
@@ -45,7 +45,7 @@ Workflow pattern là "công thức" của automation. Giống như software desi
 
 ### Pattern 3: Classification Router
 
-```
+```text
 [Input] → [Claude: Classify] → [Switch] ─→ [Handler A]
                                       ├→ [Handler B]
                                       └→ [Handler C]
@@ -56,7 +56,7 @@ Workflow pattern là "công thức" của automation. Giống như software desi
 
 ### Pattern 4: Human-in-the-Loop
 
-```
+```text
 [Input] → [Claude: Draft] → [Wait for Approval] → [IF Approved] → [Execute]
                                                         ↓ No
                                                [Claude: Revise] → [Back to Wait]
@@ -67,8 +67,8 @@ Workflow pattern là "công thức" của automation. Giống như software desi
 
 ### Pattern 5: Batch Processing
 
-```
-[Input List] → [Split In Batches] → [Claude: Process Each] → [Aggregate] → [Output]
+```text
+[Input List] → [Loop Over Items] → [Claude: Process Each] → [Aggregate] → [Output]
 ```
 
 **Dùng khi**: Process nhiều item, cần rate limiting hoặc chunking.
@@ -76,7 +76,7 @@ Workflow pattern là "công thức" của automation. Giống như software desi
 
 ### Pattern 6: Error Recovery Loop
 
-```
+```text
 [Input] → [Claude: Try] → [IF Error] → [Claude: Fix] → [Retry]
                               ↓ Success
                           [Output]
@@ -121,11 +121,11 @@ return [{ json: { category, original: $('Webhook').first().json } }];
 
 ### Demo 3: Batch Processing — Document Analysis
 
-**Split In Batches**: Size 10, reset mỗi run
+**Loop Over Items**: Size 10, reset mỗi run
 
 **Execute Command**: `claude -p "Summarize mỗi document:\n\n{{ JSON.stringify($json) }}"`
 
-**Merge Node**: "Merge By Position" để collect tất cả output
+**Merge Node**: "Merge (Combine → Position)" để collect tất cả output
 
 ---
 
@@ -196,25 +196,25 @@ return [{ json: { type: $input.first().json.stdout.trim().toLowerCase() } }];
 
 **Hướng dẫn**:
 1. Webhook nhận array 20 item
-2. Split In Batches (size 5)
+2. Loop Over Items (size 5)
 3. Claude summarize mỗi batch
 4. Merge tất cả result
 
 <details>
 <summary>💡 Hint</summary>
 
-Sau Split In Batches, workflow chạy 4 lần (20/5). Dùng Merge node cuối để collect output.
+Sau Loop Over Items, workflow chạy 4 lần (20/5). Dùng Merge node cuối để collect output.
 
 </details>
 
 <details>
 <summary>✅ Solution</summary>
 
-**Split In Batches:** Batch Size = 5
+**Loop Over Items:** Batch Size = 5
 
 **Execute Command:** `claude -p "Summarize các item:\n\n{{ JSON.stringify($json) }}"`
 
-**Merge node:** Mode = "Merge By Position"
+**Merge node:** Mode = "Merge (Combine → Position)"
 
 </details>
 
@@ -237,7 +237,7 @@ Sau Split In Batches, workflow chạy 4 lần (20/5). Dùng Merge node cuối đ
 
 | Node | Mục đích |
 |------|----------|
-| `Split In Batches` | Chunk array thành nhóm nhỏ |
+| `Loop Over Items` | Chunk array thành nhóm nhỏ |
 | `Merge` | Combine parallel branch |
 | `Switch` | Multi-way routing (3+ path) |
 | `Wait` | Pause chờ external webhook |
@@ -275,7 +275,7 @@ Sau Split In Batches, workflow chạy 4 lần (20/5). Dùng Merge node cuối đ
 
 **Multi-Pattern Solution**:
 
-```
+```text
 Pattern 1: Batch Processing
 └─ 200 review → batch 20
 

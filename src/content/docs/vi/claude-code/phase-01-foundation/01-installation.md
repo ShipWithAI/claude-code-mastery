@@ -60,7 +60,7 @@ $ node --version
 ```
 
 Output mong đợi:
-```
+```text
 v18.0.0   # hoặc cao hơn
 ```
 
@@ -77,7 +77,7 @@ $ npm install -g @anthropic-ai/claude-code
 ```
 
 Output mong đợi:
-```
+```text
 # Output có thể khác
 added 1 package in Xs
 ```
@@ -87,7 +87,7 @@ phương pháp cài đặt được recommend hiện tại, vì có thể thay �
 
 **Phương án B: Homebrew (macOS)** ⚠️ Cần xác minh
 ```bash
-$ brew install claude-code
+$ brew install --cask claude-code
 ```
 
 ⚠️ Tên formula Homebrew chính xác cần xác minh. Chạy `brew search claude` để
@@ -108,7 +108,7 @@ $ claude --version
 ```
 
 Output mong đợi:
-```
+```text
 # Output có thể khác
 claude version X.Y.Z
 ```
@@ -149,7 +149,7 @@ Lệnh này hiển thị tất cả slash command có sẵn. Bạn sẽ thấy c
 
 Trong Claude Code session, hỏi một câu đơn giản để xác minh mọi thứ hoạt động:
 
-```
+```text
 > Best practice cho error handling trong Go là gì?
 ```
 
@@ -282,7 +282,7 @@ $ claude
 | Tác vụ | Lệnh | Ghi chú |
 |--------|------|---------|
 | **Cài (npm)** | `npm install -g @anthropic-ai/claude-code` | Cần Node.js 18+ |
-| **Cài (Homebrew)** | `brew install claude-code` | ⚠️ Cần xác minh tên formula |
+| **Cài (Homebrew)** | `brew install --cask claude-code` | ⚠️ Cần xác minh tên formula |
 | **Kiểm tra version** | `claude --version` | Xác minh cài đặt thành công |
 | **Bắt đầu session** | `claude` | Mở interactive mode |
 | **Chế độ one-shot** | `claude -p "prompt"` | Single query, không session |
@@ -291,7 +291,7 @@ $ claude
 | **Xóa context** | `/clear` | Trong session; reset conversation |
 | **Xem chi phí** | `/cost` | Trong session; hiển thị token usage |
 | **Init project** | `/init` | Trong session; tạo CLAUDE.md |
-| **Thoát session** | `/exit` hoặc Ctrl+C | Rời Claude Code |
+| **Thoát session** | `/exit`, hoặc Ctrl+C hai lần (hoặc Ctrl+D) | Rời Claude Code |
 | **Set API Key** | `export ANTHROPIC_API_KEY="sk-..."` | Thay thế cho OAuth |
 | **Cấu hình** | `claude config` | Quản lý settings |
 

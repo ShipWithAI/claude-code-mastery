@@ -84,12 +84,12 @@ graph LR
 ### Step 1: Nhận Suggestion
 
 Prompt:
-```
+```text
 Recommend library validate số điện thoại VN
 ```
 
 Claude trả lời:
-```
+```text
 Dùng package `vn-phone-validator`:
 npm install vn-phone-validator
 
@@ -106,7 +106,7 @@ $ npm info vn-phone-validator
 ```
 
 Expected output:
-```
+```text
 npm ERR! code E404
 npm ERR! 404 Not Found - GET https://registry.npmjs.org/vn-phone-validator
 ```
@@ -116,13 +116,13 @@ npm ERR! 404 Not Found - GET https://registry.npmjs.org/vn-phone-validator
 ### Step 3: Yêu Cầu Correction
 
 Prompt Claude:
-```
+```text
 Package vn-phone-validator không tồn tại (404 từ npm).
 Suggest real alternative. Tôi sẽ verify với npm info.
 ```
 
 Claude correct:
-```
+```text
 Xin lỗi! Dùng `libphonenumber-js` — library thật:
 npm install libphonenumber-js
 ```
@@ -134,7 +134,7 @@ $ npm info libphonenumber-js
 ```
 
 Output:
-```
+```text
 libphonenumber-js@1.10.x
 Google's libphonenumber compiled to JavaScript...
 ```
@@ -148,7 +148,7 @@ $ cat node_modules/libphonenumber-js/README.md | head -100
 ```
 
 Hoặc yêu cầu Claude:
-```
+```text
 Read actual types/README của libphonenumber-js trước khi suggest API
 ```
 
@@ -207,6 +207,26 @@ Nếu Claude suggest tên nghe "quá perfect" như `super-date-formatter` hoặc
 3. Check official docs tại nodejs.org
 4. So sánh: Claude đúng hay sai?
 
+<details>
+<summary>✅ Solution</summary>
+
+Ví dụ verification:
+```bash
+# Claude suggest: fs.promises.readFileAsync('file.txt')
+# Check tại nodejs.org/api/fs.html#fspromisesreadfilepath-options
+# → Method thật là fs.promises.readFile(), không có suffix "Async"
+```
+
+So sánh:
+
+| Claude suggest | Thực tế (nodejs.org) | Kết quả |
+|---|---|---|
+| `fs.promises.readFileAsync()` | `fs.promises.readFile()` | ❌ Hallucination |
+| `fs.promises.writeFile()` | `fs.promises.writeFile()` | ✅ Đúng |
+
+**Why it works**: Docs của Node.js là nguồn xác thực duy nhất — tên method nghe "hợp lý" (thêm "Async" cho rõ nghĩa) nhưng không tồn tại thật.
+</details>
+
 ### Bài 3: Path Verification
 
 **Goal**: Verify file path Claude mention.
@@ -216,6 +236,24 @@ Nếu Claude suggest tên nghe "quá perfect" như `super-date-formatter` hoặc
 2. Claude mention một file path
 3. Run `ls <path>` hoặc `find . -name "filename"`
 4. Có match không?
+
+<details>
+<summary>✅ Solution</summary>
+
+Ví dụ:
+```bash
+# Claude nói: "Config nằm ở src/config/settings.ts"
+$ ls src/config/settings.ts
+ls: src/config/settings.ts: No such file or directory  # Output may vary
+
+$ find . -name "settings.ts"
+./src/lib/config.ts   # Output may vary — file thật ở path khác
+```
+
+Kết quả: path Claude đưa ra sai — Claude "đoán" theo convention phổ biến (`config/settings.ts`) thay vì đọc structure thật của project.
+
+**Why it works**: `ls`/`find` là ground truth — không bao giờ tin path AI đưa ra khi chưa verify trên chính máy bạn.
+</details>
 
 ---
 
@@ -244,7 +282,7 @@ Khi Claude nói những câu này, VERIFY ngay:
 ### Verification Prompts
 
 Yêu cầu Claude tự verify:
-```
+```text
 "Verify package exists trước khi suggest"
 "Read actual types/README của package này"
 "Run --help và show real flags"

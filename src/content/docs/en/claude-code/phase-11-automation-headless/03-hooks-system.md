@@ -91,7 +91,7 @@ graph LR
 mkdir -p .claude/hooks
 ```
 Expected output:
-```
+```text
 # Directory created (no output if successful)
 ```
 Why: Centralized location for all hook scripts.
@@ -114,7 +114,7 @@ EOF
 chmod +x .claude/hooks/log-change.sh
 ```
 Expected output:
-```
+```text
 # Script created and made executable
 ```
 Why: Immutable audit trail of every file Claude Code touches.
@@ -146,7 +146,7 @@ EOF
 chmod +x .claude/hooks/lint-check.sh
 ```
 Expected output:
-```
+```text
 # Script created and made executable
 ```
 Why: Prevents Claude Code from writing code that violates your style rules.
@@ -172,7 +172,7 @@ EOF
 chmod +x .claude/hooks/notify-complete.sh
 ```
 Expected output:
-```
+```text
 # Script created and made executable
 ```
 Why: Team visibility — everyone knows when AI-assisted work completes.
@@ -190,7 +190,7 @@ cat > .claude/hooks.json << 'EOF'
 EOF
 ```
 Expected output:
-```
+```text
 # Configuration file created
 ```
 

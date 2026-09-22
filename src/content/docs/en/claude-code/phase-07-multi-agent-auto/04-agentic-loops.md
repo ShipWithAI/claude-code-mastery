@@ -83,7 +83,7 @@ Every loop must have a way to stop:
 | **Max iterations** | "Try at most 5 times" |
 | **Threshold** | "Stop when response time < 100ms" |
 | **Timeout** | "Stop after 10 minutes" |
-| **Human intervention** | User types "stop" or presses Ctrl+C |
+| **Human intervention** | User types "stop" or presses **Esc** to interrupt the current turn |
 
 Without termination conditions, loops run until token budget exhausted.
 
@@ -114,7 +114,7 @@ $ claude
 ```
 
 Expected output:
-```
+```text
 Claude Code v1.x
 Type /help for commands
 >
@@ -123,7 +123,7 @@ Type /help for commands
 **Step 2: Invoke self-correction loop with explicit termination**
 
 Prompt:
-```
+```text
 Run npm test.
 
 If any tests fail:
@@ -143,7 +143,7 @@ After each iteration, report:
 **Step 3: Observe healthy loop progression**
 
 Expected output:
-```
+```text
 Running npm test...
 
 FAIL src/services/userService.test.ts
@@ -194,7 +194,7 @@ Loop terminating: success condition met.
 
 If you saw this instead:
 
-```
+```text
 === ITERATION 1 ===
 Fixing typo in line 45: "usr" → "user"...
 Running npm test...
@@ -213,7 +213,7 @@ FAIL 3 tests failed
 
 This is stuck. Same fix repeated, no progress. Intervene:
 
-```
+```text
 Stop. You're repeating the same fix three times.
 
 Let's analyze:
@@ -223,12 +223,12 @@ Let's analyze:
 
 **Step 5: Check token usage**
 
-```
+```text
 /cost
 ```
 
 Expected output:
-```
+```text
 Session cost: $0.15
 Tokens used: 45,000 input / 12,000 output
 ```
@@ -255,7 +255,7 @@ If cost is rising fast without progress, that confirms stuck loop.
 <summary>💡 Hint</summary>
 
 Good prompt structure:
-```
+```text
 [TASK]: Fix the failing test in userService.test.ts
 
 [LOOP]:
@@ -277,7 +277,7 @@ This makes the loop explicit and observable.
 <summary>✅ Solution</summary>
 
 Full prompt:
-```
+```text
 Read userService.test.ts and identify the failing assertion.
 Fix the implementation in userService.ts to make it pass.
 Run npm test.
@@ -331,7 +331,7 @@ Intervene early. Waiting doesn't help.
 Intervention phrases that work:
 
 **When stuck on same error:**
-```
+```text
 Stop. You've tried this approach 3 times with the same result.
 
 Explain:
@@ -341,7 +341,7 @@ Explain:
 ```
 
 **When changing without progress:**
-```
+```text
 Stop. Let's step back.
 
 What is the actual root cause here? Not just the symptom.
@@ -349,7 +349,7 @@ Explain your theory before fixing anything.
 ```
 
 **When algorithm is wrong:**
-```
+```text
 You're stuck because the approach is wrong, not the implementation.
 
 Try a completely different algorithm. What are 2-3 alternative ways to solve this?
@@ -388,7 +388,7 @@ After intervention, give either:
 | Stuck loop | "Stop. Explain what you've tried so far." |
 | Wrong direction | "Let's try a completely different approach." |
 | Sufficient progress | "That's good enough. Move on to next task." |
-| Emergency stop | Press Ctrl+C |
+| Emergency stop | Press **Esc** to interrupt immediately |
 
 ### Context Management in Loops
 
@@ -423,7 +423,7 @@ After intervention, give either:
 
 The team wrote one prompt with an explicit loop structure:
 
-```
+```text
 Read endpoints.json which lists all 50 REST endpoints.
 
 For each endpoint:

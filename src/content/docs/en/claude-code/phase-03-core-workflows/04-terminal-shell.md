@@ -72,7 +72,7 @@ Let's walk through a realistic scenario: setting up and testing a new microservi
 **Step 1: Create project structure**
 
 Ask Claude:
-```
+```text
 "Create a new Express API project called user-service with TypeScript,
 install dependencies, and show me the package.json"
 ```
@@ -83,7 +83,7 @@ mkdir -p user-service && cd user-service && npm init -y
 ```
 
 Expected output:
-```
+```text
 Wrote to /Users/you/projects/user-service/package.json:
 {
   "name": "user-service",
@@ -104,7 +104,7 @@ npm install express typescript @types/express @types/node ts-node
 ```
 
 This runs in **background mode**. Claude continues the conversation while npm downloads packages. You'll see:
-```
+```text
 ⏳ Running in background: npm install...
 ```
 
@@ -115,7 +115,7 @@ Why it matters: You don't wait for npm. Claude can continue answering questions 
 **Step 3: Check installation status**
 
 While install runs, ask Claude:
-```
+```text
 "Is the installation done? Show me the installed packages."
 ```
 
@@ -125,7 +125,7 @@ npm list --depth=0
 ```
 
 Expected output:
-```
+```text
 user-service@1.0.0
 ├── express@4.18.2
 ├── typescript@5.3.3
@@ -141,7 +141,7 @@ Why it matters: Claude can query intermediate state without blocking the workflo
 **Step 4: Create and run tests**
 
 Ask Claude:
-```
+```text
 "Create a simple test for a /health endpoint and run it with jest"
 ```
 
@@ -153,7 +153,7 @@ npm test
 ```
 
 Expected output:
-```
+```text
 > user-service@1.0.0 test
 > jest
 
@@ -171,7 +171,7 @@ Why it matters: Sequential operations with `&&` ensure each step completes befor
 **Step 5: Run development server in background**
 
 Ask Claude:
-```
+```text
 "Start the dev server and verify it's responding"
 ```
 
@@ -186,7 +186,7 @@ sleep 2 && curl http://localhost:3000/health
 ```
 
 Expected output:
-```
+```json
 {"status":"ok","timestamp":"2026-02-02T10:30:00.000Z"}
 ```
 
@@ -197,7 +197,7 @@ Why it matters: Background process (`&`) + verification command. Claude chains t
 **Step 6: Parse logs for errors**
 
 Ask Claude:
-```
+```text
 "Check the last 20 lines of application logs for any errors"
 ```
 
@@ -207,7 +207,7 @@ tail -n 20 logs/app.log | grep -i error
 ```
 
 Expected output (if clean):
-```
+```text
 (no output = no errors)
 ```
 
@@ -218,7 +218,7 @@ Why it matters: Claude can parse structured output, extract patterns, and interp
 **Step 7: Environment-aware commands**
 
 Ask Claude:
-```
+```text
 "Build the Docker image for production"
 ```
 
@@ -231,12 +231,12 @@ docker build -t user-service:latest \
 ```
 
 Expected output:
-```
+```text
 [+] Building 45.2s (12/12) FINISHED
  => [internal] load build definition from Dockerfile
  => => transferring dockerfile: 432B
  => [stage-1 3/5] COPY package*.json ./
- => [stage-1 4/5] RUN npm ci --only=production
+ => [stage-1 4/5] RUN npm ci --omit=dev
  => exporting to image
  => => naming to docker.io/library/user-service:latest
 ```
@@ -248,7 +248,7 @@ Why it matters: Claude constructs commands with appropriate flags and arguments 
 **Step 8: Multi-stage pipeline**
 
 Ask Claude:
-```
+```text
 "Run the full CI pipeline: lint, test, build, and verify the Docker image runs"
 ```
 
@@ -264,7 +264,7 @@ docker stop user-service-test
 ```
 
 Expected output (abbreviated):
-```
+```text
 > eslint . --ext .ts
 ✓ No linting errors
 
@@ -286,7 +286,7 @@ Why it matters: This demonstrates **chained commands with proper error handling*
 **Step 9: Error recovery**
 
 Suppose the test failed at step 8. Claude sees:
-```
+```text
 FAIL src/__tests__/auth.test.ts
   ✕ POST /login validates credentials (23 ms)
 
@@ -308,7 +308,7 @@ Why it matters: Claude doesn't just execute — it **monitors, detects failures,
 **Step 10: Cleanup and verification**
 
 Ask Claude:
-```
+```text
 "Clean up all test containers and verify nothing is still running"
 ```
 
@@ -320,7 +320,7 @@ docker ps --filter "name=user-service"
 ```
 
 Expected output:
-```
+```text
 user-service-test
 CONTAINER ID   IMAGE   COMMAND   CREATED   STATUS   PORTS   NAMES
 (empty = cleanup successful)
@@ -408,7 +408,7 @@ Output:
 <details>
 <summary>💡 Hint</summary>
 
-Create a Dockerfile with an error like `FRON node:18` (misspelled FROM) or `COPY nonexistent.txt /app/`. Claude will see the Docker build error output and can identify the syntax or file issue.
+Create a Dockerfile with an error like `FRON node:22` (misspelled FROM) or `COPY nonexistent.txt /app/`. Claude will see the Docker build error output and can identify the syntax or file issue.
 
 </details>
 
@@ -421,7 +421,7 @@ You: "Create a Dockerfile for a Node app but make it broken on purpose — I wan
 
 Claude creates:
 ```dockerfile
-FRON node:18
+FRON node:22
 WORKDIR /app
 COPY package.json .
 RUN npm install
@@ -435,7 +435,7 @@ docker build -t test-app .
 ```
 
 Output:
-```
+```text
 Error response from daemon: Dockerfile parse error line 1: unknown instruction: FRON
 ```
 
@@ -450,7 +450,7 @@ docker build -t test-app .
 ```
 
 Output:
-```
+```text
 [+] Building 8.2s (8/8) FINISHED
 => exporting to image
 ```
@@ -500,7 +500,7 @@ npm run coverage
 ```
 
 If the branch doesn't exist, output shows:
-```
+```text
 Cloning into 'demo-api'...
 error: pathspec 'feature/auth' did not match any file(s) known to git
 ```
@@ -514,7 +514,7 @@ cd demo-api && git branch -r
 ```
 
 Output:
-```
+```text
 origin/main
 origin/develop
 origin/feature/authentication
@@ -585,15 +585,15 @@ Claude re-runs the full chain with the correct branch name. All steps complete s
 
 ❌ Wrong:
 ```bash
-docker-compose up
+docker compose up
 # This blocks forever
 ```
 
 ✅ Correct:
 ```bash
-docker-compose up -d  # Detached mode
+docker compose up -d  # Detached mode
 sleep 3
-docker-compose ps     # Verify containers started
+docker compose ps     # Verify containers started
 ```
 
 **Special Case — npm/yarn Scripts**:
@@ -618,7 +618,7 @@ curl http://localhost:3000  # Verify running
 **Scenario**: Deploying a microservice update to Kubernetes staging cluster at 2 AM (production deploy window). The deployment requires building a new Docker image, running smoke tests in a temp container, pushing to registry, updating the K8s deployment, and verifying pod health. Normally this takes 15 minutes of manual terminal work.
 
 **Problem**: During the deploy, the smoke test failed with a cryptic error:
-```
+```text
 Error: connect ECONNREFUSED 10.0.0.45:5432
 ```
 
@@ -657,7 +657,7 @@ kubectl rollout history deployment/user-service -n staging
 ```
 
 Output revealed:
-```
+```text
 NAME                        READY   STATUS    RESTARTS   AGE
 postgres-6d8f9c4b5b-7x2n4   0/1     Pending   0          45s
 ```
@@ -669,7 +669,7 @@ kubectl describe pod postgres-6d8f9c4b5b-7x2n4 -n staging | grep -A 5 Events
 ```
 
 Output:
-```
+```text
 Events:
   Warning  FailedScheduling  30s   default-scheduler  0/3 nodes available:
   insufficient memory.

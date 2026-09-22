@@ -63,20 +63,16 @@ That said, CLAUDE.md is incredibly powerful because:
 
 ### Configuration Settings
 
-⚠️ Needs verification — the exact configuration commands may vary by Claude Code version.
-
-Claude Code has both global and project-level configuration:
+**There is no `claude config` subcommand.** Settings are plain JSON files — read and edit
+them directly:
 
 ```bash
-# View current configuration
-claude config show
-
-# Set a configuration value
-claude config set <key> <value>
-
-# Reset to defaults
-claude config reset
+cat ~/.claude/settings.json          # user settings
+cat .claude/settings.json            # project settings (committed)
+cat .claude/settings.local.json      # project-local (gitignored)
 ```
+
+⚠️ Field names inside these files are not verified in this course — check the official Claude Code docs for the current settings schema.
 
 **Typical configuration areas:**
 - **Permissions**: Default approval settings (callback to Module 2.2)
@@ -85,9 +81,10 @@ claude config reset
 - **Logging**: What gets logged and where
 
 **Project-level vs Global:**
-- **Global config**: Lives in `~/.claude/config` — affects all projects
-- **Project config**: Lives in `.claude/config` in project root — overrides global
-- **Use case**: Global = safe defaults, Project = exceptions for trusted repos
+- **Global settings**: `~/.claude/settings.json` — affects all projects
+- **Project settings**: `.claude/settings.json` in project root — committed, shared with the team
+- **Project-local settings**: `.claude/settings.local.json` — gitignored, machine-specific overrides
+- **Use case**: Global = safe defaults, project settings = exceptions for trusted repos
 
 ### Team Governance
 
@@ -286,7 +283,7 @@ EOF
 ```bash
 $ cat > .env.example << 'EOF'
 # Database
-DATABASE_URL=postgresql://user:password@localhost:5432/banking_dev
+DATABASE_URL=postgresql://username:password@localhost:5432/banking_dev
 DB_POOL_SIZE=10
 
 # Authentication
@@ -344,7 +341,7 @@ EOF
 ```
 
 **Expected result:**
-```
+```bash
 $ git status
 On branch main
 
@@ -369,7 +366,7 @@ $ cat > .git/hooks/pre-commit << 'EOF'
 echo "🔍 Running gitleaks secret scan..."
 
 # Run gitleaks on staged files only
-gitleaks protect --staged --verbose
+gitleaks git --pre-commit --staged --verbose
 
 EXIT_CODE=$?
 
@@ -402,7 +399,7 @@ $ git commit -m "test"
 ```
 
 **Expected output:**
-```
+```text
 🔍 Running gitleaks secret scan...
 
     ○
@@ -461,7 +458,7 @@ $ chmod +x sandbox.sh
 
 ### Step 5: Create Team Onboarding Document
 
-```bash
+````bash
 $ cat > SECURITY_ONBOARDING.md << 'EOF'
 # Banking API — Security Onboarding for Claude Code
 
@@ -605,30 +602,34 @@ By completing this onboarding, you're not just learning tools — you're joining
 our security culture. Every engineer is a security engineer.
 
 EOF
-```
+````
 
 **Expected result:** New team members have a clear, checkable path to safe Claude Code usage.
 
-### Step 6: Configure Claude Code (⚠️ Needs verification)
+### Step 6: Configure Claude Code
+
+Project settings live in `.claude/settings.json` (committed, shared with the team):
+
+```json
+{
+  "model": "sonnet"
+}
+```
+
+Verify:
 
 ```bash
-# Set project-level configuration
-$ claude config set model claude-3-5-sonnet-20241022
-$ claude config set auto-compact true
-$ claude config set log-level info
+$ cat .claude/settings.json
 ```
 
 **Expected output:**
-```
-Configuration updated:
-  model: claude-3-5-sonnet-20241022
-  auto-compact: true
-  log-level: info
-
-Config saved to: .claude/config
+```text
+{
+  "model": "sonnet"
+}
 ```
 
-**Why it matters:** Project-specific settings ensure consistency across team members.
+**Why it matters:** Project-level settings are plain JSON in git, so every teammate runs with the same model — and the change is reviewable in a PR. Full key list: https://code.claude.com/docs/en/settings
 
 ### Step 7: Run a Secure Claude Code Session
 
@@ -670,7 +671,7 @@ $ claude
 
 **During session:** Read EVERY permission prompt. Example:
 
-```
+```text
 Claude Code wants to:
   Read file: .env
 
@@ -681,7 +682,7 @@ Allow? [y/N]
 "No, please reference .env.example instead, not .env"
 
 **End session:**
-```
+```text
 /exit
 ```
 
@@ -852,7 +853,7 @@ The best onboarding docs are written by people who just went through onboarding.
 <details>
 <summary>✅ Solution Template</summary>
 
-```markdown
+````markdown
 # [Project Name] — Claude Code Security Onboarding
 
 Welcome! This guide will get you set up for safe AI-assisted development.
@@ -935,7 +936,7 @@ If something goes wrong:
 - Questions: [Slack channel]
 
 **Estimated time**: [Your estimate]
-```
+````
 
 **Validation**:
 - [ ] New hire can complete without asking questions
@@ -1109,16 +1110,18 @@ High-risk, high-likelihood, low-effort fixes go first.
 | **Git** | Never push without showing diff | Catches accidental commits |
 | **Database** | Never `DELETE` without `WHERE` | Prevents data loss |
 
-### Configuration Commands (⚠️ Needs verification)
+### Configuration Files
+
+Settings are plain JSON files — there's no CLI subcommand for viewing or resetting configuration.
 
 | Command | Purpose | Scope |
 |---------|---------|-------|
-| `claude config show` | View current settings | Global or project |
-| `claude config set key value` | Change setting | Global or project |
-| `claude config reset` | Restore defaults | Global or project |
+| `cat ~/.claude/settings.json` | View user settings | Global |
+| `cat .claude/settings.json` | View project settings (committed) | Project |
+| `cat .claude/settings.local.json` | View project-local settings (gitignored) | Project |
 
-**Project config**: Lives in `.claude/config` (overrides global)
-**Global config**: Lives in `~/.claude/config` (default for all projects)
+**Project settings**: Lives in `.claude/settings.json` (overrides global)
+**Global settings**: Lives in `~/.claude/settings.json` (default for all projects)
 
 ### Phase 2 Security Stack Summary
 
@@ -1165,7 +1168,7 @@ High-risk, high-likelihood, low-effort fixes go first.
 ```bash
 # Secret scanning
 gitleaks detect                    # Scan entire repo
-gitleaks protect --staged          # Scan staged files only
+gitleaks git --pre-commit --staged          # Scan staged files only
 gitleaks detect --verbose          # Detailed output
 
 # Environment verification
@@ -1324,7 +1327,7 @@ Last updated: 2024-01-15 (after incident #3)
 
 ---
 
-## Phase 2 Complete — Your Security Graduation
+### Phase 2 Complete — Your Security Graduation
 
 Congratulations! You've completed Phase 2: Security & Sandboxing. You now have a complete, operational security toolkit:
 

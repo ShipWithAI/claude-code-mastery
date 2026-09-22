@@ -1,5 +1,6 @@
 ---
 title: 'n8n + SDK Orchestration'
+description: 'Orchestrate Claude from n8n Code nodes and hand off to Claude Code headless for repo-aware tasks.'
 ---
 
 # Module 12.3: n8n + SDK Orchestration
@@ -40,7 +41,7 @@ const client = new Anthropic({
 });
 
 const response = await client.messages.create({
-  model: "claude-sonnet-4-20250514",
+  model: "sonnet",
   max_tokens: 1024,
   messages: [{ role: "user", content: $json.prompt }]
 });
@@ -60,7 +61,7 @@ return { response: response.content[0].text };
     "content-type": "application/json"
   },
   "body": {
-    "model": "claude-sonnet-4-20250514",
+    "model": "sonnet",
     "max_tokens": 1024,
     "messages": [{"role": "user", "content": "={{ $json.prompt }}"}]
   }
@@ -88,7 +89,7 @@ const client = new Anthropic({ apiKey: $env.ANTHROPIC_API_KEY });
 const userPrompt = $input.first().json.prompt;
 
 const response = await client.messages.create({
-  model: "claude-sonnet-4-20250514",
+  model: "sonnet",
   max_tokens: 2048,
   system: "You are a helpful assistant. Always respond in JSON format.",
   messages: [{ role: "user", content: userPrompt }]
@@ -123,7 +124,7 @@ const tools = [{
 }];
 
 const response = await client.messages.create({
-  model: "claude-sonnet-4-20250514",
+  model: "sonnet",
   max_tokens: 1024,
   tools: tools,
   messages: [{ role: "user", content: $json.prompt }]
@@ -181,7 +182,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const client = new Anthropic({ apiKey: $env.ANTHROPIC_API_KEY });
 
 const response = await client.messages.create({
-  model: "claude-sonnet-4-20250514",
+  model: "sonnet",
   max_tokens: 1024,
   system: "Respond only in valid JSON format.",
   messages: [{ role: "user", content: $json.prompt }]
@@ -228,7 +229,7 @@ const tools = [{
 }];
 
 const response = await client.messages.create({
-  model: "claude-sonnet-4-20250514",
+  model: "sonnet",
   max_tokens: 1024,
   tools: tools,
   messages: [{ role: "user", content: "What is 42 times 17?" }]
@@ -291,7 +292,7 @@ const client = new Anthropic({ apiKey: $env.ANTHROPIC_API_KEY });
 
 ```javascript
 const response = await client.messages.create({
-  model: "claude-sonnet-4-20250514",
+  model: "sonnet",
   max_tokens: 1024,
   messages: [{ role: "user", content: prompt }]
 });

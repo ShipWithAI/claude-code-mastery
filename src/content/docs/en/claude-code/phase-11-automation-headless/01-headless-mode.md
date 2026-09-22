@@ -127,7 +127,7 @@ head -5 README.md
 ```
 
 Output:
-```text
+```markdown
 # TypeScript Utility Library
 
 A collection of useful TypeScript utilities for common tasks.

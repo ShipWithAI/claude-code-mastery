@@ -140,7 +140,7 @@ Kết quả mong đợi: Claude Code khởi động ở interactive mode với p
 Prompt Claude Code với: "Run git status to show me the current repository state"
 
 Kết quả mong đợi (conceptual):
-```
+```text
 Claude Code wants to run a command:
 
   git status
@@ -161,7 +161,7 @@ Kết quả mong đợi: Claude Code chạy `git status` và hiện output cho b
 Prompt: "Delete all files in the src directory"
 
 Permission prompt mong đợi (conceptual):
-```
+```text
 Claude Code wants to run a command:
 
   rm -rf src/
@@ -179,7 +179,7 @@ Kết quả mong đợi: Claude Code dừng lại và trả lời kiểu như "I
 Prompt: "Show me the first 10 lines of README.md"
 
 Permission prompt mong đợi:
-```
+```text
 Claude Code wants to run a command:
 
   head -n 10 README.md
@@ -193,11 +193,13 @@ Click "Approve Always" (chỉ để demo thôi — cẩn thận với cái này 
 
 Kết quả mong đợi: Claude Code chạy command. Lần sau nó muốn chạy `head`, nó sẽ không hỏi (bạn đã approve command type này permanently cho session hoặc project này ⚠️ exact scope cần verification).
 
-**Bước 6: Kiểm tra Permission Setting** ⚠️ Needs verification
+**Bước 6: Kiểm tra Permission Setting**
 ```bash
-$ claude config show
+$ cat ~/.claude/settings.json          # user settings
+$ cat .claude/settings.json            # project settings (committed)
+$ cat .claude/settings.local.json      # project-local (gitignored)
 ```
-Kết quả mong đợi: Configuration output hiển thị current permission setting, allowlist, và trust level. ⚠️ Command chính xác và output format cần verification.
+Kết quả mong đợi: JSON hiển thị block `permissions` (allow/deny/ask lists). Settings là plain files — không có CLI subcommand để xem configuration.
 
 ---
 
@@ -238,19 +240,19 @@ Nếu Claude Code không trigger prompt cho network request, đó là thông tin
 **Đọc file**: Có thể không có prompt — Claude Code dùng Read tool trực tiếp.
 
 **Ghi file**: Nên trigger prompt như:
-```
+```text
 echo 'hello' > test.txt
 ```
 Approve nếu trong project directory.
 
 **List file**: Nên trigger prompt:
-```
+```text
 ls -la
 ```
 An toàn để approve — read-only operation.
 
 **Network request**: ⚠️ Behavior khác nhau. Có thể trigger prompt như:
-```
+```bash
 curl https://registry.npmjs.com/...
 ```
 Đây là READ operation nhưng liên quan network. Chỉ approve nếu bạn tin target và yêu cầu action này rõ ràng.
@@ -431,7 +433,7 @@ Ngay cả khi bạn là solo developer hoặc team nhỏ, vẫn nên document po
 | Cho rằng permission prompt sẽ bắt hết mọi thứ | Permission system bảo vệ khỏi SHELL COMMAND. Claude Code vẫn có thể ĐỌC bất kỳ file nào bạn có quyền truy cập mà không cần prompt. Permission không thay thế sandbox. |
 | Approve command trên path bạn không nhận ra | Nếu thấy `/etc/`, `~/.ssh/`, hoặc path ngoài project, DỪNG LẠI. Deny và hỏi Claude Code tại sao truy cập location đó. |
 | Phát triển "approval fatigue" và auto-click yes | Chống lại bằng: (1) allowlist các command thực sự an toàn ⚠️, (2) nghỉ giải lao, (3) hỏi tại sao Claude Code cần nhiều shell command — có thể prompt của bạn cần cải thiện. |
-| Văn hóa "chạy cho nhanh" dẫn đến approve không suy nghĩ | Dừng lại 3 giây trước mỗi approve. Nếu bạn không thể giải thích command đó làm gì, DENY. Nhớ Tùng trong Module 2.1 mất $2,847 vì "nhanh một chút"? |
+| Văn hóa "chạy cho nhanh" dẫn đến approve không suy nghĩ | Dừng lại 3 giây trước mỗi approve. Nếu bạn không thể giải thích command đó làm gì, DENY. Nhớ Nam trong Module 2.1 mất $2,847 vì "nhanh một chút"? |
 
 ---
 

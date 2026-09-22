@@ -46,7 +46,7 @@ The fastest method. Take a screenshot, then paste it directly into Claude Code:
 **Method 2: File Path Reference**
 
 Simply mention the file path in your prompt — Claude auto-reads image files when referenced:
-```
+```text
 Look at screenshot.png and fix the layout issue
 ```
 Supports: PNG, JPG, GIF, WebP
@@ -127,7 +127,7 @@ $ claude
 ```
 
 **Your prompt:**
-```
+```text
 See mobile-bug.png — the "Submit" button overlaps
 the form text when viewport is <400px wide.
 Fix the CSS to prevent this overlap.
@@ -136,7 +136,7 @@ Fix the CSS to prevent this overlap.
 **What Claude sees**: The exact visual state — button position, text flow, container dimensions.
 
 **Expected response pattern**:
-```
+```text
 I can see the button is using position: absolute
 without accounting for the form height. Here's the fix:
 
@@ -157,7 +157,7 @@ $ claude
 ```
 
 **Your prompt:**
-```
+```text
 See architecture.png — we're adding a new
 "Notification Service". Where should it sit in
 this architecture? Should it be behind the API
@@ -165,7 +165,7 @@ Gateway or talk to services directly?
 ```
 
 **Expected response pattern**:
-```
+```text
 Looking at your diagram, I see:
 - API Gateway → Auth Service → User Service
 - Payment Service talks directly to external APIs
@@ -187,7 +187,7 @@ $ claude
 ```
 
 **Your prompt:**
-```
+```text
 See console-error.png — this React error appears
 when I click "Delete". The stack trace is cut off.
 What's the likely cause and how do I debug it?
@@ -196,7 +196,7 @@ What's the likely cause and how do I debug it?
 **What Claude sees**: The error message, component names in the stack, React DevTools state, network tab status.
 
 **Expected response pattern**:
-```
+```text
 I can see this is a "Cannot read property 'id' of undefined"
 error in your DeleteButton component. Looking at the
 stack trace visible in your screenshot...
@@ -215,7 +215,7 @@ $ claude
 ```
 
 **Your prompt:**
-```
+```text
 See dashboard-wireframe.png — implement this
 in React with Tailwind CSS. Use the exact layout
 shown: sidebar left, main content area with
@@ -223,7 +223,7 @@ shown: sidebar left, main content area with
 ```
 
 **Expected response pattern**:
-```
+```text
 Based on your wireframe, here's the component structure:
 
 [Provides implementation that matches the visual
@@ -243,7 +243,7 @@ After using visual context:
 ```
 
 **Expected output:**
-```
+```text
 Total tokens: 8,234
 ├─ Input: 6,891 ($0.021)
 │  ├─ Text: 4,123 tokens
@@ -291,7 +291,7 @@ For the text description, try to be detailed but not exhaustive. Describe the bu
 <summary>✅ Solution Approach</summary>
 
 **Round 1 — Text-only example:**
-```
+```text
 Prompt: "My navigation menu items are too close together
 on mobile. They're hard to tap. I think the padding is
 wrong. It's a flex container with space-between."
@@ -301,7 +301,7 @@ Accuracy: Depends on how well you described it
 ```
 
 **Round 2 — Screenshot example:**
-```
+```text
 Prompt: "See nav-bug.png — menu items overlap on mobile.
 Fix the spacing."
 
@@ -325,7 +325,7 @@ Follow-ups: Usually none needed
    - Should show: layout structure, component hierarchy, basic content
 2. Save as PNG/JPG
 3. Prompt Claude Code:
-   ```
+   ```text
    See wireframe.png — implement this component
    in [your framework: React/Vue/Svelte].
    Use [your styling: Tailwind/CSS-in-JS/plain CSS].
@@ -350,7 +350,7 @@ If the wireframe is hand-drawn or low-fidelity, add clarification in your prompt
 <summary>✅ Solution Pattern</summary>
 
 **Good wireframe prompt structure:**
-```
+```text
 See [filename] — this is a [component type] for [purpose].
 
 Layout details:
@@ -449,7 +449,7 @@ Use semantic HTML. Make it responsive.
 1. Designer exports PNG from Figma at 2x resolution
 2. Developer crops to show one screen at a time
 3. Provides to Claude Code with framework context:
-   ```
+   ```text
    See transaction-screen.png — implement this in
    Compose Multiplatform. Match the layout exactly.
    Use our design tokens from theme/tokens.kt.

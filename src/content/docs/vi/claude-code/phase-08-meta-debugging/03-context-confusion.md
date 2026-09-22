@@ -74,7 +74,7 @@ Watch for:
 
 ### Khi Nào Dùng /compact
 
-```
+```text
 Claude reference old info? → /compact
 Switch sang topic mới? → /compact trước
 Session > 1 giờ dense work? → Proactive /compact
@@ -90,7 +90,7 @@ Severe confusion, không gì help? → /clear + fresh start
 
 ### Step 1: Observe Confusion Symptom
 
-```
+```text
 Bạn: Implement payment webhook handler.
 
 Claude: Tôi sẽ tạo payment webhook handler. Dựa trên thảo luận
@@ -103,7 +103,7 @@ trước, tôi sẽ dùng JWT validation middleware...
 
 ### Step 2: Confirm Confusion
 
-```
+```text
 Bạn: Payment webhook không dùng JWT. Nó dùng signature verification
 với webhook secret. JWT là cho user auth, không phải webhook.
 
@@ -117,12 +117,12 @@ signature verification — MIXED approach]
 
 ### Step 3: Dùng /compact để Clear Confusion
 
-```
+```text
 /compact
 ```
 
 Expected output:
-```
+```text
 Context compacted. Summary retained:
 - Đang làm payment system integration
 - Cần webhook handler cho payment notification
@@ -131,7 +131,7 @@ Context compacted. Summary retained:
 
 ### Step 4: Re-ground Sau Compact
 
-```
+```text
 Bạn: To be clear cho webhook handler:
 - Đây là PAYMENT webhook (VNPay, Stripe), KHÔNG phải user auth
 - Dùng signature verification với webhook secret
@@ -202,7 +202,7 @@ Watch for: pattern cũ xuất hiện trong implementation mới, mixed terminolo
 **Most effective re-grounding pattern**:
 
 Sau topic switch:
-```
+```text
 Topic trước (auth) COMPLETE. Đừng reference.
 New topic: Payment processing.
 Key fact:
@@ -212,7 +212,7 @@ Key fact:
 ```
 
 Sau confusion detected:
-```
+```text
 STOP. Clear assumption về file này.
 Current truth:
 - File: paymentWebhook.ts
@@ -245,13 +245,13 @@ Start fresh với understanding này.
 ### Re-grounding Template
 
 Sau `/compact`:
-```
+```text
 "Current state: Đang implement [X] dùng [Y approach].
 Discussion trước về [Z] không còn relevant.
 Continue với [specific next step]."
 ```
 
-```
+```text
 "Forget [old topic]. New focus: [new topic].
 Key constraint: [most important requirement]."
 ```
@@ -293,12 +293,12 @@ Key constraint: [most important requirement]."
 
 **Fix applied**:
 
-```
+```text
 /compact
 ```
 
 Sau đó:
-```
+```text
 New context: ONLY ORDER service now.
 - Product catalog DONE, đừng reference
 - Order service handle: checkout, payment, fulfillment

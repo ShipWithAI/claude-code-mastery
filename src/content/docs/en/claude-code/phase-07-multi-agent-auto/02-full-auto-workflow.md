@@ -52,7 +52,7 @@ Start with the right prompt structure:
 
 ### Phase 3: MONITOR
 
-Full Auto doesn't mean unattended. Watch for unexpected file access, error messages, and scope creep. Keep Ctrl+C ready.
+Full Auto doesn't mean unattended. Watch for unexpected file access, error messages, and scope creep. Keep **Esc** ready to interrupt the current turn.
 
 ### Phase 4: VERIFY
 
@@ -87,7 +87,7 @@ $ git status
 ```
 
 Expected output:
-```
+```text
 On branch auto/generate-service-tests
 nothing to commit, working tree clean
 ```
@@ -98,7 +98,7 @@ Now start Claude and run Think+Plan first:
 $ claude
 ```
 
-```
+```text
 Think carefully about generating unit tests for all services in src/services/.
 Consider: test framework (Jest), mocking strategy for dependencies,
 edge cases, error conditions.
@@ -107,7 +107,7 @@ Create a detailed execution plan. Don't write any code yet.
 
 Claude outputs a plan covering test structure, mocking approach, coverage goals, and file organization. Review it, then compact:
 
-```
+```text
 /compact
 ```
 
@@ -115,7 +115,7 @@ Claude outputs a plan covering test structure, mocking approach, coverage goals,
 
 Now activate Full Auto mode. ⚠️ Needs verification on exact flag syntax:
 
-```
+```text
 Execute the test generation plan you created.
 
 Boundaries:
@@ -133,7 +133,7 @@ Checkpoints:
 
 **Step 3: MONITOR — Watch Progress**
 
-Terminal shows checkpoint progress. Watch for files created outside `__tests__/`, repeated errors, or service file modifications. Keep Ctrl+C ready.
+Terminal shows checkpoint progress. Watch for files created outside `__tests__/`, repeated errors, or service file modifications. Keep **Esc** ready to interrupt the current turn.
 
 **Step 4: VERIFY — Check Everything**
 
@@ -218,7 +218,7 @@ Before starting Full Auto, check ALL items:
 
 ### Full Auto Prompt Template
 
-```
+```text
 Execute [reference to plan].
 
 Boundaries:
@@ -235,7 +235,7 @@ Checkpoints:
 
 ### Emergency Stop
 
-**Ctrl+C** — stops execution immediately
+**Esc** — interrupts the current turn immediately; your session and context stay intact
 
 ### Post-Execution Verification
 
@@ -270,7 +270,7 @@ Checkpoints:
 **Attempt 2 (Right)**: Senior dev used proper workflow:
 - **PREPARE**: Created branch, planned 6 batches (utils → services → routes → components → pages → config)
 - **EXECUTE**: Batch 1 only touched `src/utils/`, explicit boundaries set
-- **MONITOR**: Caught Claude violating boundary (tried fixing import in `src/services/`), stopped (Ctrl+C), clarified, restarted
+- **MONITOR**: Caught Claude violating boundary (tried fixing import in `src/services/`), stopped (pressed **Esc**), clarified, restarted
 - **VERIFY**: `git diff`, type-check, tests all passed
 
 Repeated for 6 batches over one week.

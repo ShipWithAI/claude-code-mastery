@@ -95,7 +95,7 @@ $ claude
 ```
 
 First prompt:
-```
+```text
 I need to refactor auth from session-based to JWT. 8 files affected.
 
 Phase plan:
@@ -122,12 +122,12 @@ This sets expectations: methodical, structured, file-focused.
 **Step 3: Phase 1 Completion + Compact**
 
 After Claude's analysis:
-```
+```text
 /compact
 ```
 
 Expected output:
-```
+```text
 Context compacted. Key information preserved:
 - Current auth uses Express sessions + Passport
 - User passwords hashed with bcrypt
@@ -150,14 +150,14 @@ Expected: Complete jwt.js file written directly. No back-and-forth needed.
 **Step 5: Task Decomposition — File by File**
 
 Back in main session (already compacted):
-```
+```text
 Phase 3: Execution. Let's update files one by one.
 
 File 1/8: Update middleware/auth.js to use JWT instead of session.
 ```
 
 Claude updates file. Then:
-```
+```text
 /compact
 ```
 
@@ -166,7 +166,7 @@ Repeat for each file. Each `/compact` clears the previous file's details while p
 **Step 6: Context Recycling — Save Analysis**
 
 After Phase 2 (Planning), save the architecture:
-```
+```text
 Save the JWT architecture design to docs/jwt-migration.md for future reference.
 ```
 
@@ -188,12 +188,12 @@ Now this context is permanent, reusable, and doesn't consume conversation tokens
 **Step 7: Final Cost Review**
 
 After Phase 4:
-```
+```text
 /cost
 ```
 
 Expected output:
-```
+```text
 Session Cost Summary:
 - Input tokens: 28,450
 - Output tokens: 12,300
@@ -239,7 +239,7 @@ Don't explain HOW to refactor yet — that's Phase 2.
 <summary>✅ Solution</summary>
 
 Example first prompt:
-```
+```text
 Refactor payment processing to support multiple gateways (Stripe, PayPal, Bank Transfer).
 Currently hard-coded to Stripe in 6 files.
 
@@ -253,7 +253,7 @@ Phase 1: Analyze services/stripe.js, controllers/payment.js, models/transaction.
 ```
 
 After analysis and `/compact`:
-```
+```text
 Context compacted. Key information preserved:
 - Stripe API calls in 8 locations
 - Hard-coded API keys in services/stripe.js
@@ -325,7 +325,7 @@ Time: ~3-4 minutes. Tokens: ~800 input, ~2500 output total (vs. 3000+ input for 
 
 ### Session Phase Template
 
-```
+```text
 Phase 1: Understanding
 - Read relevant files (3-5 max)
 - Ask clarifying questions
@@ -370,7 +370,7 @@ Format: [EXPORT_STYLE, COMMENTS, ETC]"
 
 ### /compact Decision Flowchart
 
-```
+```text
 Is task complete or at phase boundary?
   YES → /compact
   NO ↓
@@ -420,7 +420,7 @@ Continue without compacting
    - Phase 4: Integration tests + docs
 
 2. **Context Priming**: First prompt for each service:
-   ```
+   ```text
    Extracting [SERVICE_NAME] service. Monolith files: [3-5 key files].
    Target: Standalone service with REST API, own DB, async events.
    Phase 1: Analyze domain logic in monolith.

@@ -153,7 +153,7 @@ $ claude -p "Design an API endpoint for managing user preferences (theme, langua
 ```
 
 Expected output:
-```
+```text
 Created architecture.md with:
 - POST /api/v1/users/:id/preferences
 - Schema: { theme: string, language: string, notifications: boolean }

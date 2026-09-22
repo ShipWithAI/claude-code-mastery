@@ -60,7 +60,7 @@ graph TD
 
 ### Planning Prompt Template
 
-```
+```text
 Tôi cần [mục tiêu cụ thể].
 Trạng thái hiện tại: [cái gì đã có]
 Constraint: [cái gì không đổi được]
@@ -101,7 +101,7 @@ $ claude
 ```
 
 Prompt:
-```
+```text
 Tôi cần thêm notification system hỗ trợ email (SendGrid) và push (Firebase).
 Gồm template system và rate limiting.
 
@@ -118,7 +118,7 @@ KHÔNG viết code. CHỈ plan.
 ```
 
 Output mong đợi:
-```
+```markdown
 ## Execution Plan: Notification System
 
 ### File Ảnh Hưởng (12 file)
@@ -155,7 +155,7 @@ Output mong đợi:
 ### Bước 2: CONFIRM — Challenge và Adjust
 
 Prompt:
-```
+```text
 Plan tốt. Ba điều chỉnh:
 1. Thêm SMS qua Twilio làm channel thứ 3
 2. Template system lên bước 2 (provider phụ thuộc vào nó)
@@ -169,7 +169,7 @@ Claude revise — issue bị bắt TRƯỚC khi code.
 ### Bước 3: EXECUTE Bước 1
 
 Prompt:
-```
+```text
 Plan approved. Implement bước 1: notification interface và types.
 ```
 
@@ -188,12 +188,12 @@ export interface NotificationPayload {
 
 Sau khi hoàn thành bước 1-4:
 
-```
+```text
 /compact
 ```
 
 Rồi:
-```
+```text
 Đang ở bước 5/12. Review progress so với plan.
 On track? Cần adjust gì không?
 ```
@@ -240,7 +240,7 @@ Câu hỏi challenge tốt:
 <summary>✅ Đáp án</summary>
 
 **Planning prompt**:
-```
+```text
 Tôi cần thêm CSV export cho user data. Hỗ trợ filter theo date range
 và user status. Hiện tại: Express API với Prisma ORM.
 
@@ -305,7 +305,7 @@ Tự hỏi:
 
 ### Planning Prompt Template
 
-```
+```text
 Tôi cần [mục tiêu].
 Hiện tại: [cái gì có]
 Constraint: [không đổi được]
@@ -321,7 +321,7 @@ KHÔNG viết code. CHỈ plan.
 
 ### Checkpoint Template
 
-```
+```text
 Đang ở bước X/Y. /compact rồi review:
 - Progress so với plan?
 - Cần adjust?
@@ -330,7 +330,7 @@ KHÔNG viết code. CHỈ plan.
 
 ### Plan Revision Template
 
-```
+```text
 Plan tốt. Điều chỉnh:
 1. [Thêm/bỏ/sắp lại]
 2. [Constraint mới]

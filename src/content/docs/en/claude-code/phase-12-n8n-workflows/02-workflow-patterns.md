@@ -25,7 +25,7 @@ Workflow patterns are the "recipes" of automation. Just like software design pat
 
 ### Pattern 1: Sequential Pipeline
 
-```
+```text
 [Input] → [Claude: Step 1] → [Claude: Step 2] → [Claude: Step 3] → [Output]
 ```
 
@@ -34,7 +34,7 @@ Workflow patterns are the "recipes" of automation. Just like software design pat
 
 ### Pattern 2: Parallel Fan-Out/Fan-In
 
-```
+```text
          ┌→ [Claude: Task A] →┐
 [Input] ─┼→ [Claude: Task B] →┼→ [Merge] → [Output]
          └→ [Claude: Task C] →┘
@@ -45,7 +45,7 @@ Workflow patterns are the "recipes" of automation. Just like software design pat
 
 ### Pattern 3: Classification Router
 
-```
+```text
 [Input] → [Claude: Classify] → [Switch] ─→ [Handler A]
                                        ├→ [Handler B]
                                        └→ [Handler C]
@@ -56,7 +56,7 @@ Workflow patterns are the "recipes" of automation. Just like software design pat
 
 ### Pattern 4: Human-in-the-Loop
 
-```
+```text
 [Input] → [Claude: Draft] → [Wait for Approval] → [IF Approved] → [Execute]
                                                         ↓ No
                                                [Claude: Revise] → [Back to Wait]
@@ -67,8 +67,8 @@ Workflow patterns are the "recipes" of automation. Just like software design pat
 
 ### Pattern 5: Batch Processing
 
-```
-[Input List] → [Split In Batches] → [Claude: Process Each] → [Aggregate] → [Output]
+```text
+[Input List] → [Loop Over Items] → [Claude: Process Each] → [Aggregate] → [Output]
 ```
 
 **Use when**: Processing many items, need rate limiting or chunking.
@@ -76,7 +76,7 @@ Workflow patterns are the "recipes" of automation. Just like software design pat
 
 ### Pattern 6: Error Recovery Loop
 
-```
+```text
 [Input] → [Claude: Try] → [IF Error] → [Claude: Fix] → [Retry]
                               ↓ Success
                           [Output]
@@ -121,11 +121,11 @@ return [{ json: { category, original: $('Webhook').first().json } }];
 
 ### Demo 3: Batch Processing — Document Analysis
 
-**Split In Batches**: Size 10, reset on each run
+**Loop Over Items**: Size 10, reset on each run
 
 **Execute Command**: `claude -p "Summarize each document:\n\n{{ JSON.stringify($json) }}"`
 
-**Merge Node**: "Merge By Position" to collect all outputs
+**Merge Node**: "Merge (Combine → Position)" to collect all outputs
 
 ---
 
@@ -189,7 +189,7 @@ Make Claude return ONLY the category name. Use a Code node to clean/lowercase th
 <summary>✅ Solution</summary>
 
 **Classify prompt:**
-```
+```text
 "Classify as exactly one of: question, complaint, feedback, spam. Return ONLY the word.\n\nMessage: {{ $json.message }}"
 ```
 
@@ -208,28 +208,28 @@ return [{ json: { type: $input.first().json.stdout.trim().toLowerCase() } }];
 
 **Instructions**:
 1. Webhook receives array of 20 items
-2. Split In Batches (size 5)
+2. Loop Over Items (size 5)
 3. Claude summarizes each batch
 4. Merge all results
 
 <details>
 <summary>💡 Hint</summary>
 
-After Split In Batches, the workflow runs 4 times (20/5). Use Merge node at the end to collect all outputs.
+After Loop Over Items, the workflow runs 4 times (20/5). Use Merge node at the end to collect all outputs.
 
 </details>
 
 <details>
 <summary>✅ Solution</summary>
 
-**Split In Batches:** Batch Size = 5
+**Loop Over Items:** Batch Size = 5
 
 **Execute Command:**
 ```json
 { "command": "claude", "arguments": "-p \"Summarize these items:\n\n{{ JSON.stringify($json) }}\"" }
 ```
 
-**Merge node:** Mode = "Merge By Position"
+**Merge node:** Mode = "Merge (Combine → Position)"
 
 </details>
 
@@ -252,7 +252,7 @@ After Split In Batches, the workflow runs 4 times (20/5). Use Merge node at the 
 
 | Node | Purpose |
 |------|---------|
-| `Split In Batches` | Chunk arrays into smaller groups |
+| `Loop Over Items` | Chunk arrays into smaller groups |
 | `Merge` | Combine parallel branches |
 | `Switch` | Multi-way routing (3+ paths) |
 | `Wait` | Pause for external webhook |
@@ -291,7 +291,7 @@ After Split In Batches, the workflow runs 4 times (20/5). Use Merge node at the 
 
 **Multi-Pattern Solution**:
 
-```
+```text
 Pattern 1: Batch Processing
 └─ 200 reviews → batches of 20
 

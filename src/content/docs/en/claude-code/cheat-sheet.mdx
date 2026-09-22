@@ -51,7 +51,7 @@ Use **one-shot mode** (`-p`) for quick questions. Use **REPL mode** for multi-tu
 | `/vim` | Enable vim mode | For vim users |
 | `/bug` | Report a bug | Send bug report to Anthropic |
 | `/export` | Export conversation to file | Save session for later reference |
-| `/exit` or `Ctrl+C` | Exit session | Done working |
+| `/exit` or `Ctrl+C` twice (or `Ctrl+D`) | Exit session | Done working |
 
 <Aside type="caution">
 `/compact` preserves task context while freeing space. `/clear` erases everything. Prefer `/compact` during active work.
@@ -61,9 +61,9 @@ Use **one-shot mode** (`-p`) for quick questions. Use **REPL mode** for multi-tu
 
 | Shortcut | Action |
 |----------|--------|
-| `Escape` | Cancel current generation |
+| `Escape` | Interrupt the current turn — session and context stay intact |
 | `Escape` × 2 | Rewind — show message selector to undo |
-| `Ctrl+C` | Interrupt / exit |
+| `Ctrl+C` twice (or `Ctrl+D`) | Exit the session |
 | `Ctrl+V` | Paste image from clipboard (macOS: `Ctrl+V`, NOT `Cmd+V`) |
 | `Ctrl+G` | Open prompt in external editor (`$EDITOR`) |
 | `Ctrl+L` | Clear terminal screen |
@@ -209,7 +209,7 @@ Thumbs.db
 
 ```bash
 # .env.example — committed to git, safe for Claude to read
-DATABASE_URL=postgresql://user:password@localhost:5432/dbname
+DATABASE_URL=postgresql://username:password@localhost:5432/dbname
 REDIS_URL=redis://:password@localhost:6379
 API_KEY=your_api_key_here
 STRIPE_KEY=sk_test_placeholder
@@ -245,7 +245,7 @@ brew install gitleaks
 # Add pre-commit hook
 cat > .git/hooks/pre-commit << 'HOOK'
 #!/bin/bash
-gitleaks protect --staged --verbose
+gitleaks git --pre-commit --staged --verbose
 if [ $? -ne 0 ]; then
     echo "SECRETS DETECTED! Commit blocked."
     exit 1

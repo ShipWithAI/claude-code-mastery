@@ -144,7 +144,7 @@ $ git push origin test-claude-review
 
 Tạo PR trên GitHub. Sau ~30 giây, bạn sẽ thấy comment từ bot:
 
-```
+```text
 🤖 Claude Code Review
 
 File: src/test.ts

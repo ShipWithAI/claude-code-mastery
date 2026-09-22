@@ -39,7 +39,7 @@ Key features:
 
 ### n8n + Claude Code Architecture
 
-```
+```text
 [Trigger] → [n8n Workflow] → [Execute Claude Code] → [Process Output] → [Action]
     │             │                  │                     │              │
   Email      Visual Editor        claude -p            Parse JSON      Slack
@@ -85,7 +85,7 @@ $ n8n start
 ```
 
 Expected output:
-```
+```text
 n8n ready on port 5678
 Editor is now accessible via: http://localhost:5678
 ```
@@ -375,7 +375,7 @@ return [{ json: { result: output } }];
 
 | ❌ Mistake | ✅ Correct Approach |
 |---|---|
-| Claude CLI not in n8n's PATH | Use full path: `/usr/local/bin/claude` |
+| Claude CLI not in n8n's PATH | Use full path: `~/.local/bin/claude` |
 | API key not available | Set `ANTHROPIC_API_KEY` before starting n8n |
 | No timeout on Claude calls | Set timeout in Execute Command (60000ms+) |
 | Quotes breaking prompts | Use Set node to prepare complex prompts |
@@ -393,7 +393,7 @@ return [{ json: { result: output } }];
 
 **n8n + Claude Solution**:
 
-```
+```text
 [Email Trigger] → [Claude: Extract] → [Claude: Suggest] → [Google Sheets]
                                                               ↓
                                           [Slack] ← [Trello: Create Card]

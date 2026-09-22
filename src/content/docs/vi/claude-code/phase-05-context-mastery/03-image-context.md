@@ -49,7 +49,7 @@ Cách nhanh nhất. Chụp screenshot rồi dán trực tiếp vào Claude Code:
 **Phương pháp 2: Tham chiếu đường dẫn file**
 
 Chỉ cần nhắc đến đường dẫn file trong prompt — Claude tự đọc file ảnh khi được tham chiếu:
-```
+```text
 Xem screenshot.png và fix layout issue
 ```
 Hỗ trợ: PNG, JPG, GIF, WebP
@@ -111,7 +111,7 @@ Image tốn nhiều token hơn text. **Chiến lược**: Không screenshot mọ
 
 **Tình huống**: Button padding không đều trên mobile.
 
-```
+```text
 Prompt (không screenshot):
 "Button 'Đăng nhập' trên mobile có padding không đều.
 Top 12px, bottom 8px, left 16px, right 14px.
@@ -120,7 +120,7 @@ Text không căn giữa. Fix layout."
 
 **Response**: Claude đưa fix dựa trên đoán — có thể không khớp với issue thật.
 
-```
+```text
 Prompt (với screenshot):
 [Attach screenshot showing the button]
 "Screenshot này cho thấy button 'Đăng nhập' có layout issue.
@@ -135,7 +135,7 @@ Analyze và fix padding và alignment."
 
 **Tình huống**: Giải thích microservices architecture.
 
-```
+```text
 Prompt (text):
 "Hệ thống có API Gateway, Auth Service, Payment Service,
 Notification Service. Gateway route đến services.
@@ -144,7 +144,7 @@ Auth dùng Redis cache. Payment call external bank API..."
 
 **Mất công mô tả**, reader phải hình dung trong đầu.
 
-```
+```text
 Prompt (diagram):
 [Attach architecture diagram PNG]
 "Dựa vào diagram này, review architecture và suggest improvements
@@ -159,14 +159,14 @@ cho scalability và fault tolerance."
 
 **Tình huống**: Runtime error trong browser.
 
-```
+```text
 Prompt (text):
 "TypeError: Cannot read properties of undefined (reading 'map')
 at Component.render line 47
 Stack trace dài..."
 ```
 
-```
+```text
 Prompt (screenshot):
 [Attach DevTools screenshot showing error + stack + state]
 "Analyze error này. Screenshot có đầy đủ stack trace và state."
@@ -180,7 +180,7 @@ Prompt (screenshot):
 
 **Tình huống**: Figma mockup cần implement.
 
-```
+```text
 Prompt:
 [Attach wireframe PNG]
 "Implement screen này bằng Jetpack Compose.
@@ -201,7 +201,7 @@ Sau các bước trên, check cost impact:
 ```
 
 **Expected output**:
-```
+```text
 Total tokens: ~4,200
   - Text: 800 tokens
   - Images: ~3,400 tokens (2 screenshots)
@@ -238,7 +238,7 @@ Chọn UI bug **visual rõ ràng** (không phải logic bug). VD: button không 
 <summary>✅ Đáp án</summary>
 
 **Round 1 (Text)**:
-```
+```text
 Prompt: "Button 'Submit' trên form đăng ký có padding top 8px,
 bottom 12px. Text không căn giữa vertical. Background #2196F3. Fix."
 
@@ -247,7 +247,7 @@ line-height, surrounding elements.
 ```
 
 **Round 2 (Screenshot)**:
-```
+```text
 Prompt: [Screenshot] "Fix button alignment issue."
 
 Response: Claude thấy chính xác font rendering, actual pixel misalignment,
@@ -286,7 +286,7 @@ Wireframe càng rõ ràng → code càng accurate. Annotate measurements trên w
 **Wireframe**: Card với image (top), title (bold 18sp), description (14sp gray), button (bottom, primary color).
 
 **Prompt**:
-```
+```text
 [Attach wireframe]
 "Implement card component này bằng Jetpack Compose.
 Padding 16dp, corner radius 12dp, elevation 4dp.

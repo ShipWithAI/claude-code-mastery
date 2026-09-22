@@ -169,7 +169,7 @@ $ claude
 
 Trong session, yêu cầu Claude liệt kê home directory:
 
-```
+```text
 > Run: ls -la ~
 ```
 
@@ -180,12 +180,12 @@ mà không hỏi, đó là thông tin quan trọng về configuration của bạ
 
 Yêu cầu Claude kiểm tra xem nó có thể thấy SSH key không:
 
-```
+```text
 > Run: ls ~/.ssh/
 ```
 
 Kết quả mong đợi (nếu bạn có SSH key):
-```
+```text
 # Output có thể khác
 id_rsa
 id_rsa.pub
@@ -198,7 +198,7 @@ CÓ THỂ thấy các file này nếu user của bạn có thể.
 
 **Bước 3: Kiểm tra access đến credential**
 
-```
+```text
 > Run: cat ~/.aws/credentials 2>/dev/null || echo "No AWS credentials file"
 ```
 
@@ -209,7 +209,7 @@ access key của bạn trong context window.
 
 Yêu cầu Claude chạy gì đó bạn sẽ deny:
 
-```
+```text
 > Run: rm -rf ~/Desktop/test-delete-me
 ```
 
@@ -222,13 +222,13 @@ Nếu không có permission prompt, bạn KHÔNG CÓ protection dựa trên perm
 
 **Bước 5: Kiểm tra gì có thể vô tình bị commit**
 
-```
+```text
 > Run: git status --porcelain
 ```
 
 Sau đó kiểm tra .gitignore:
 
-```
+```text
 > Run: cat .gitignore
 ```
 
@@ -237,7 +237,7 @@ So sánh: Có file nhạy cảm nào (`.env`, `credentials.json`, etc.) KHÔNG c
 
 **Bước 6: Thoát và suy ngẫm**
 
-```
+```text
 /exit
 ```
 
@@ -288,7 +288,7 @@ MoMo, VNPay, ZaloPay, Shopee API — đây là target giá trị cao.
 <summary>✅ Đáp án</summary>
 
 Ví dụ audit output:
-```
+```text
 CRITICAL:
 - ~/.ssh/id_rsa (SSH private key)
 - ~/.aws/credentials (AWS access key)
@@ -345,7 +345,7 @@ Claude đề xuất trước khi nó hành động.
 
 Document finding của bạn:
 
-```
+```text
 Permission behavior của Claude Code của tôi:
 - Nó có hỏi trước khi chạy shell command? [CÓ/KHÔNG]
 - Tôi có thể deny command? [CÓ/KHÔNG]
@@ -364,28 +364,25 @@ như có full unrestricted access đến hệ thống của bạn.
 
 **Mục tiêu**: Thiết lập protection thực tế cho file nhạy cảm.
 
-⚠️ **Claude Code có thể có hoặc không hỗ trợ file `.claudeignore`.** Bài tập
-này show concept; verify xem version của bạn có hỗ trợ không.
+**Claude Code không có cơ chế blocklist kiểu gitignore** (không tồn tại ignore-file nào cả).
+Cơ chế thật là `permissions.deny` trong `.claude/settings.json`.
 
 **Hướng dẫn**:
 
-**Option A: Nếu .claudeignore tồn tại**
-1. Tạo file `.claudeignore` trong home directory:
-```bash
-$ cat > ~/.claudeignore << 'EOF'
-.ssh/
-.aws/
-.env
-*.pem
-*.key
-credentials*
-EOF
+**Option A: Deny các path nhạy cảm trong settings.json**
+1. Thêm list `permissions.deny` vào `~/.claude/settings.json` (user-level, áp dụng cho mọi project):
+```json
+{
+  "permissions": {
+    "deny": ["Read(~/.ssh/**)", "Read(~/.aws/**)", "Read(./.env)", "Read(./.env.*)", "Read(**/*.pem)", "Read(**/*.key)"]
+  }
+}
 ```
 
-2. Verify nó hoạt động bằng cách yêu cầu Claude đọc file bị ignore
+2. Verify nó hoạt động bằng cách yêu cầu Claude đọc một trong các path bị deny — request phải bị chặn, không chỉ là prompt hỏi
 
-**Option B: Nếu .claudeignore không tồn tại (khả năng cao hơn)**
-1. Dùng OS-level protection thay thế:
+**Option B: OS-level protection (defense in depth, dùng cùng Option A)**
+1. Dùng OS-level protection như một lớp bổ sung:
 ```bash
 $ chmod 600 ~/.ssh/*
 $ chmod 600 ~/.aws/credentials
@@ -406,13 +403,15 @@ từ Claude Code. Protection có hoạt động không?
 <details>
 <summary>💡 Gợi ý</summary>
 
-OS permission (chmod) hoạt động bất kể feature của Claude Code. File với
-`chmod 000` không thể đọc được ngay cả bởi Claude Code chạy với user của bạn
-(trừ khi bạn là root).
-
-Chờ đã — điều đó sai. `chmod 600` có nghĩa owner có thể read/write. Vì Claude
-chạy với user của bạn, nó CÓ THỂ đọc file 600. Để protection thực sự, bạn cần
-dùng user account khác hoặc containerization.
+OS permission chỉ chặn được Claude Code khi nó thực sự deny chính user account
+của bạn. File với `chmod 000` không ai đọc được ngoại trừ root — cái này chặn
+được Claude Code thật. Nhưng `chmod 600` (mức "khóa lại" phổ biến) vẫn cho
+owner read/write, mà Claude Code chạy dưới user của bạn — nên nó VẪN đọc được
+file 600. `chmod` một mình không phải protection thật sự trước Claude Code —
+nó chạy dưới chính user của bạn. Cơ chế được document là `permissions.deny`
+trong `.claude/settings.json` (xem Option A); hãy verify bằng cách yêu cầu
+Claude đọc file đó. Để isolation thực sự, bạn cần dùng user account khác
+hoặc container.
 
 </details>
 
@@ -421,15 +420,18 @@ dùng user account khác hoặc containerization.
 
 Các protection đáng tin cậy nhất:
 
-1. **Dựa trên directory**: Chỉ chạy Claude Code trong project directory, không
+1. **`permissions.deny`**: Chặn đọc `~/.ssh/`, `~/.aws/`, `.env`, và các file
+   key/pem trong `.claude/settings.json` (xem Option A ở trên)
+
+2. **Dựa trên directory**: Chỉ chạy Claude Code trong project directory, không
    bao giờ trong ~
 
-2. **Dựa trên container**: Chạy Claude Code trong Docker mà không mount
+3. **Dựa trên container**: Chạy Claude Code trong Docker mà không mount
    directory nhạy cảm (xem Module 2.3)
 
-3. **User riêng**: Tạo user account riêng cho công việc Claude Code (nâng cao)
+4. **User riêng**: Tạo user account riêng cho công việc Claude Code (nâng cao)
 
-4. **Cảnh giác**: Luôn đọc kỹ command proposal trước khi approve
+5. **Cảnh giác**: Luôn đọc kỹ command proposal trước khi approve
 
 Verification: Sau mỗi protection, test bằng cách thử truy cập file từ Claude
 Code. Nếu thành công, protection của bạn đã fail.
@@ -499,7 +501,7 @@ với environment variable cho database và API connection.
 
 Nam có file `.env` trong project với credential thật:
 
-```
+```text
 # .env (ĐÂY LÀ VÍ DỤ — không bao giờ dùng credential thật như thế này)
 DATABASE_URL=postgres://admin:FAKE-PASSWORD-123@db.example.com:5432/prod
 STRIPE_SECRET_KEY=sk-FAKE-DO-NOT-USE-xxxxxxxxxxxx
@@ -537,7 +539,7 @@ $ git push origin main
 
 **Breach xảy ra**:
 
-Repository là public (đáng lẽ phải private, nhưng Tùng đã config sai lúc
+Repository là public (đáng lẽ phải private, nhưng Nam đã config sai lúc
 setup). Trong **8 phút**, automated scanner đã tìm thấy AWS credential. Trong
 **20 phút**, crypto miner đang chạy trên AWS account của Nam.
 
@@ -553,7 +555,7 @@ Nam. May mắn là họ chỉ đào crypto thay vì xóa database production.
 
 1. `.env` không có trong `.gitignore` (sai lầm #1)
 2. Claude Code đọc file `.env` và include giá trị thật vào code generate
-3. Tùng không review kỹ file generate để tìm embedded secret
+3. Nam không review kỹ file generate để tìm embedded secret
 4. Repo vô tình public
 5. Không có AWS billing alert được config cho spending bất thường
 6. Dùng chung AWS account cho cả team tăng blast radius
@@ -569,7 +571,7 @@ Nam. May mắn là họ chỉ đào crypto thay vì xóa database production.
    **Verify**: `git status` KHÔNG nên hiển thị .env
 
 2. **Không bao giờ để Claude đọc .env trực tiếp** — thay vào đó, mô tả variable:
-   ```
+   ```text
    > Tạo docker-compose.yml với các environment variable sau:
    > DATABASE_URL, STRIPE_SECRET_KEY, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
    > Dùng syntax ${VARIABLE_NAME} để đọc từ environment

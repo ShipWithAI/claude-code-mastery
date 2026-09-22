@@ -96,7 +96,7 @@ $ claude
 
 Trong session:
 
-```
+```text
 Context: KMP backend, Ktor framework, PostgreSQL database.
 Reference: Check UserService.kt — we use dependency injection pattern.
 
@@ -123,7 +123,7 @@ Expectation: Cache GET /products for 5 minutes, invalidate on POST/PUT/DELETE.
 $ claude
 ```
 
-```
+```text
 **Context**:
 - KMP backend: Ktor 2.3, Koin DI, PostgreSQL + Exposed ORM
 - Existing: Redis already configured in build.gradle.kts
@@ -165,7 +165,7 @@ $ claude
 
 Sau khi Claude tạo code, review output:
 
-```
+```text
 Good! Now review for edge cases:
 1. What if cache key collision occurs?
 2. What if product list is empty — do we cache empty result?
@@ -183,7 +183,7 @@ Claude sẽ update code với:
 
 ### Bước 5: Negative Constraint
 
-```
+```text
 Final check: Do NOT cache user-specific data in shared cache.
 Review ProductCacheService.kt — ensure no userId in cache key.
 ```
@@ -221,7 +221,7 @@ Mỗi prompt cần:
 <summary>✅ Đáp Án Mẫu</summary>
 
 **A. CREF Version:**
-```
+```text
 Context: Next.js app, NextAuth.js, PostgreSQL
 Reference: Check src/auth/LoginForm.tsx and api/auth/[...nextauth].ts
 Bug: User can login with wrong password if caps lock on
@@ -231,7 +231,7 @@ Constraint: Do NOT change existing session logic
 ```
 
 **B. CREF Version:**
-```
+```text
 Context: REST API, Express.js, Joi validation library
 Reference: Check validators/userValidator.js for pattern
 Task: Add validation to POST /products endpoint
@@ -241,7 +241,7 @@ Constraint: Use existing Joi setup, do NOT install new library
 ```
 
 **C. CREF Version:**
-```
+```text
 Context: Django app, PostgreSQL, 50k products table, slow list view
 Reference: Check models.py (Product model) and views/ProductListView
 Issue: N+1 query on category foreign key
@@ -272,7 +272,7 @@ Liệt kê tất cả files liên quan đến `/products` — từ route, contro
 <details>
 <summary>✅ Đáp Án Mẫu</summary>
 
-```
+```text
 Create /orders endpoint following these references exactly:
 
 Structure:

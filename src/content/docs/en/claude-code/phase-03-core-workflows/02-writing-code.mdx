@@ -79,12 +79,12 @@ Never accept the first output blindly:
 
 Inside your Claude session, reference existing patterns:
 
-```
+```text
 Look at src/routes/auth/login.ts and src/middleware/errorHandler.ts. I need to add a forgot-password flow following the same patterns.
 ```
 
 Expected response:
-```
+```text
 I've analyzed the patterns:
 - Routes use asyncHandler wrapper for error handling
 - Responses follow { success: boolean, data?: T, error?: string } format
@@ -100,7 +100,7 @@ I'm ready to generate the forgot-password endpoint following these conventions.
 
 **Step 2: Generate new code with constraints**
 
-```
+```text
 Create POST /auth/forgot-password. Requirements:
 - Use existing emailService from src/services/email.ts
 - Follow the same error handling as login route
@@ -150,7 +150,7 @@ export const forgotPassword = asyncHandler(async (req, res) => {
 
 **Step 3: Edit existing code**
 
-```
+```text
 Add the forgot-password route to src/routes/auth/index.ts following the existing route registration pattern.
 ```
 
@@ -171,7 +171,7 @@ router.post('/forgot-password',
 
 **Step 4: Refactor while adding**
 
-```
+```text
 The current auth routes have duplicated email validation. Extract a shared validateEmail middleware and use it in both login and forgot-password.
 ```
 
@@ -192,7 +192,7 @@ export const validateEmail = [
 
 **Step 5: Generate tests**
 
-```
+```text
 Write tests for forgot-password following the same structure as login.test.ts. Use existing test helpers and mock patterns.
 ```
 
@@ -223,12 +223,12 @@ describe('POST /auth/forgot-password', () => {
 
 **Step 6: Self-review**
 
-```
+```text
 Review the code you just wrote. Does it follow the project conventions? Any edge cases missed? Any security concerns?
 ```
 
 Expected response:
-```
+```text
 Review findings:
 ✅ Follows asyncHandler pattern
 ✅ Uses standardized response format
@@ -256,7 +256,7 @@ Shall I add these improvements?
    $ claude
    ```
 3. Ask Claude to identify conventions:
-   ```
+   ```text
    Analyze this project's coding conventions. Look at:
    - Naming patterns (camelCase, snake_case?)
    - Error handling approach
@@ -265,7 +265,7 @@ Shall I add these improvements?
    - Comment style
    ```
 4. Ask Claude to generate a new module:
-   ```
+   ```text
    Create a new UserPreferences module following the exact conventions you identified.
    ```
 5. Compare the generated code with existing modules. Does it "belong"?
@@ -303,11 +303,11 @@ The key is the comparison step — it catches deviations.
 **Instructions**:
 1. Find a function in your project that's 50+ lines
 2. Ask Claude to analyze it:
-   ```
+   ```text
    Analyze this function. What does it do? What are its responsibilities?
    ```
 3. Ask for a refactoring plan:
-   ```
+   ```text
    This function has too many responsibilities. Propose a step-by-step refactoring plan.
    ```
 4. Execute one step at a time
@@ -384,26 +384,26 @@ Never skip the "do tests pass" verification between steps.
 - Identified: MVVM architecture, Repository pattern, existing ImageProcessor utility
 
 **Day 1 — Generating**:
-```
+```text
 Create ReceiptScannerViewModel following the pattern in CameraViewModel.kt.
 Use existing ImageProcessor for preprocessing.
 Add state for: scanning, processing, result, error.
 ```
 
 **Day 2 — Editing**:
-```
+```text
 Add OCR result data classes to shared/models/ following existing Receipt.kt pattern.
 Include: rawText, extractedAmount, extractedDate, confidence score.
 ```
 
 **Day 2 — Refactoring**:
-```
+```text
 The image processing pipeline in CameraViewModel duplicates compression logic.
 Extract into ImageProcessor.prepareForOCR() and use in both camera and receipt scanner.
 ```
 
 **Day 3 — Platform-specific**:
-```
+```text
 Generate iOS implementation of ReceiptScanner following the existing
 expect/actual pattern in shared/platform/. Use Vision framework for OCR.
 ```
