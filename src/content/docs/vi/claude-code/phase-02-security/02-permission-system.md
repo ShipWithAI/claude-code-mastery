@@ -140,8 +140,7 @@ report. I didn't try reading the file another way.
 Bằng chứng nằm ở tool result phía sau câu trả lời:
 `Permission to use Bash with command cat .env has been denied.` `--allowedTools Bash` cho phép
 *tool*, nhưng deny `Read(./.env)` vẫn thắng vì deny xét trước. `--permission-mode default` ép hành
-vi mặc định — cũng là thứ bạn nhận được nếu không có file settings nào đặt
-`permissions.defaultMode`.
+vi mặc định; trên gói Pro, Max và Team, starting mode built-in là `auto`.
 
 **Step 3: Chứng minh allow rule xoá prompt**
 

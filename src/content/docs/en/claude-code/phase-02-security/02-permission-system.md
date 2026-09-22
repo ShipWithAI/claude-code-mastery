@@ -142,8 +142,7 @@ report. I didn't try reading the file another way.
 The tool result behind it is the evidence:
 `Permission to use Bash with command cat .env has been denied.` `--allowedTools Bash` allowed the
 *tool*; the `Read(./.env)` deny still won, because deny goes first. `--permission-mode default`
-forces the stock behaviour, which is what you get anyway unless a settings file sets
-`permissions.defaultMode`.
+forces the stock behaviour; on Pro, Max and Team plans the built-in starting mode is `auto`.
 
 **Step 3: Prove the allow rule removes the prompt**
 
