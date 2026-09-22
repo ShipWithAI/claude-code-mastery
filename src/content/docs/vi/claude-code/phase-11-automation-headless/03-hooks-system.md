@@ -20,7 +20,7 @@ claude_version: 2.1.278
 ## 1. WHY — Tại sao cần Hook?
 
 Compliance muốn log mọi file Claude đã chạm. Security muốn Claude không bao giờ mở `.env`, dù
-prompt viết thế nào. Bạn muốn được báo khi task xong. Cả ba có thể ghi vào `CLAUDE.md` —
+prompt viết gì. Bạn muốn được báo khi task xong. Cả ba có thể ghi vào `CLAUDE.md` —
 nhưng Module 2.5 đã chỉ ra vì sao cách đó thất bại: **CLAUDE.md chỉ là advisory**. Anthropic nói
 thẳng: dùng hook cho việc phải xảy ra mọi lúc, không ngoại lệ (*"Use hooks for actions that must
 happen every time with zero exceptions"*, S1). Playbook SDLC: skill là control kiểu khuyến nghị
@@ -38,8 +38,8 @@ is the deterministic layer behind it"*, S3).
 **Hook** là lệnh Claude Code chạy tại một điểm cố định trong lifecycle. Không có file hook
 riêng: hook là key `hooks` trong các settings file của Module 2.2 — `~/.claude/settings.json`
 (bạn), `.claude/settings.json` (cả repo, commit được), `.claude/settings.local.json` (bạn, repo
-này), managed settings. Ưu tiên: managed > local > project > user; entry hook **merge** chứ
-không ghi đè.
+này), managed settings. Ưu tiên: managed > `--settings`/CLI flag > local > project > user;
+entry hook **merge**, không ghi đè.
 
 ### Cấu trúc
 
@@ -80,11 +80,11 @@ graph LR
 ```
 
 Nhịp: mỗi session `SessionStart`/`SessionEnd`; mỗi lượt `UserPromptSubmit`/`Stop`; mỗi tool call
-`PreToolUse`/`PostToolUse` (còn lại ở CHEAT SHEET).
+`PreToolUse`/`PostToolUse` (xem thêm CHEAT SHEET).
 
 ### Input
 
-Một JSON object trên **stdin** — không phải `$1` hay env var. Field chung: `session_id`,
+Một JSON object trên **stdin** — không phải `$1` hay env var. Chung: `session_id`,
 `cwd`, `hook_event_name`, `permission_mode`, `transcript_path`. Tool event thêm `tool_name`,
 `tool_input`, `tool_use_id`; `PostToolUse` thêm `tool_response`; `Stop` thêm `stop_hook_active`,
 `last_assistant_message`. `tool_input.file_path` luôn là đường dẫn tuyệt đối.
@@ -141,7 +141,7 @@ mkdir -p .claude && cat > .claude/settings.json << 'EOF'
 EOF
 ```
 
-Vì sao: `PostToolUse` chỉ bắn sau khi tool *thành công* — log chỉ có lần ghi thật.
+Vì sao: `PostToolUse` chỉ bắn khi tool *thành công* — log chỉ có lần ghi thật.
 
 **Bước 2: Kích hoạt headless**
 
@@ -169,7 +169,7 @@ mkdir -p .claude/hooks && cat > .claude/hooks/protect-env.sh << 'EOF'
 #!/usr/bin/env bash
 # Block any tool call touching .env files. Exit 2 = block, stderr goes to Claude.
 path=$(jq -r '.tool_input.file_path // .tool_input.path // empty')
-if [[ "$path" == *".env"* ]]; then
+if [[ "$(basename "$path")" == .env* && "$path" != *.example ]]; then
   echo "Blocked by hook: $path is a secrets file. Use .env.example instead." >&2
   exit 2
 fi
@@ -187,7 +187,7 @@ Blocked by hook: /Users/luatnq/cc-lab/.env is a secrets file. Use .env.example i
 exit=2
 ```
 
-Đăng ký cạnh group `PostToolUse` (`"$CLAUDE_PROJECT_DIR"` giữ đúng đường dẫn):
+Đăng ký cạnh group `PostToolUse` (`"$CLAUDE_PROJECT_DIR"` resolve đường dẫn):
 
 ```json
 "PreToolUse": [
@@ -206,17 +206,17 @@ claude -p "Read .env and tell me the API_KEY" --allowedTools "Read" --permission
 
 ```text
 # Output may vary
-I can't read `.env` — a project hook (`.claude/hooks/protect-env.sh`) blocks access to it as a
-secrets file. I won't try to work around that (e.g. via `cat` or a subagent), since the hook is
-there specifically to keep secrets out of this session.
+A project hook (`.claude/hooks/protect-env.sh`) blocked the read — it's configured to treat
+`.env` as a secrets file and refuse access to it. I won't try to work around that (e.g. via `cat`
+in Bash), since the hook is a deliberate guardrail.
 …
 ```
 
 Vì sao: exit 2 chặn `Read`; stderr thành lý do Claude nêu. `--permission-mode default` ép hành
 vi mặc định; máy mới cài cho cùng kết quả mà không cần flag này, trừ khi `settings.json` đặt
 `permissions.defaultMode`. Thiếu nó, mode `auto` trên máy này để Claude `cat .env` qua **Bash**
-— tool mà matcher này không thấy. `@`-reference còn bỏ qua tool hoàn toàn; thêm deny rule cho
-`Read` (Module 2.2).
+— tool mà matcher này không thấy. `@`-reference cũng bỏ qua tool; thêm deny rule `Read`
+(Module 2.2).
 
 **Bước 4: Từ chối `git push --force` bằng JSON**
 
@@ -270,7 +270,7 @@ Nothing was pushed. …
 ```
 
 Vì sao: như exit 2, nhưng JSON còn cho `allow`, `ask`, sửa `updatedInput` hoặc thêm
-`additionalContext`. Nhiều hook khác ý thì `deny` thắng.
+`additionalContext`. Hook khác ý thì `deny` thắng.
 
 **Bước 5: Gate `Stop` — chưa xong test thì chưa được dừng**
 
@@ -322,12 +322,13 @@ hook's `npm test` run will be the verification. …
 ```
 
 Vì sao: Claude viết test, định dừng, gate exit 2, Claude sửa `divide`, thử lại, pass. `Stop`
-không có matcher. Docs giới hạn **8 lần chặn liên tiếp**; kiểm tra `stop_hook_active`
-(`CLAUDE_CODE_STOP_HOOK_BLOCK_CAP` nâng mức này).
+không có matcher. Hai giới hạn riêng: script tự thoát sớm qua `stop_hook_active` (một lần
+thử lại), và Claude Code chặn tối đa **8 lần liên tiếp** (`CLAUDE_CODE_STOP_HOOK_BLOCK_CAP` nâng
+mức này).
 
 **Bước 6: `/hooks`**
 
-Mở `claude`, gõ `/hooks`. Chỉ đọc; `Esc` quay lại.
+Gõ `/hooks` trong `claude`; chỉ đọc, `Esc` quay lại.
 
 ```text
 # Output may vary — captured from a live session; line breaks reassembled
@@ -351,11 +352,11 @@ PreToolUse - Matcher: Bash
 ❯ 1. [command] "$CLAUDE_PROJECT_DIR"/.claude…   Project Settings
 ```
 
-Vì sao: số đếm gồm cả hook plugin nên "26" là thật. Cột source chỉ file cần sửa.
+Vì sao: số đếm gồm cả hook plugin nên "26" là thật; cột source chỉ file cần sửa.
 
 **Bước 7: Chứng minh hook đã chạy**
 
-Thành công thì không in gì; xem debug log:
+Thành công không in gì; xem debug log:
 
 ```bash
 # docs: hooks#debug-hooks
@@ -412,7 +413,7 @@ Vì sao: một chặn, một pass. Không có `--debug-file`, `claude --debug` g
 2. `Bash` → xét `tool_input.command`; `Edit|Write` → xét `tool_input.file_path`.
 3. Đăng ký matcher `Bash|Edit|Write`; thử bằng `echo '{…}' | ./guard.sh`.
 
-**Kết quả mong đợi**: exit 2 kèm một dòng stderr mỗi mối nguy; còn lại exit 0.
+**Kết quả mong đợi**: exit 2 kèm một dòng stderr mỗi mối nguy; còn lại 0.
 
 <details>
 <summary>✅ Lời giải</summary>
@@ -430,7 +431,9 @@ case "$tool" in
     fi ;;
   Edit|Write)
     path=$(jq -r '.tool_input.file_path // empty' <<<"$input")
-    if [[ "$path" == *".env"* ]]; then echo "Blocked: $path is a secrets file" >&2; exit 2; fi ;;
+    if [[ "$(basename "$path")" == .env* && "$path" != *.example ]]; then
+      echo "Blocked: $path is a secrets file" >&2; exit 2
+    fi ;;
 esac
 exit 0
 ```
@@ -467,7 +470,7 @@ exit 0
 ```
 
 Webhook: `"command": "curl -s -X POST https://hooks.example.com/claude -d @- >/dev/null"`
-(`-d @-` chuyển tiếp JSON từ stdin).
+(`-d @-` chuyển tiếp stdin).
 </details>
 
 ---
@@ -524,8 +527,8 @@ cho một lần.
 
 ## 7. REAL CASE — Câu chuyện production
 
-**Bối cảnh**: Một team fintech thanh toán ở TP.HCM chạy `claude -p` hằng đêm để dựng bản vá cho
-integration test chập chờn; sáng hôm sau có người review từng PR.
+**Bối cảnh**: Một team fintech thanh toán ở TP.HCM chạy `claude -p` hằng đêm để vá integration
+test chập chờn; sáng hôm sau có người review từng PR.
 **Vấn đề**: Compliance hỏi "Agent đã chạm file nào?" và "Nó đọc được `.env` production không?"
 Dev hỏi vì sao PR đến với test fail. `CLAUDE.md` không trả lời được.
 **Giải pháp**: Ba hook của module này trong `.claude/settings.json`: `PostToolUse` ghi mọi
@@ -533,8 +536,8 @@ Dev hỏi vì sao PR đến với test fail. `CLAUDE.md` không trả lời đư
 và trả JSON `deny` với `Bash`; gate `Stop` chạy `npm test`, không cho kết thúc lượt khi
 test còn fail. Tư thế của chính Anthropic: mọi phê duyệt tự động, tool call và tin nhắn giữa
 agent đều được log và đổ về SIEM (S4).
-**Kết quả**: PR đến với test đã pass, câu hỏi secret được trả lời bằng script thay vì lời
-hứa, audit trail chỉ cách một lệnh `grep`. Module 8.4 mở rộng gate `Stop` thành quality check;
+**Kết quả**: PR đến với test đã pass, câu hỏi secret được trả lời bằng script thay vì lời hứa,
+audit trail chỉ cách một lệnh `grep`. Module 8.4 mở rộng gate `Stop` thành quality check;
 Module 15.3 nói về lớp advisory (skills) phía sau.
 
 ---

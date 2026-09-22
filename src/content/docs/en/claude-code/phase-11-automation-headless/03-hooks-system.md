@@ -19,8 +19,8 @@ claude_version: 2.1.278
 
 ## 1. WHY — Why This Matters
 
-Compliance wants a log of every file Claude touched. Security wants Claude to never open
-`.env`, whatever the prompt says. You want a ping when a long task finishes. `CLAUDE.md` could
+Compliance wants a log of every file Claude touched. Security wants Claude never to open
+`.env`, whatever the prompt says. You want a ping when a long task ends. `CLAUDE.md` could
 hold all three — but Module 2.5 showed why that fails: **CLAUDE.md is advisory**.
 Anthropic is blunt: *"Use hooks for actions that must happen every time with zero exceptions"*
 (S1). The SDLC playbook: *"A skill is a control, though an advisory one"* … *"A hook is the
@@ -37,8 +37,8 @@ deterministic layer behind it"* (S3).
 A **hook** is a command Claude Code runs at a fixed point in its lifecycle. There is no
 dedicated hooks file: hooks are a `hooks` key in the Module 2.2 settings files —
 `~/.claude/settings.json` (you), `.claude/settings.json` (the repo, commit it),
-`.claude/settings.local.json` (you, this repo), managed settings. Precedence: managed > local >
-project > user; hook entries **merge** rather than override.
+`.claude/settings.local.json` (you, this repo), managed settings. Precedence: managed >
+`--settings`/CLI flags > local > project > user; hook entries **merge**, never override.
 
 ### Shape
 
@@ -168,7 +168,7 @@ mkdir -p .claude/hooks && cat > .claude/hooks/protect-env.sh << 'EOF'
 #!/usr/bin/env bash
 # Block any tool call touching .env files. Exit 2 = block, stderr goes to Claude.
 path=$(jq -r '.tool_input.file_path // .tool_input.path // empty')
-if [[ "$path" == *".env"* ]]; then
+if [[ "$(basename "$path")" == .env* && "$path" != *.example ]]; then
   echo "Blocked by hook: $path is a secrets file. Use .env.example instead." >&2
   exit 2
 fi
@@ -186,7 +186,7 @@ Blocked by hook: /Users/luatnq/cc-lab/.env is a secrets file. Use .env.example i
 exit=2
 ```
 
-Register it beside the `PostToolUse` group (`"$CLAUDE_PROJECT_DIR"` resolves the path):
+Register it beside the `PostToolUse` group (`"$CLAUDE_PROJECT_DIR"` resolves paths):
 
 ```json
 "PreToolUse": [
@@ -205,17 +205,17 @@ claude -p "Read .env and tell me the API_KEY" --allowedTools "Read" --permission
 
 ```text
 # Output may vary
-I can't read `.env` — a project hook (`.claude/hooks/protect-env.sh`) blocks access to it as a
-secrets file. I won't try to work around that (e.g. via `cat` or a subagent), since the hook is
-there specifically to keep secrets out of this session.
+A project hook (`.claude/hooks/protect-env.sh`) blocked the read — it's configured to treat
+`.env` as a secrets file and refuse access to it. I won't try to work around that (e.g. via `cat`
+in Bash), since the hook is a deliberate guardrail.
 …
 ```
 
 Why: exit 2 blocked `Read`; stderr became Claude's reason. `--permission-mode default`
 forces the stock behavior; on a fresh install you get the same result without it unless
 `settings.json` sets `permissions.defaultMode`. Without it, this machine's `auto` mode let Claude
-`cat .env` through **Bash** — a tool this matcher never sees. `@`-references bypass tools
-entirely; add a `Read` deny rule (Module 2.2).
+`cat .env` through **Bash** — a tool this matcher never sees. `@`-references bypass tools too;
+add a `Read` deny rule (Module 2.2).
 
 **Step 4: Deny `git push --force` with JSON**
 
@@ -268,7 +268,7 @@ The push was blocked by a project hook before it ran:
 Nothing was pushed. …
 ```
 
-Why: same effect as exit 2, but JSON can also `allow`, `ask`, rewrite `updatedInput`, or add
+Why: like exit 2, but JSON can also `allow`, `ask`, rewrite `updatedInput`, or add
 `additionalContext`. Between hooks, `deny` wins.
 
 **Step 5: `Stop` gate — no finishing while tests fail**
@@ -321,12 +321,13 @@ hook's `npm test` run will be the verification. …
 ```
 
 Why: Claude wrote the test, tried to stop, the gate exited 2, Claude fixed `divide`, tried
-again, passed. `Stop` has no matcher. Docs cap it at **8 consecutive blocks**; check
-`stop_hook_active` (`CLAUDE_CODE_STOP_HOOK_BLOCK_CAP` raises it).
+again, passed. `Stop` has no matcher. Two separate limits: the script's own `stop_hook_active`
+early exit (one retry), and Claude Code's cap of **8 consecutive blocks**
+(`CLAUDE_CODE_STOP_HOOK_BLOCK_CAP` raises it).
 
 **Step 6: `/hooks`**
 
-Type `/hooks` in `claude`. Read-only; `Esc` returns.
+Type `/hooks` in `claude`; read-only, `Esc` returns.
 
 ```text
 # Output may vary — captured from a live session; line breaks reassembled
@@ -350,11 +351,11 @@ PreToolUse - Matcher: Bash
 ❯ 1. [command] "$CLAUDE_PROJECT_DIR"/.claude…   Project Settings
 ```
 
-Why: counts include plugin hooks, so "26" is real. The source column names the file to edit.
+Why: counts include plugin hooks, so "26" is real; the source column names the file to edit.
 
 **Step 7: Prove it ran**
 
-Success prints nothing — use the debug log:
+Success prints nothing; use the debug log:
 
 ```bash
 # docs: hooks#debug-hooks
@@ -368,7 +369,7 @@ grep '"Hook Stop' /tmp/hooks.log | cut -c1-160
 ```
 
 Why: one block, one pass. Without `--debug-file`, `claude --debug` writes
-`~/.claude/debug/<session-id>.txt`. Clean up with `rm -rf .claude/hooks .claude/settings.json`.
+`~/.claude/debug/<session-id>.txt`. Clean up: `rm -rf .claude/hooks .claude/settings.json`.
 
 ---
 
@@ -412,7 +413,7 @@ Why: one block, one pass. Without `--debug-file`, `claude --debug` writes
 2. `Bash` → check `tool_input.command`; `Edit|Write` → check `tool_input.file_path`.
 3. Register with matcher `Bash|Edit|Write`; test with `echo '{…}' | ./guard.sh`.
 
-**Expected result**: exit 2 and a stderr line per danger; else exit 0.
+**Expected result**: exit 2 plus a stderr line per danger; else 0.
 
 <details>
 <summary>✅ Solution</summary>
@@ -430,7 +431,9 @@ case "$tool" in
     fi ;;
   Edit|Write)
     path=$(jq -r '.tool_input.file_path // empty' <<<"$input")
-    if [[ "$path" == *".env"* ]]; then echo "Blocked: $path is a secrets file" >&2; exit 2; fi ;;
+    if [[ "$(basename "$path")" == .env* && "$path" != *.example ]]; then
+      echo "Blocked: $path is a secrets file" >&2; exit 2
+    fi ;;
 esac
 exit 0
 ```
@@ -438,7 +441,7 @@ exit 0
 
 ### Exercise 3: Notify when Claude stops
 
-**Goal**: A desktop notification (macOS) or webhook call when a turn ends.
+**Goal**: A desktop notification (macOS) or webhook when a turn ends.
 **Instructions**:
 1. Add a `Stop` hook (or `SessionEnd` for "session closed"; those share a 1.5-second budget).
 2. macOS: `osascript -e 'display notification …'`; elsewhere `curl -X POST` to a fake
@@ -467,7 +470,7 @@ exit 0
 ```
 
 Webhook: `"command": "curl -s -X POST https://hooks.example.com/claude -d @- >/dev/null"`
-(`-d @-` forwards the stdin JSON).
+(`-d @-` forwards stdin).
 </details>
 
 ---
@@ -524,9 +527,9 @@ for one run.
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: A payments team in Ho Chi Minh City runs `claude -p` nightly to draft fixes for
+**Scenario**: A Ho Chi Minh City payments team runs `claude -p` nightly to draft fixes for
 flaky integration tests; a human reviews every PR next morning.
-**Problem**: Compliance asked "Which files did the agent touch?" and "Can it read the production
+**Problem**: Compliance asked "Which files did the agent touch?" and "Can it read production
 `.env`?" Developers asked why PRs arrived with failing tests. `CLAUDE.md` answers none.
 **Solution**: This module's three hooks in `.claude/settings.json`: `PostToolUse` appends every
 absolute path to a log file shipped to the log pipeline; the `PreToolUse` guard exits 2 on file
