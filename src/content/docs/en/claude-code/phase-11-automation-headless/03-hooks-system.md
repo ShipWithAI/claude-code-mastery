@@ -212,8 +212,8 @@ in Bash), since the hook is a deliberate guardrail.
 ```
 
 Why: exit 2 blocked `Read`; stderr became Claude's reason. `--permission-mode default`
-forces the stock behavior; on a fresh install you get the same result without it unless
-`settings.json` sets `permissions.defaultMode`. Without it, this machine's `auto` mode let Claude
+forces the stock behavior; on Pro, Max and Team plans the built-in starting mode is `auto`,
+which `permissions.defaultMode` overrides. Without it, this machine's `auto` mode let Claude
 `cat .env` through **Bash** — a tool this matcher never sees. `@`-references bypass tools too;
 add a `Read` deny rule (Module 2.2).
 
