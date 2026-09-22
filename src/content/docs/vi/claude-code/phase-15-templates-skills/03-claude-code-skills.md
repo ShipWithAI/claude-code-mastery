@@ -20,12 +20,12 @@ claude_version: 2.1.278
 ## 1. WHY — Tại sao cần học
 
 Mỗi lần nhờ Claude viết test, bạn lại dán đúng năm dòng: "dùng `node:test`, mỗi export một
-`test()`, có edge case, không sửa source." Đồng nghiệp dán một bản hơi khác. Bạn chuyển nó vào
-`CLAUDE.md`, và giờ file đó dài 400 dòng, Claude đọc ở mọi lượt.
+`test()`, có edge case, không sửa source." Đồng nghiệp dán một bản hơi khác. Thế là nó vào
+`CLAUDE.md`, giờ dài 400 dòng, Claude đọc ở mọi lượt.
 
 Docs nói thẳng: "Create a skill when you keep pasting the same instructions, checklist, or
 multi-step procedure into chat, or when a section of CLAUDE.md has grown into a procedure rather
-than a fact." Skill chính là quy trình đó, nằm trong một thư mục, chỉ load khi cần.
+than a fact." Skill chính là quy trình đó trong một thư mục, chỉ load khi cần.
 
 ---
 
@@ -40,12 +40,12 @@ than a fact." Skill chính là quy trình đó, nằm trong một thư mục, ch
 └── scripts/          # tùy chọn: script Claude chạy, không bao giờ load vào context
 ```
 
-Tên thư mục trở thành lệnh (`/test-file`). Dấu `---` phải là dòng đầu tiên của file.
+Tên thư mục trở thành lệnh (`/test-file`). Dấu `---` phải ở dòng đầu file.
 
 ### Progressive disclosure: ba lớp (S8)
 
 Bài engineering về Agent Skills của Anthropic giải thích vì sao skill rẻ: chỉ name và description
-luôn trong context; body load khi gọi; file liên kết load khi cần.
+luôn trong context; body và file liên kết load khi cần.
 
 ```mermaid
 graph LR
@@ -53,7 +53,8 @@ graph LR
     B -->|cần chi tiết?| C["Lớp 3: references/ · scripts/<br/>đọc hoặc chạy khi cần"]
 ```
 
-Sau khi gọi, body "stays there across later turns": viết điều cần làm, đừng giải thích vì sao.
+Sau khi gọi, body "stays there across later turns" và không được đọc lại: viết nó "as standing
+instructions rather than one-time steps" (chỉ dẫn thường trực).
 
 ### Skill nằm ở đâu
 
@@ -63,7 +64,7 @@ Sau khi gọi, body "stays there across later turns": viết điều cần làm,
 | Personal | `~/.claude/skills/<name>/SKILL.md` | Mọi project trên máy bạn |
 | Plugin | `<plugin>/skills/<name>/SKILL.md` | Nơi plugin được bật, dưới tên `/plugin-name:name` |
 
-Enterprise skill đi qua managed settings; trùng tên thì enterprise thắng personal thắng project.
+Enterprise skill đi qua managed settings; trùng tên: enterprise thắng personal thắng project.
 
 ### Ai được gọi skill
 
@@ -73,7 +74,7 @@ Enterprise skill đi qua managed settings; trùng tên thì enterprise thắng p
 | `disable-model-invocation: true` | Có | Không | Không có gì cho tới khi bạn gõ `/name` |
 | `user-invocable: false` | Không | Có | Description luôn có; body khi gọi |
 
-Việc có side effect thì đặt `disable-model-invocation: true`: "You don't want Claude deciding to
+Có side effect thì đặt `disable-model-invocation: true`: "You don't want Claude deciding to
 deploy because your code looks ready."
 
 ### Nội dung động trong body
@@ -96,7 +97,7 @@ supporting file, kiểm soát ai được gọi, và tự load theo description;
 
 ## 3. DEMO — Từng bước cụ thể
 
-Chạy trong `~/cc-lab` (git repo, `src/math.js`, `tests/math.test.mjs`, `npm test`).
+Lab: `~/cc-lab` (git repo, `src/math.js`, `tests/math.test.mjs`, `npm test`).
 
 **Bước 1: Tạo skill**
 
@@ -122,8 +123,7 @@ Write a `node:test` test file for the source file `$ARGUMENTS`.
 EOF
 ```
 
-Description = cụm từ kích hoạt; body = quy trình; `allowed-tools` duyệt sẵn `Read` và `Write` cho
-lượt gọi skill.
+Description = cụm từ kích hoạt; body = quy trình; `allowed-tools` duyệt sẵn `Read` và `Write`.
 
 **Bước 2: Kiểm tra frontmatter parse được**
 
@@ -141,7 +141,7 @@ Validating components in: /Users/luatnq/cc-lab/.claude/skills
 
 **Bước 3: Gọi theo tên**
 
-Mở `claude` và gõ:
+Trong `claude`, gõ:
 
 ```text
 /test-file src/math.js
@@ -165,11 +165,11 @@ Mở `claude` và gõ:
 ```
 
 `$ARGUMENTS` đã thành `src/math.js`. Máy này chạy auto mode nên Claude dùng heredoc thay vì
-`Write` đã được duyệt sẵn; ở default mode, `Write` chạy không hỏi, tool khác vẫn hỏi.
+`Write` đã duyệt sẵn; ở default mode, `Write` chạy không hỏi, tool khác vẫn hỏi.
 
 **Bước 4: Xem trong `/skills`**
 
-Gõ `/skills`, rồi gõ `test-file` để lọc:
+Gõ `/skills`, rồi gõ `test-file`:
 
 ```text
 # Output may vary
@@ -182,12 +182,13 @@ Skills
 ❯ ✔ on         test-file · project · ~50 tok
 ```
 
-`~50 tok` là lớp 1, trả ở mọi lượt. `Space` xoay vòng `on` → `name-only` → `user-only` → `off`;
-`Esc` lưu vào `.claude/settings.local.json` dưới khóa `skillOverrides`.
+`~50 tok` là lớp 1, trả ở mọi lượt. `Space` chuyển skill qua các trạng thái `on`, `name-only`,
+`user-only`, `off`; `Esc` xóa bộ lọc, `Esc` lần hai lưu vào `.claude/settings.local.json` dưới
+khóa `skillOverrides` và đóng.
 
 **Bước 5: Để Claude tự kích hoạt từ một câu hỏi thường**
 
-Khôi phục file test (`git checkout -- tests/`), rồi hỏi mà không nhắc tên skill:
+Khôi phục file test (`git checkout -- tests/`), rồi hỏi không nhắc tên skill:
 
 ```bash
 # docs: skills, cli-reference
@@ -205,7 +206,7 @@ Wrote `tests/math.test.mjs` (replacing the previous version, which only tested `
 `src/math.js` is untouched. Per the skill I didn't run the tests — run `npm test` to verify.
 ```
 
-"Per the skill" chỉ là gợi ý, chưa phải bằng chứng. Tìm lời gọi tool `Skill` trong event stream:
+"Per the skill" chỉ là gợi ý, chưa phải bằng chứng. Tìm lời gọi tool `Skill` trong stream:
 
 ```bash
 # docs: cli-reference
@@ -245,20 +246,19 @@ Skills loaded this session
 
 ### Bài 1: Skill mà Claude không bao giờ được tự chạy
 
-**Mục tiêu**: Tạo `/changelog` ghi `CHANGELOG.md` từ git history, chỉ người dùng gọi được.
+**Mục tiêu**: `/changelog` ghi `CHANGELOG.md` từ git history, chỉ người dùng gọi được.
 
 **Hướng dẫn**:
 1. Tạo `.claude/skills/changelog/SKILL.md` với `disable-model-invocation: true`.
 2. Chèn 20 commit gần nhất bằng `` !`git log --oneline -20` ``.
-3. Hỏi "update the changelog" và quan sát Claude **không** chạy skill; sau đó tự gõ `/changelog`.
+3. Hỏi "update the changelog": Claude **không** chạy skill. Rồi tự gõ `/changelog`.
 
-**Kết quả mong đợi**: Chỉ `/changelog` mới ghi file: "If Claude tries anyway, Claude Code blocks
-the call".
+**Kết quả mong đợi**: Chỉ `/changelog` mới ghi file ("If Claude tries anyway, Claude Code blocks
+the call").
 
 <details>
 <summary>💡 Gợi ý</summary>
-Với `disable-model-invocation: true`, description không nằm trong context, nên không có gì để
-Claude khớp.
+Với `disable-model-invocation: true`, description không nằm trong context nên không có gì để khớp.
 </details>
 
 <details>
@@ -291,7 +291,7 @@ Lệnh `!` thoát khác 0 sẽ hủy cả lượt gọi; thêm `|| true` nếu l
 2. Link nó từ `SKILL.md` và nhờ Claude thêm một endpoint.
 
 **Kết quả mong đợi**: Dòng Skills trong `/context` vẫn nhỏ; Claude chỉ đọc `style.md` khi viết
-code. Docs: "Keep `SKILL.md` under 500 lines."
+code ("Keep `SKILL.md` under 500 lines").
 
 <details>
 <summary>✅ Lời giải</summary>
@@ -311,15 +311,16 @@ When writing endpoints, follow the naming and error-format rules in
 
 ### Bài 3: Chuyển file command thành skill
 
-**Mục tiêu**: Chuyển `.claude/commands/review-diff.md` sang `.claude/skills/review-diff/SKILL.md`.
+**Mục tiêu**: Chuyển `.claude/commands/review-diff.md` thành `.claude/skills/review-diff/SKILL.md`.
 
 **Hướng dẫn**:
-1. Tạo file command và xác nhận `/review-diff` chạy (file command vẫn được hỗ trợ).
-2. `git mv .claude/commands/review-diff.md .claude/skills/review-diff/SKILL.md`.
+1. Tạo file command và xác nhận `/review-diff` chạy.
+2. `mkdir -p .claude/skills/review-diff && git mv .claude/commands/review-diff.md
+   .claude/skills/review-diff/SKILL.md`.
 3. Thêm `context: fork` và `agent: Explore` để review chạy trong subagent chỉ đọc.
 
 **Kết quả mong đợi**: `/review-diff` chạy skill (skill thắng file command trùng tên) trong một
-subagent không thấy hội thoại của bạn.
+subagent chạy nền, không thấy hội thoại của bạn; kết quả về khi hoàn tất.
 
 <details>
 <summary>💡 Gợi ý</summary>
@@ -359,6 +360,7 @@ with file and line references. Do not edit files.
 | `disable-model-invocation: true` | Chỉ bạn chạy được |
 | `user-invocable: false` | Chỉ Claude chạy được |
 | `allowed-tools` | Tool được duyệt sẵn chỉ trong lượt gọi skill |
+| `model` | "Model to use when this skill is active"; áp dụng cho phần còn lại của lượt |
 | `context: fork` + `agent` | Chạy như subagent (`Explore`, `Plan`, `general-purpose`, custom) |
 
 | Lệnh / cú pháp | Mục đích |
@@ -376,11 +378,11 @@ with file and line references. Do not edit files.
 
 | ❌ Sai lầm | ✅ Cách đúng |
 |---|---|
-| Đi tìm subcommand `skill install` | Không có. Skill là thư mục: copy vào `.claude/skills/`, commit, hoặc đóng gói thành plugin (Module 15.5) |
+| Đi tìm subcommand `skill install` | Không có. Skill là thư mục: copy vào `.claude/skills/`, commit, hoặc đóng gói plugin (Module 15.5) |
 | `description: Helper for tests` | Viết như brief cho người mới (S9): làm gì **và** khi nào, bằng đúng cụm từ người ta hay gõ |
-| Skill deploy không có `allowed-tools` | Nó chỉ chạy được vì bạn bấm qua các prompt. Khai báo tool chính xác (`Bash(git push *)`) và đặt `disable-model-invocation: true` |
-| Nhét mọi workflow vào `CLAUDE.md` | (S15) "Aim to keep CLAUDE.md under 200 lines by including only essentials"; chuyển quy trình sang skill |
-| Tin `allowed-tools` trong repo không phải của bạn | Quyền này áp dụng cả trong thư mục chưa trust hay khi chạy `-p`. Đọc `SKILL.md` trước |
+| Skill deploy không có `allowed-tools` | Chạy được chỉ vì bạn bấm qua các prompt. Khai báo tool chính xác (`Bash(git push *)`) và đặt `disable-model-invocation: true` |
+| Nhét mọi workflow vào `CLAUDE.md` | (S15) "Aim to keep CLAUDE.md under 200 lines by including only essentials"; quy trình đưa vào skill |
+| Tin `allowed-tools` trong repo không phải của bạn | Áp dụng cả trong thư mục chưa trust hay khi chạy `-p`. Đọc `SKILL.md` trước |
 | Coi skill là hàng rào bảo vệ | "A skill is a control, though an advisory one." (S3) Quy tắc cứng thì dùng hook (Module 11.3) hoặc `permissions.deny` |
 
 ---
@@ -389,24 +391,23 @@ with file and line references. Do not edit files.
 
 **Bối cảnh**: Một team fintech ở TP.HCM tích hợp cổng thanh toán với ba ngân hàng Việt Nam. Cứ vài
 tháng lại có engineer mới lặp lại đúng nhóm lỗi cũ: số tiền lưu dạng số thực, VND có phần thập
-phân, retry không có idempotency key. Quy tắc nằm trong wiki chẳng ai mở, rồi trong một
-`CLAUDE.md` 500 dòng.
+phân, retry không có idempotency key. Quy tắc nằm trong một `CLAUDE.md` 500 dòng.
 
 **Vấn đề**: `CLAUDE.md` load ở mọi lượt nên context đầy nhanh, độ tuân thủ giảm; review vẫn bắt
-đi bắt lại cùng một lỗi.
+lại cùng một lỗi.
 
 **Giải pháp**: Team chuyển quy tắc vào `.claude/skills/vn-payment-rules/` với
 `user-invocable: false` và description nêu rõ từ khóa kích hoạt ("payment", "VNPay", "MoMo",
 "refund"). `SKILL.md` giữ sáu điều bất di bất dịch; `references/bank-specs.md` chứa định dạng
 trường của từng ngân hàng, chỉ load khi Claude chạm vào adapter. `CLAUDE.md` rút xuống dưới 200
-dòng. Đây đúng là cách Anthropic mô tả trong SDLC bảo mật của họ (S4): "those guidelines are
+dòng. Đây là đúng cách Anthropic làm trong SDLC bảo mật của họ (S4): "those guidelines are
 encoded in CLAUDE.md files and references to org-wide skills so the code follows these best
-practices the minute it's generated", và khi agent phát hiện nhóm lỗi mới, "the relevant file is
+practices the minute it's generated", và khi agent gặp nhóm lỗi mới, "the relevant file is
 updated to prevent it recurring".
 
-**Kết quả**: Quy tắc áp dụng lúc sinh code thay vì lúc review; thêm ngân hàng mới chỉ là thêm một
-mục trong `bank-specs.md`. Một hook (Module 11.3) vẫn là chốt chặn tất định cho quy tắc không được
-phép sai: không có `float` dưới `payments/`.
+**Kết quả**: Quy tắc áp dụng lúc sinh code thay vì lúc review; thêm ngân hàng mới chỉ là thêm
+mục trong `bank-specs.md`. Hook (Module 11.3) vẫn là chốt chặn tất định cho quy tắc không được
+sai: không có `float` dưới `payments/`.
 
 ---
 

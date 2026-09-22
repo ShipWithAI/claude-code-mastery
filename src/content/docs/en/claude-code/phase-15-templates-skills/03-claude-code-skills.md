@@ -20,12 +20,12 @@ claude_version: 2.1.278
 ## 1. WHY — Why This Matters
 
 Every time you ask for tests you paste the same five lines: "use `node:test`, one `test()` per
-export, cover the edge case, don't touch the source." Your teammate pastes a different version. You
-moved it into `CLAUDE.md`, and now that file is 400 lines Claude reads on every turn.
+export, cover the edge case, don't touch the source." Your teammate pastes a different version. So
+it went into `CLAUDE.md`, which is now 400 lines Claude reads on every turn.
 
 The docs: "Create a skill when you keep pasting the same instructions, checklist, or multi-step
 procedure into chat, or when a section of CLAUDE.md has grown into a procedure rather than a
-fact." A skill is that procedure, in a folder, loaded only when needed.
+fact." A skill is that procedure in a folder, loaded only when needed.
 
 ---
 
@@ -44,8 +44,8 @@ The directory name becomes the command (`/test-file`). The `---` must be the fil
 
 ### Progressive disclosure: three layers (S8)
 
-Anthropic's Agent Skills post explains why skills are cheap: name and description are always in
-context; the body loads on invoke; linked files load on demand.
+Anthropic's Agent Skills post explains why skills are cheap: only name and description are
+always in context; the body and linked files load on demand.
 
 ```mermaid
 graph LR
@@ -53,7 +53,8 @@ graph LR
     B -->|needs detail?| C["Layer 3: references/ · scripts/<br/>read or run on demand"]
 ```
 
-Once invoked, the body "stays there across later turns": state what to do, not why.
+Once invoked, the body "stays there across later turns" and is not re-read: write it "as
+standing instructions rather than one-time steps".
 
 ### Where skills live
 
@@ -63,7 +64,7 @@ Once invoked, the body "stays there across later turns": state what to do, not w
 | Personal | `~/.claude/skills/<name>/SKILL.md` | All your projects on this machine |
 | Plugin | `<plugin>/skills/<name>/SKILL.md` | Where the plugin is enabled, as `/plugin-name:name` |
 
-Enterprise skills ship via managed settings; enterprise beats personal beats project.
+Enterprise skills ship via managed settings; enterprise beats personal, which beats project.
 
 ### Who invokes it
 
@@ -96,7 +97,7 @@ supporting files, invocation control, and auto-loading; on a name clash the skil
 
 ## 3. DEMO — Step by Step
 
-Run this in `~/cc-lab` (git repo, `src/math.js`, `tests/math.test.mjs`, `npm test`).
+Lab: `~/cc-lab` (`src/math.js`, `tests/math.test.mjs`, `npm test`).
 
 **Step 1: Create the skill**
 
@@ -122,8 +123,7 @@ Write a `node:test` test file for the source file `$ARGUMENTS`.
 EOF
 ```
 
-Description = trigger phrases; body = procedure; `allowed-tools` pre-approves `Read` and `Write`
-for the invoking turn.
+Description = trigger phrases; body = procedure; `allowed-tools` pre-approves `Read` and `Write`.
 
 **Step 2: Check the frontmatter parses**
 
@@ -141,7 +141,7 @@ Validating components in: /Users/luatnq/cc-lab/.claude/skills
 
 **Step 3: Invoke it by name**
 
-Start `claude` and type:
+In `claude`, type:
 
 ```text
 /test-file src/math.js
@@ -165,12 +165,11 @@ Start `claude` and type:
 ```
 
 `$ARGUMENTS` became `src/math.js`. This machine runs in auto mode, so Claude used a heredoc
-instead of the pre-approved `Write`; in default mode `Write` runs without a prompt, other tools
-still ask.
+instead of the pre-approved `Write`; in default mode `Write` runs unprompted and other tools ask.
 
 **Step 4: See it in `/skills`**
 
-Type `/skills`, then `test-file` to filter:
+Type `/skills`, then `test-file`:
 
 ```text
 # Output may vary
@@ -183,12 +182,13 @@ Skills
 ❯ ✔ on         test-file · project · ~50 tok
 ```
 
-`~50 tok` is layer 1, paid every turn. `Space` cycles `on` → `name-only` → `user-only` → `off`;
-`Esc` saves it to `.claude/settings.local.json` as `skillOverrides`.
+`~50 tok` is layer 1, paid every turn. `Space` cycles a skill through the states `on`,
+`name-only`, `user-only`, `off`; `Esc` clears the filter, a second `Esc` saves to
+`.claude/settings.local.json` as `skillOverrides` and closes.
 
 **Step 5: Let Claude trigger it from a plain request**
 
-Restore the test file (`git checkout -- tests/`), then ask without naming it:
+Restore the test file (`git checkout -- tests/`), then ask without naming the skill:
 
 ```bash
 # docs: skills, cli-reference
@@ -206,7 +206,7 @@ Wrote `tests/math.test.mjs` (replacing the previous version, which only tested `
 `src/math.js` is untouched. Per the skill I didn't run the tests — run `npm test` to verify.
 ```
 
-"Per the skill" is a hint, not proof. Find the `Skill` tool call in the event stream:
+"Per the skill" is a hint, not proof. Find the `Skill` tool call in the stream:
 
 ```bash
 # docs: cli-reference
@@ -246,16 +246,15 @@ Skills loaded this session
 
 ### Exercise 1: A skill Claude must never run on its own
 
-**Goal**: Create `/changelog` that writes `CHANGELOG.md` from git history, user-only.
+**Goal**: A user-only `/changelog` that writes `CHANGELOG.md` from git history.
 
 **Instructions**:
 1. Create `.claude/skills/changelog/SKILL.md` with `disable-model-invocation: true`.
-2. Inject the last 20 commits with `` !`git log --oneline -20` ``.
-3. Ask "update the changelog" and observe that Claude does **not** run the skill; then run
-   `/changelog` yourself.
+2. Inject the last 20 commits: `` !`git log --oneline -20` ``.
+3. Ask "update the changelog": Claude does **not** run the skill. Then run `/changelog`.
 
-**Expected result**: Only `/changelog` writes the file: "If Claude tries anyway, Claude Code
-blocks the call".
+**Expected result**: Only `/changelog` writes the file ("If Claude tries anyway, Claude Code
+blocks the call").
 
 <details>
 <summary>💡 Hint</summary>
@@ -280,7 +279,7 @@ Group the commits above under Added / Changed / Fixed and write them to CHANGELO
 under a new "Unreleased" heading. Do not edit any other file.
 ```
 
-A non-zero exit from the `!` command aborts the invocation; append `|| true` if it may fail.
+A non-zero exit from the `!` command aborts the invocation; add `|| true` if it may fail.
 </details>
 
 ### Exercise 2: A skill with a reference file
@@ -292,7 +291,7 @@ A non-zero exit from the `!` command aborts the invocation; append `|| true` if 
 2. Link it from `SKILL.md` and ask Claude to add an endpoint.
 
 **Expected result**: The Skills row in `/context` stays small; Claude reads `style.md` only when
-it writes code. Docs rule: "Keep `SKILL.md` under 500 lines."
+writing code ("Keep `SKILL.md` under 500 lines").
 
 <details>
 <summary>✅ Solution</summary>
@@ -307,24 +306,25 @@ When writing endpoints, follow the naming and error-format rules in
 [references/style.md](references/style.md). Read it before writing code.
 ```
 
-`user-invocable: false`: background knowledge, not an action.
+`user-invocable: false`: knowledge, not an action.
 </details>
 
 ### Exercise 3: Convert a command file into a skill
 
-**Goal**: Migrate `.claude/commands/review-diff.md` to `.claude/skills/review-diff/SKILL.md`.
+**Goal**: Move `.claude/commands/review-diff.md` to `.claude/skills/review-diff/SKILL.md`.
 
 **Instructions**:
-1. Create the command file and confirm `/review-diff` works (command files still do).
-2. `git mv .claude/commands/review-diff.md .claude/skills/review-diff/SKILL.md`.
+1. Create the command file and confirm `/review-diff` works.
+2. `mkdir -p .claude/skills/review-diff && git mv .claude/commands/review-diff.md
+   .claude/skills/review-diff/SKILL.md`.
 3. Add `context: fork` and `agent: Explore` for a read-only subagent.
 
 **Expected result**: `/review-diff` runs the skill (it beats a same-named command file) in a
-subagent that never sees your conversation.
+background subagent that never sees your conversation; the result arrives when it completes.
 
 <details>
 <summary>💡 Hint</summary>
-Don't name it `review`: "the bundled alias `/review` never runs your skill".
+Not `review`: "the bundled alias `/review` never runs your skill".
 </details>
 
 <details>
@@ -359,6 +359,7 @@ with file and line references. Do not edit files.
 | `disable-model-invocation: true` | Only you can run it |
 | `user-invocable: false` | Only Claude can run it |
 | `allowed-tools` | Tools pre-approved for the invoking turn only |
+| `model` | "Model to use when this skill is active"; applies for the rest of the turn |
 | `context: fork` + `agent` | Run as a subagent (`Explore`, `Plan`, `general-purpose`, custom) |
 
 | Command / syntax | Purpose |
@@ -368,7 +369,7 @@ with file and line references. Do not edit files.
 | `/skill-doctor` | Per-skill context cost and usage; text with `-p` |
 | `claude plugin validate .claude/skills` | Find `SKILL.md` files that don't parse |
 | `"skillOverrides": {"deploy": "off"}` | Hide a skill without editing it |
-| `Skill(deploy *)` in `permissions.deny` | Block Claude from invoking it |
+| `Skill(deploy *)` in `permissions.deny` | Block Claude invoking it |
 
 ---
 
@@ -376,11 +377,11 @@ with file and line references. Do not edit files.
 
 | ❌ Mistake | ✅ Correct Approach |
 |---|---|
-| Looking for a `skill install` subcommand | None exists. A skill is a directory: copy it into `.claude/skills/`, commit it, or ship it in a plugin (Module 15.5) |
-| `description: Helper for tests` | Brief it like a new hire (S9): what it does **and** when, with the phrases people type |
-| A deploy skill with no `allowed-tools` | It only works because you click through prompts. Declare exact tools (`Bash(git push *)`) and set `disable-model-invocation: true` |
-| Every workflow in `CLAUDE.md` | (S15) "Aim to keep CLAUDE.md under 200 lines by including only essentials"; move procedures into skills |
-| Trusting `allowed-tools` in a repo you did not write | The grant applies even in an untrusted folder or a `-p` run. Read `SKILL.md` first |
+| Looking for a `skill install` subcommand | None exists. A skill is a directory: copy it into `.claude/skills/`, commit it, or ship it as a plugin (Module 15.5) |
+| `description: Helper for tests` | Brief it like a new hire (S9): what it does **and** when, in the phrases people type |
+| A deploy skill with no `allowed-tools` | It works only because you click through prompts. Declare exact tools (`Bash(git push *)`) and set `disable-model-invocation: true` |
+| Every workflow in `CLAUDE.md` | (S15) "Aim to keep CLAUDE.md under 200 lines by including only essentials"; procedures go in skills |
+| Trusting `allowed-tools` in a repo you did not write | It applies even in an untrusted folder or a `-p` run. Read `SKILL.md` first |
 | Treating a skill as a guardrail | "A skill is a control, though an advisory one." (S3) Enforce hard rules with hooks (Module 11.3) or `permissions.deny` |
 
 ---
@@ -389,24 +390,23 @@ with file and line references. Do not edit files.
 
 **Scenario**: A Ho Chi Minh City fintech team integrates a payment gateway with three Vietnamese
 banks. Every few months a new engineer reproduces the same bug class: amounts as floating point,
-VND with decimals, no idempotency key on retries. The rules lived in a wiki nobody opened, then in
-a 500-line `CLAUDE.md`.
+VND with decimals, no idempotency key on retries. The rules lived in a 500-line `CLAUDE.md`.
 
 **Problem**: `CLAUDE.md` loaded every turn, so context filled fast and adherence dropped; review
-kept catching the same mistakes after the fact.
+kept catching the same bugs.
 
 **Solution**: The team moved the rules into `.claude/skills/vn-payment-rules/` with
 `user-invocable: false` and a description naming the triggers ("payment", "VNPay", "MoMo",
 "refund"). `SKILL.md` holds six non-negotiables; `references/bank-specs.md` holds each bank's
 field formats and loads only when Claude touches an adapter. `CLAUDE.md` shrank under 200 lines.
-This is the pattern Anthropic describes for its own secure SDLC (S4): "those guidelines are
-encoded in CLAUDE.md files and references to org-wide skills so the code follows these best
-practices the minute it's generated", and when an agent finds a new bug class, "the relevant file
-is updated to prevent it recurring".
+This is Anthropic's own secure-SDLC pattern (S4): "those guidelines are encoded in CLAUDE.md files
+and references to org-wide skills so the code follows these best practices the minute it's
+generated", and when an agent finds a new bug class, "the relevant file is updated to prevent it
+recurring".
 
 **Result**: Rules apply at generation time, not review time; a new bank is a new section in
-`bank-specs.md`. A hook (Module 11.3) remains the deterministic backstop for the one rule that
-must never slip: no `float` under `payments/`.
+`bank-specs.md`. A hook (Module 11.3) remains the deterministic backstop for the rule that must
+never slip: no `float` under `payments/`.
 
 ---
 
