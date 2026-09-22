@@ -1,6 +1,6 @@
 ---
 title: 'Custom Skill Development'
-description: 'Structure a production skill, package it with a hook as a plugin, validate and load it with --plugin-dir, and measure it with claude plugin eval.'
+description: 'Package a skill with a hook and scripts as a plugin, validate and load it with --plugin-dir, and measure it with claude plugin eval.'
 verified: 2026-09-22
 claude_version: 2.1.278
 ---
@@ -11,10 +11,9 @@ claude_version: 2.1.278
 >
 > **Prerequisite**: Module 15.3 (Claude Code Skills), Module 15.4 (Community Ecosystem)
 >
-> **Outcome**: After this module, you will be able to structure a skill with `scripts/` and
-> `references/`, package it with a hook as a plugin in `.claude-plugin/plugin.json`, check it with
-> `claude plugin validate`, load it with `claude --plugin-dir`, and measure it with
-> `claude plugin eval`.
+> **Outcome**: After this module, you will be able to package a skill together with a hook and
+> its scripts as a plugin in `.claude-plugin/plugin.json`, check it with `claude plugin validate`,
+> load it with `claude --plugin-dir`, and measure it with `claude plugin eval`.
 
 ---
 
@@ -203,7 +202,8 @@ Type `/plugin`, press `Tab` to reach **Installed**, then type `cc-lab` to filter
     Type to search · Space to toggle · f to favorite · Enter to view · Esc to go back
 ```
 
-`inline` means "loaded from `--plugin-dir`", not installed from a marketplace.
+The `inline` label is what v2.1.278 shows for a `--plugin-dir` plugin; the docs only say such
+plugins "show in the `/plugin` interface", not in the inline `/plugin list`.
 
 **Step 4: Run the namespaced skill headless**
 
@@ -368,7 +368,7 @@ score.
 ---
 description: Push the current branch and open a release PR. Manual only.
 disable-model-invocation: true
-allowed-tools: Bash(git push origin *), Bash(gh pr create *)
+allowed-tools: Bash(git branch --show-current), Bash(git push origin *), Bash(gh pr create *)
 ---
 
 **Branch**: !`git branch --show-current`
@@ -378,7 +378,8 @@ Push the branch above with `git push origin <branch>`, then run
 ```
 
 Narrow `allowed-tools` means a wrong step still hits a permission prompt; manual invocation
-means Claude never decides to deploy. Both are needed.
+means Claude never decides to deploy. Both are needed. The injected `git branch` is listed too:
+outside auto mode, an injected command that a rule would ask about aborts the invocation.
 </details>
 
 ---
