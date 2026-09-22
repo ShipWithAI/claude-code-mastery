@@ -22,6 +22,7 @@ Before writing a new module:
    - **PITFALLS** — Common mistakes (wrong vs right)
    - **REAL CASE** — Production scenario
 3. Read [`CLAUDE.md`](./CLAUDE.md) for full writing guidelines and the module template
+- Run `npm run lint:course` and `npm run build` before opening a PR; both run in CI.
 
 Content lives in `src/content/docs/en/claude-code/` (English) and `src/content/docs/vi/claude-code/` (Vietnamese).
 
