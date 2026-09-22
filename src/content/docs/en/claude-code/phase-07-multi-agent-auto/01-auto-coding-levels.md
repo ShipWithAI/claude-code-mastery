@@ -175,8 +175,8 @@ The write to `hello.txt` was blocked pending your permission. Please approve the
 ls: hello.txt: No such file or directory
 ```
 
-`--permission-mode default` forces the stock behavior; on a fresh install you get the same
-result without it unless `settings.json` sets `permissions.defaultMode`. Level 2:
+`--permission-mode default` forces the stock behavior; on Pro, Max and Team plans the built-in
+starting mode is `auto`, which `permissions.defaultMode` overrides. Level 2:
 
 ```bash
 claude -p "Create a file hello.txt containing hi" --permission-mode acceptEdits
