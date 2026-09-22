@@ -1,315 +1,360 @@
 ---
 title: 'Hệ sinh thái cộng đồng'
-description: 'Khám phá hệ sinh thái Claude Code: community tools, extensions, shared skills và best practices.'
+description: 'Thêm plugin marketplace, đọc hooks và MCP config trước khi cài, cài plugin ở project scope, và giới hạn những gì team được dùng.'
+verified: 2026-09-22
+claude_version: 2.1.278
 ---
 
 # Module 15.4: Hệ sinh thái cộng đồng
 
-> **Thời gian ước tính**: ~25 phút
+> **Thời gian ước tính**: ~30 phút
 >
 > **Yêu cầu trước**: Module 15.3 (Claude Code Skills)
 >
-> **Kết quả**: Sau module này, bạn sẽ biết tìm resource cộng đồng ở đâu, cách đánh giá chất lượng, và cách contribute lại cho ecosystem.
+> **Kết quả**: Sau module này, bạn sẽ thêm được một plugin marketplace, đọc hooks và MCP config
+> của plugin trước khi cài, cài nó ở project scope để cả team cùng có, và giới hạn marketplace
+> lẫn MCP server mà team được phép dùng.
 
 ---
 
 ## 1. WHY — Tại sao cần học
 
-Bạn nhận project React Native deadline 2 tuần. Bạn dành 3 giờ viết CLAUDE.md từ đầu — chưa viết dòng code nào. Đồng nghiệp bạn search GitHub 5 phút, tìm template 500 stars, customize 15 phút, xong. Community ecosystem giúp bạn không phải build từ zero, nhưng cần biết evaluate chất lượng và contribute lại.
+Ai đó trong team dán link GitHub kèm câu "cài plugin này đi, hay lắm". Nó mang theo một hook
+`SessionStart`, một hook `Stop` và một MCP server đòi token. Cả team cài vì nó phổ biến; không ai
+đọc. Sáu tuần sau, hook đó vẫn chạy ở mỗi prompt trong một repo chứa credential ngân hàng.
+
+Docs nói thẳng: "Plugins and marketplaces are highly trusted components that can execute
+arbitrary code on your machine with your user privileges." Module này nói về việc đọc trước khi
+cài, và biến nó thành luật của team.
 
 ---
 
-## 2. CONCEPT — Khái niệm cốt lõi
+## 2. CONCEPT — Ý tưởng cốt lõi
 
-### Ecosystem Layer
+### Hai bước: marketplace, rồi plugin
 
-Claude Code ecosystem có 3 tầng chính:
+**Marketplace** là một git repo (hoặc thư mục, hoặc URL) có `.claude-plugin/marketplace.json`
+liệt kê plugin. Thêm nó một lần, rồi cài plugin từ đó dưới dạng `name@marketplace`.
 
-| Layer | Nguồn | Ví dụ | Độ tin cậy |
-|-------|-------|-------|------------|
-| **Official** | Anthropic, docs chính thức | Core docs, example repos | Cao nhất |
-| **Community** | Open source contributors | Templates, skills, guides | Varies |
-| **Enterprise** | Internal công ty | Private libraries, standards | Nội bộ |
+```mermaid
+graph LR
+    M["marketplace<br/>.claude-plugin/marketplace.json"] -->|"/plugin install name@marketplace"| P["plugin<br/>.claude-plugin/plugin.json"]
+    P --> S["skills/ · agents/"]
+    P --> H["hooks/hooks.json<br/>chạy theo event"]
+    P --> C[".mcp.json<br/>server + token"]
+    S & H & C --> U["tất cả chạy với quyền của bạn"]
+```
 
-### Resource Community Chia Sẻ
+### Plugin đến từ đâu
 
-- **CLAUDE.md Templates**: Project-specific instructions
-- **Skills**: Custom capabilities
-- **Prompt Recipes**: Proven patterns
-- **Best Practices**: Production lessons
-- **Tutorials & Integration Examples**: Step-by-step guides
+| Nguồn | Thêm / cài | Có gì trong đó |
+|---|---|---|
+| `claude-plugins-official` | Tự đăng ký; xem trong `/plugin` → **Discover** hoặc claude.com/plugins | Catalogue do Anthropic duy trì, ví dụ `/plugin install github@claude-plugins-official` |
+| `anthropics/claude-plugins-community` | `/plugin marketplace add anthropics/claude-plugins-community` → `name@claude-community` | Plugin cộng đồng |
+| `anthropics/claude-code` | `/plugin marketplace add anthropics/claude-code` → `claude-code-plugins` | Repo của chính Anthropic: `commit-commands`, `security-guidance`, `plugin-dev`, `hookify`, … |
+| `anthropics/skills` | `/plugin marketplace add anthropics/skills` → `anthropic-agent-skills` | `document-skills` (docx/pdf/pptx/xlsx), `example-skills`, `claude-api`, … phần lớn Apache 2.0 |
+| Repo của bạn | `/plugin marketplace add your-org/claude-plugins` | Skill, hook, MCP config nội bộ |
+| Danh sách tuyển chọn | ví dụ [awesome-claude-code](https://github.com/hesreallyhim/awesome-claude-code) | Là danh sách, không phải review. Checklist vẫn áp dụng |
 
-### Tìm Resource Ở Đâu
+Official hay không, cảnh báo trong docs vẫn như nhau: "Anthropic doesn't control what MCP
+servers, files, or other software are included in plugins and can't verify that they work as
+intended."
 
-- **Official**: docs.anthropic.com, Anthropic GitHub
-- **Community**: GitHub search, dev blogs, Stack Overflow, Gists
+### Scope: ai nhận được plugin
 
-### Quality Evaluation Framework
+| Scope | Ghi vào | Dùng cho |
+|---|---|---|
+| `user` (mặc định của CLI) | `~/.claude/settings.json` | Chỉ máy bạn |
+| `project` | `.claude/settings.json`: `extraKnownMarketplaces` + `enabledPlugins` | Commit lên; đồng đội nhận sau khi trust thư mục |
+| `local` | `.claude/settings.local.json` | Chỉ checkout này |
+| `managed` | Managed settings | Toàn tổ chức, không override được |
 
-4 tiêu chí đánh giá:
+### Checklist trước khi cài
 
-1. **Maintenance (30%)**: Last commit < 3 tháng, active issues
-2. **Quality (40%)**: Documentation, examples, tests, clean code
-3. **Adoption (20%)**: Stars/forks, community usage
-4. **Compatibility (10%)**: Version match với Claude Code
+Trước `/plugin install`, mở source và trả lời năm câu:
 
-**Scoring**: 80+ = Excellent, 60-79 = Good, 40-59 = Caution, <40 = Avoid
+1. **Ai publish?** Tổ chức, lịch sử commit, marketplace bạn đã tin.
+2. **`hooks/hooks.json`**: những event nào (`SessionStart`, `UserPromptSubmit`, `Stop` chạy mỗi
+   lượt) và script làm gì.
+3. **`.mcp.json`**: endpoint nào, token nào đi vào `headers` hoặc `env`.
+4. **Skill**: `allowed-tools`, `` !`lệnh` ``, `disable-model-invocation` cho việc có side effect.
+5. **Nó có cần tất cả những thứ đó không?** Một helper commit không cần hook `Stop`.
 
-### Contribution Spectrum
+### Kiểm soát cho team (enforced, không phải khuyến nghị)
 
-1. **Star/Fork** (30s) — Signal quality
-2. **Issue/Docs** (5-15 phút) — Bug reports, typo fixes
-3. **Examples** (30 phút) — Add use cases
-4. **Code** (1-4+ giờ) — Bug fixes, features
+| Setting | Scope | Tác dụng |
+|---|---|---|
+| `enabledPlugins` | mọi scope; managed `false` chặn ở mọi scope | Bật/tắt từng plugin; project đè user |
+| `extraKnownMarketplaces` | mọi scope; settings trong repo có hiệu lực sau khi trust | Tự thêm marketplace cho project |
+| `strictKnownMarketplaces` | **chỉ managed** | Allowlist nguồn; `[]` khóa tất cả, kể cả official |
+| `blockedMarketplaces` | managed | Denylist |
+| `allowedMcpServers` | mọi scope; "Deploy it in managed settings to enforce it" | Allowlist theo `serverName`, `serverCommand`, `serverUrl`; áp cả server của plugin |
 
 ---
 
-## 3. DEMO — Từng bước cụ thể
+## 3. DEMO — Từng bước
 
-**Scenario**: Build microservices platform với Kubernetes.
+Chạy trong `~/cc-lab`. Các bước dùng dạng shell `claude plugin …` để output tái lập được;
+`/plugin …` trong session làm điều tương tự.
 
-### Bước 1: Search Resource
-
-```bash
-gh search repos "claude code kubernetes" --stars=">10" --sort=stars
-```
-
-**Kết quả**: 3 repos:
-- `k8s-claude-template` (⭐245, 1 month)
-- `claude-k8s-ops` (⭐89, 3 months)
-- `kubernetes-ai-dev` (⭐12, 1 week)
-
-### Bước 2: Evaluate Top Result
+**Bước 1: Xem bạn đã có marketplace nào**
 
 ```bash
-git clone https://github.com/example/k8s-claude-template.git
-cd k8s-claude-template
+# docs: plugin-marketplaces
+claude plugin marketplace list
 ```
 
-**Checklist**: Maintenance (30), Quality (40), Adoption (20), Compatibility (10)
+```text
+# Output may vary
+Configured marketplaces:
 
-**Score: 95/100 — Excellent**
+  ❯ claude-plugins-official
+    Source: GitHub (anthropics/claude-plugins-official)
+  …
+```
 
-### Bước 3: Adapt Cho Project
+**Bước 2: Thêm marketplace repo của Anthropic ở project scope**
 
 ```bash
-# Copy và customize template
-cp k8s-claude-template/CLAUDE.md ./CLAUDE.md
-
-# Edit để thêm:
-# - Project-specific tech stack
-# - Company naming conventions
-# - Secret management rules
-# - Relevant sections từ template gốc
+# docs: plugin-marketplaces, discover-plugins
+claude plugin marketplace add anthropics/claude-code --scope project
+cat .claude/settings.json
 ```
 
-### Bước 4: Test
+```text
+# Output may vary
+Adding marketplace…Cloning via SSH: git@github.com:anthropics/claude-code.git
+Refreshing marketplace cache (timeout: 120s)…
+Clone complete, validating marketplace…
+✔ Successfully added marketplace: claude-code-plugins (declared in project settings)
+{
+  "extraKnownMarketplaces": {
+    "claude-code-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/claude-code"
+      }
+    }
+  }
+}
+```
+
+Tên marketplace lấy từ `marketplace.json` của nó, không phải tên repo. Commit
+`.claude/settings.json`; đồng đội nhận được sau khi trust thư mục.
+
+**Bước 3: Đọc trước khi cài**
+
+Marketplace là repo public, nên hãy đọc thứ nó sẽ chạy. So sánh một plugin nặng hook với một
+plugin đơn giản:
 
 ```bash
-claude
-> "Deploy payment-service to staging cluster"
-# Claude Code đọc CLAUDE.md, generate manifests đúng convention
+# docs: plugins-reference (hooks/hooks.json, .mcp.json layout)
+curl -s https://raw.githubusercontent.com/anthropics/claude-code/main/plugins/security-guidance/hooks/hooks.json \
+  | jq -c '.hooks | keys'
+curl -s https://raw.githubusercontent.com/anthropics/claude-code/main/plugins/commit-commands/commands/commit.md \
+  | head -4
+curl -s https://raw.githubusercontent.com/anthropics/claude-plugins-official/main/external_plugins/github/.mcp.json
 ```
 
-### Bước 5: Contribute Back
+```text
+# Output may vary
+["PostToolUse","SessionStart","Stop","UserPromptSubmit"]
+---
+allowed-tools: Bash(git add:*), Bash(git status:*), Bash(git commit:*)
+description: Create a git commit
+---
+{
+  "github": {
+    "type": "http",
+    "url": "https://api.githubcopilot.com/mcp/",
+    "headers": {
+      "Authorization": "Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}"
+    }
+  }
+}
+```
 
-Sau 2 tuần, bạn thấy template thiếu Vault integration. Contribute lại:
+`security-guidance` gắn hook vào bốn event, gồm mỗi prompt và mỗi lần stop: đó là việc của nó,
+nhưng bạn cần biết trước khi nó chạy trên repo có secret. `commit-commands` là ba file command
+chỉ được `git add/status/commit`. Plugin `github` official là một MCP server HTTP gửi
+`GITHUB_PERSONAL_ACCESS_TOKEN` của bạn tới `api.githubcopilot.com`. Không có gì bị giấu; chỉ là
+chưa ai đọc.
+
+**Bước 4: Cài ở project scope**
 
 ```bash
-# Fork, create branch, add documentation
-git checkout -b add-vault-integration
-
-# Add Vault section vào template
-# Commit với clear message
-# Push và create PR
-
-gh pr create --title "Add Vault integration guidelines" \
-  --body "Tested in production with K8s 1.28"
+# docs: discover-plugins, plugins-reference
+claude plugin install commit-commands@claude-code-plugins --scope project
+cat .claude/settings.json
 ```
 
-**PR merged → Hàng ngàn người khác benefit từ experience của bạn.**
+```text
+# Output may vary
+Installing plugin "commit-commands@claude-code-plugins"...✔ Successfully installed plugin: commit-commands@claude-code-plugins (scope: project)
+{
+  "extraKnownMarketplaces": { "claude-code-plugins": { … } },
+  "enabledPlugins": {
+    "commit-commands@claude-code-plugins": true
+  }
+}
+```
+
+Trong session, `/plugin install commit-commands@claude-code-plugins` sẽ hỏi scope thay vì cần
+flag.
+
+**Bước 5: Liệt kê từ trong session**
+
+Mở `claude` và gõ `/plugin list`:
+
+```text
+# Output may vary
+❯ /plugin list
+  ⎿  Installed plugins:
+       • commit-commands@claude-code-plugins (v1.0.0, project) ✔ enabled
+       …
+```
+
+`/plugin` → **Installed** hiện `commit-commands Plugin · claude-code-plugins · ✔ enabled · 3
+skills`, gọi bằng `/commit-commands:commit`.
+
+**Bước 6: Gỡ sạch**
+
+```bash
+# docs: plugins-reference, plugin-marketplaces
+claude plugin uninstall commit-commands@claude-code-plugins --scope project
+claude plugin marketplace remove claude-code-plugins
+```
+
+```text
+# Output may vary
+✔ Successfully uninstalled plugin: commit-commands (scope: project)
+✔ Successfully removed marketplace: claude-code-plugins
+```
+
+Gỡ marketplace thì "also uninstalls any plugins you installed from it".
 
 ---
 
-## 4. PRACTICE — Luyện tập
+## 4. PRACTICE — Tự thực hành
 
-### Bài 1: Resource Discovery
+### Bài 1: Audit một plugin bạn không viết
 
-**Mục tiêu**: Tìm 3 high-quality community resources cho tech stack của bạn.
-
-**Hướng dẫn**:
-1. Identify stack chính của project hiện tại (VD: "Next.js + Prisma + PostgreSQL")
-2. Search GitHub với pattern: `"CLAUDE.md" + {framework}`
-3. Evaluate top 3 results bằng Quality Framework
-4. Document findings trong bảng so sánh
-
-**Expected result**: Markdown table với 3 repos, scores, và recommendation.
-
-<details>
-<summary>💡 Gợi ý</summary>
-
-Dùng filters: `stars:>10 pushed:>2024-11-01 language:markdown`
-
-</details>
-
-<details>
-<summary>✅ Giải pháp</summary>
-
-**Steps**:
-1. Search: `gh search repos "CLAUDE.md nextjs" --stars=">10"`
-2. Clone top 3 results
-3. Evaluate: check last commit, stars, tests
-4. Create comparison table
-
-**Sample Result**:
-
-| Repo | Stars | Update | Score | Verdict |
-|------|-------|--------|-------|---------|
-| repo1 | 340 | 2 weeks | 95/100 | ✅ Use |
-| repo2 | 120 | 1 month | 75/100 | ⚠️ Test |
-| repo3 | 45 | 6 months | 60/100 | ❌ Skip |
-
-</details>
-
-### Bài 2: Quality Deep Dive
-
-**Mục tiêu**: Evaluate kỹ một resource trước khi dùng production.
+**Mục tiêu**: Áp checklist lên `anthropics/skills`.
 
 **Hướng dẫn**:
-1. Pick resource từ Bài 1
-2. Run full quality checklist
-3. Test trong throwaway project
-4. Document risks và mitigations
+1. `claude plugin marketplace add anthropics/skills --scope local`.
+2. Đọc `.claude-plugin/marketplace.json` của repo và liệt kê tên các plugin.
+3. Với `document-skills`, ghi lại tool mà mỗi `SKILL.md` cần và xem có hook hay `.mcp.json`
+   nào không. Rồi `claude plugin marketplace remove anthropic-agent-skills`.
 
-**Expected result**: Risk assessment document.
+**Kết quả mong đợi**: Một câu nói rõ plugin chạy gì và với tool nào.
+
+### Bài 2: Khóa team lại
+
+**Mục tiêu**: Managed settings chỉ cho phép marketplace official, repo của tổ chức bạn, và một
+MCP server.
 
 <details>
-<summary>💡 Gợi ý</summary>
+<summary>✅ Lời giải</summary>
 
-Check: dependencies (`npm audit`), license, maintainer reputation, response time.
+```json
+{
+  "strictKnownMarketplaces": [
+    { "source": "github", "repo": "anthropics/claude-plugins-official" },
+    { "source": "github", "repo": "your-org/claude-plugins" }
+  ],
+  "allowedMcpServers": [
+    { "serverUrl": "https://mcp.internal.example.com/*" }
+  ]
+}
+```
 
+`strictKnownMarketplaces` chỉ có tác dụng trong managed settings; `allowedMcpServers` cũng chỉ
+là luật ở đó. Cả hai áp lên cả server do plugin cung cấp.
 </details>
 
-<details>
-<summary>✅ Giải pháp</summary>
+### Bài 3: Publish plugin ở Module 15.5 trong nội bộ
 
-**Evaluation**:
-- Maintenance: ✅ Active (2 weeks ago)
-- Quality: ✅ README + tests + clean code
-- Adoption: ✅ 340 stars, 45 forks
-- Compatibility: ✅ Matches versions
-- Security: ✅ No audit warnings
-
-**Risks**: Single maintainer, dependency updates needed
-
-**Verdict**: ✅ Approve với monitoring plan
-
-</details>
-
-### Bài 3: Contribute Back
-
-**Mục tiêu**: Give back cho community bằng 1 meaningful contribution.
-
-**Hướng dẫn**:
-1. Identify gap trong resource bạn đang dùng (bug, missing doc, unclear example)
-2. Fix locally và test
-3. Submit PR theo contribution guidelines
-4. Respond to maintainer feedback
-
-**Expected result**: Merged PR hoặc documented attempt.
+**Mục tiêu**: Một marketplace riêng mà team thêm bằng một lệnh.
 
 <details>
-<summary>💡 Gợi ý</summary>
+<summary>✅ Lời giải</summary>
 
-Easy contributions: typos, examples, README clarifications. Đọc CONTRIBUTING.md trước.
+```json
+{
+  "name": "acme-tools",
+  "owner": { "name": "ACME Platform Team" },
+  "plugins": [
+    {
+      "name": "cc-lab-plugin",
+      "source": "./plugins/cc-lab-plugin",
+      "description": "Test-writing skill plus post-write test hook"
+    }
+  ]
+}
+```
 
-</details>
-
-<details>
-<summary>✅ Giải pháp</summary>
-
-**Workflow**:
-1. Fork repo
-2. Create branch: `improve-error-example`
-3. Add example file showing error handling pattern
-4. Commit: `docs: add error handling example`
-5. Push và create PR với clear motivation
-6. Respond to feedback → PR merged
-
-**Outcome**: Documentation improved cho community.
-
+Lưu thành `.claude-plugin/marketplace.json` cạnh `plugins/cc-lab-plugin/`, chạy
+`claude plugin validate .` (`✔ Validation passed with warnings` cho tới khi bạn thêm
+`description`), push, rồi `/plugin marketplace add your-org/acme-tools` và
+`/plugin install cc-lab-plugin@acme-tools`.
 </details>
 
 ---
 
 ## 5. CHEAT SHEET
 
-### Resource Discovery
-
-| Nguồn | Search Pattern | Best For |
-|-------|----------------|----------|
-| **GitHub Code** | `"CLAUDE.md" + {tech}` | Project templates |
-| **GitHub Repos** | `claude code {tech} stars:>10` | Skills, tools |
-| **Anthropic Docs** | Official documentation | Foundation, best practices |
-| **Developer Blogs** | `claude code tutorial {use-case}` | Walkthroughs |
-| **Stack Overflow** | `[claude-code] {problem}` | Troubleshooting |
-
-### Quality Scoring Quick Reference
-
-| Criteria | Weight | Quick Check |
-|----------|--------|-------------|
-| **Maintenance** | 30% | Last commit < 3 tháng? |
-| **Quality** | 40% | README + examples + tests? |
-| **Adoption** | 20% | Stars > 100? |
-| **Compatibility** | 10% | Version match? |
-
-**Decision**: 80+ = Adopt, 60-79 = Test, 40-59 = Caution, <40 = Avoid
-
-### Contribution Ladder
-
-| Level | Time | Examples |
-|-------|------|----------|
-| **Star** | 5s | Signal quality |
-| **Issue** | 5m | Bug report, feature request |
-| **Docs** | 15m | Fix typo, clarify example |
-| **Example** | 30m | Add use case |
-| **Bug Fix** | 1-2h | Submit PR |
-| **Feature** | 4+h | New capability |
+| Lệnh / setting | Mục đích |
+|---|---|
+| `/plugin` | Menu: Discover · Installed · Marketplaces · Errors · Stats |
+| `/plugin marketplace add owner/repo` (`./dir`, git URL, `owner/repo@ref`) | Đăng ký marketplace |
+| `/plugin marketplace list` · `update <name>` · `remove <name>` | Quản lý marketplace |
+| `/plugin install name@marketplace` | Cài; hỏi scope |
+| `/plugin install name --marketplace owner/repo` | Thêm + cài trong một bước (v2.1.275+) |
+| `/plugin uninstall name@marketplace` · `enable` · `disable` · `list` | Quản lý plugin |
+| `claude plugin install name@marketplace -s project` | Dạng shell; user scope nếu thiếu `-s` |
+| `claude plugin validate .` | Kiểm tra `marketplace.json` hoặc `plugin.json` |
+| `/reload-plugins` | Kích hoạt không cần restart |
+| `"enabledPlugins": {"name@market": true}` | Bật/tắt theo scope; managed `false` chặn mọi nơi |
+| `"extraKnownMarketplaces"` | Tự thêm cho project (sau khi trust thư mục) |
+| `"strictKnownMarketplaces": []` | Managed lockdown; liệt kê nguồn để cho phép |
+| `"allowedMcpServers"` | Allowlist MCP; enforce từ managed settings |
 
 ---
 
-## 6. PITFALLS — Sai lầm thường gặp
+## 6. PITFALLS — Lỗi thường gặp
 
-| ❌ Sai | ✅ Đúng |
-|--------|---------|
-| Dùng result đầu tiên không evaluate | So sánh ít nhất 3 options |
-| Ignore last update date | Prefer updated trong 3 tháng |
-| Copy template không đọc hiểu | Đọc kỹ, hiểu rồi adapt |
-| Không test trước production | Test trong throwaway project |
-| Take mà không give back | Contribute improvements |
-| Tin blindly vào star count | Stars ≠ quality, evaluate kỹ |
-| Không đọc CONTRIBUTING.md | Đọc guidelines trước PR |
+| ❌ Sai lầm | ✅ Cách đúng |
+|---|---|
+| Lấy số lượt cài, số star hay awesome-list làm thẩm định | Chúng chỉ nói thứ đó tồn tại và phổ biến. Tự chạy checklist năm câu |
+| Cài ở user scope cho tool của team | `--scope project` ghi `enabledPlugins` vào `.claude/settings.json`; commit nó |
+| "Plugin official nên an toàn" | Plugin official mang cùng cảnh báo. `github@claude-plugins-official` gửi token tới một HTTP server: ổn nếu bạn chủ ý |
+| Đặt `strictKnownMarketplaces` trong `.claude/settings.json` | Key này chỉ dành cho managed. Project settings dùng `enabledPlugins` / `extraKnownMarketplaces` |
+| Coi hook của plugin là vô hại vì "chỉ nhắc nhở" | Hook chạy script với quyền của bạn ở mỗi event; đọc script, đừng đọc description |
 
 ---
 
 ## 7. REAL CASE — Câu chuyện thực tế
 
-**Scenario**: VinTech Payment — fintech startup Việt Nam, 6 teams dùng Claude Code với setup khác nhau. Mỗi team mất 2-3 giờ setup từ scratch, lặp lại mistakes, patterns inconsistent.
+**Bối cảnh**: Một công ty outsourcing ở Hà Nội dùng Claude Code trên hơn chục repo của khách, vài
+repo có credential ngân hàng trong CI. Dev tự do thêm marketplace; không ai liệt kê được hook
+nào đang chạy ở đâu.
 
-**Solution**:
-- **Tháng 1**: Tech Lead tìm `microservices-claude-template` (⭐450, score 88/100), adapt cho VinTech
-- **Tháng 2**: Roll out cho teams, setup time giảm 2-3 giờ → 30 phút
-- **Tháng 3**: Contribute Kafka integration guideline, PR merged
+**Vấn đề**: Đợt security review của khách hỏi "code bên thứ ba nào chạy khi kỹ sư của các bạn mở
+repo của chúng tôi?" Câu trả lời thật thà là "chúng tôi không biết".
 
-**Kết quả (3 tháng)**:
-- ✅ Setup: 2-3 giờ → 15 phút
-- ✅ Consistency: 30% → 95%
-- ✅ Junior devs follow best practices ngay từ đầu
-- ✅ Community karma: 3 merged PRs
+**Giải pháp**: Plugin trở thành artefact được review. Mỗi đề xuất là một PR vào
+`your-org/claude-plugins`, copy plugin vào kèm checklist đã điền: event trong `hooks/hooks.json`,
+endpoint và token trong `.mcp.json`, `allowed-tools` của từng skill. Managed settings đặt
+`strictKnownMarketplaces` gồm marketplace official và repo đó, `allowedMcpServers` gồm hai server
+nội bộ. `.claude/settings.json` của từng project mang `extraKnownMarketplaces` và
+`enabledPlugins`, nên mỗi checkout tự khai báo thứ chạy trong nó. Đúng luật Anthropic áp cho
+agent của họ (S4): "Give every agent a single-purpose identity with the minimum permissions for
+its job".
 
-**Quote Senior DevOps**:
-> "80% patterns là universal. Community đã solve. Mình focus 20% business logic unique. Contribute lại, learn từ feedback toàn cầu. Win-win."
+**Kết quả**: Câu hỏi của khách giờ có một file làm câu trả lời, và hook mới không thể vào repo
+nếu chưa qua PR review. Thêm một plugin mất một ngày thay vì một phút; đó chính là mục đích.
 
 ---
 
-> **Tiếp theo**: [Module 15.5: Custom Skill Development](../05-custom-skill-development/) →
+> **Tiếp theo**: [Module 15.5: Phát triển Skill tùy chỉnh](../05-custom-skill-development/) →

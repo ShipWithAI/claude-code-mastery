@@ -1,294 +1,324 @@
 ---
 title: 'Community Ecosystem'
-description: 'Discover Claude Code community resources, evaluate third-party tools, and contribute to the ecosystem.'
+description: 'Add plugin marketplaces, inspect hooks and MCP config before installing, install plugins at project scope, and restrict what a team may use.'
+verified: 2026-09-22
+claude_version: 2.1.278
 ---
 
 # Module 15.4: Community Ecosystem
 
-> **Estimated time**: ~25 minutes
+> **Estimated time**: ~30 minutes
 >
 > **Prerequisite**: Module 15.3 (Claude Code Skills)
 >
-> **Outcome**: After this module, you will know where to find community resources, how to evaluate them, and how to contribute back to the ecosystem.
+> **Outcome**: After this module, you will be able to add a plugin marketplace, inspect a
+> plugin's hooks and MCP config before installing it, install it at project scope so your team
+> gets it, and restrict which marketplaces and MCP servers a team may use.
 
 ---
 
 ## 1. WHY — Why This Matters
 
-You've built an excellent CLAUDE.md template for Next.js projects. You've created reusable prompt recipes for common refactoring tasks. You've spent hours perfecting these resources. Then you realize: someone else probably solved this already.
+Someone on the team pastes "install this plugin, it's great" with a GitHub link. It ships a
+`SessionStart` hook, a `Stop` hook and an MCP server that wants a token. Everyone installs it
+because it is popular; nobody reads it. Six weeks later that hook still runs on every prompt in a
+repo that holds bank credentials.
 
-The Claude Code ecosystem is growing. Developers share templates, skills, and patterns. Using community resources accelerates your workflow. Contributing back helps everyone. The challenge is finding quality resources and knowing how to evaluate them.
+The docs are blunt: "Plugins and marketplaces are highly trusted components that can execute
+arbitrary code on your machine with your user privileges." This module is about reading before
+installing, and making that a team rule.
 
 ---
 
 ## 2. CONCEPT — Core Ideas
 
-### Ecosystem Layers
+### Two steps: marketplace, then plugin
 
-```text
-┌─────────────────────────────────┐
-│   Official (Anthropic)          │  ← Foundation
-├─────────────────────────────────┤
-│   Community (Open Source)       │  ← Collaboration
-├─────────────────────────────────┤
-│   Enterprise (Companies)        │  ← Specialization
-└─────────────────────────────────┘
+A **marketplace** is a git repo (or directory, or URL) with `.claude-plugin/marketplace.json`
+listing plugins. Add it once, then install plugins from it as `name@marketplace`.
+
+```mermaid
+graph LR
+    M["marketplace<br/>.claude-plugin/marketplace.json"] -->|"/plugin install name@marketplace"| P["plugin<br/>.claude-plugin/plugin.json"]
+    P --> S["skills/ · agents/"]
+    P --> H["hooks/hooks.json<br/>runs on events"]
+    P --> C[".mcp.json<br/>servers + tokens"]
+    S & H & C --> U["all run as you"]
 ```
 
-| Layer | Source | Quality Control | Examples |
-|-------|--------|----------------|----------|
-| **Official** | Anthropic | Verified | Core docs, example projects |
-| **Community** | GitHub, forums | Peer review | Templates, skills, guides |
-| **Enterprise** | Companies | Internal | Custom skills, integrations |
+### Where plugins come from
 
-### What the Community Shares
+| Source | Add / install | What is there |
+|---|---|---|
+| `claude-plugins-official` | Auto-registered; browse in `/plugin` → **Discover** or claude.com/plugins | Anthropic-maintained catalogue, e.g. `/plugin install github@claude-plugins-official` |
+| `anthropics/claude-plugins-community` | `/plugin marketplace add anthropics/claude-plugins-community` → `name@claude-community` | Community plugins |
+| `anthropics/claude-code` | `/plugin marketplace add anthropics/claude-code` → `claude-code-plugins` | Anthropic's own repo: `commit-commands`, `security-guidance`, `plugin-dev`, `hookify`, … |
+| `anthropics/skills` | `/plugin marketplace add anthropics/skills` → `anthropic-agent-skills` | `document-skills` (docx/pdf/pptx/xlsx), `example-skills`, `claude-api`, … many Apache 2.0 |
+| Your own repo | `/plugin marketplace add your-org/claude-plugins` | Internal skills, hooks, MCP config |
+| Curated lists | e.g. [awesome-claude-code](https://github.com/hesreallyhim/awesome-claude-code) | A list, not a review. Same checklist applies |
 
-- CLAUDE.md Templates (framework-specific)
-- Skills (domain expertise packages)
-- Prompt Recipes (reusable patterns)
-- Integration Examples (tool connections)
-- Best Practices & Tutorials
+Official or not, the docs' warning is the same: "Anthropic doesn't control what MCP servers,
+files, or other software are included in plugins and can't verify that they work as intended."
 
-### Where to Find Resources
+### Scopes: who gets the plugin
 
-**Official**: docs.anthropic.com, Anthropic GitHub, Anthropic Discord
-**Community**: GitHub ("CLAUDE.md" + tech stack), blogs, forums, YouTube
+| Scope | Written to | Use for |
+|---|---|---|
+| `user` (CLI default) | `~/.claude/settings.json` | Your machine only |
+| `project` | `.claude/settings.json`: `extraKnownMarketplaces` + `enabledPlugins` | Commit it; teammates get it after folder trust |
+| `local` | `.claude/settings.local.json` | This checkout only |
+| `managed` | Managed settings | Org-wide, not overridable |
 
-### Quality Evaluation Framework
+### The pre-install checklist
 
-**Maintenance (30%)**: Recent commits, active responses, regular updates
-**Quality (40%)**: Clear docs, real examples, clean code
-**Adoption (20%)**: Stars/forks, community discussion, production use
-**Compatibility (10%)**: Compatible license, acceptable dependencies, matching versions
+Before `/plugin install`, open the source and answer five questions:
 
-### Contribution Spectrum
+1. **Who publishes it?** Org, commit history, a marketplace you already trust.
+2. **`hooks/hooks.json`**: which events (`SessionStart`, `UserPromptSubmit`, `Stop` fire every
+   turn) and what the scripts do.
+3. **`.mcp.json`**: which endpoints, which tokens go into `headers` or `env`.
+4. **Skills**: `allowed-tools`, `` !`commands` ``, `disable-model-invocation` on side effects.
+5. **Does it need all that?** A commit helper does not need a `Stop` hook.
 
-```text
-LOW EFFORT → HIGH IMPACT
+### Team controls (enforced, not advisory)
 
-Star/Watch        → Visibility
-Bug Reports       → Quality
-Documentation     → Adoption
-Template Sharing  → Reusability
-Skill Creation    → Capability
-Integration       → Ecosystem
-```
+| Setting | Scope | Effect |
+|---|---|---|
+| `enabledPlugins` | any; managed `false` blocks every scope | On/off per plugin; project overrides user |
+| `extraKnownMarketplaces` | any; repo settings honored after trust | Auto-add marketplaces for a project |
+| `strictKnownMarketplaces` | **managed only** | Allowlist of sources; `[]` locks down everything, official included |
+| `blockedMarketplaces` | managed | Denylist |
+| `allowedMcpServers` | any; "Deploy it in managed settings to enforce it" | Allowlist by `serverName`, `serverCommand`, `serverUrl`; covers plugin servers |
 
 ---
 
 ## 3. DEMO — Step by Step
 
-**Scenario**: Finding, evaluating, and using community resources for a Kubernetes project.
+Run in `~/cc-lab`. The steps use the `claude plugin …` shell form so output is reproducible;
+`/plugin …` inside a session does the same.
 
-### Step 1: Search for Resources
+**Step 1: See which marketplaces you already have**
 
 ```bash
-# ⚠️ Search methods — verify current best sources
-
-# GitHub search
-# Search: "CLAUDE.md kubernetes"
-# Filter: Recently updated, Most stars
-
-# Example results you might find:
-# 1. k8s-claude-template (250 stars, updated 2 weeks ago)
-# 2. kubernetes-skill (80 stars, updated 3 months ago)
-# 3. devops-claude-templates (150 stars, updated 6 months ago)
+# docs: plugin-marketplaces
+claude plugin marketplace list
 ```
-
-### Step 2: Evaluate Top Result
 
 ```text
-Resource: k8s-claude-template
+# Output may vary
+Configured marketplaces:
 
-✅ Maintenance: Updated 2 weeks ago, active responses
-✅ Quality: Clear README, 5 examples, production-ready
-✅ Adoption: 250 stars, 40 forks, 12 contributors
-✅ Compatibility: MIT License, K8s 1.28+
-
-SCORE: 85/100 → GOOD TO USE
+  ❯ claude-plugins-official
+    Source: GitHub (anthropics/claude-plugins-official)
+  …
 ```
 
-### Step 3: Adapt for Your Project
+**Step 2: Add Anthropic's repo marketplace at project scope**
 
 ```bash
-# Clone the template
-$ git clone https://github.com/example/k8s-claude-template
-
-# Copy CLAUDE.md to your project
-$ cp k8s-claude-template/CLAUDE.md ~/my-k8s-project/
-
-# Customize for your setup
-$ code ~/my-k8s-project/CLAUDE.md
+# docs: plugin-marketplaces, discover-plugins
+claude plugin marketplace add anthropics/claude-code --scope project
+cat .claude/settings.json
 ```
 
-```markdown
-# Changes made:
-- Updated cluster version (1.28 → 1.29)
-- Added your team's namespace conventions
-- Included your monitoring stack (Prometheus/Grafana)
-- Added examples from your actual services
+```text
+# Output may vary
+Adding marketplace…Cloning via SSH: git@github.com:anthropics/claude-code.git
+Refreshing marketplace cache (timeout: 120s)…
+Clone complete, validating marketplace…
+✔ Successfully added marketplace: claude-code-plugins (declared in project settings)
+{
+  "extraKnownMarketplaces": {
+    "claude-code-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/claude-code"
+      }
+    }
+  }
+}
 ```
 
-### Step 4: Use and Contribute
+The marketplace name comes from its `marketplace.json`, not the repo name. Commit
+`.claude/settings.json`; teammates get it after trusting the folder.
+
+**Step 3: Read before you install**
+
+The marketplace is a public repo, so read what it will run. Compare a hook-heavy plugin with a
+plain one:
 
 ```bash
-# ⚠️ Verify current implementation
-$ claude skill install kubernetes-production
-# Now Claude has production patterns, security best practices, debugging workflows
+# docs: plugins-reference (hooks/hooks.json, .mcp.json layout)
+curl -s https://raw.githubusercontent.com/anthropics/claude-code/main/plugins/security-guidance/hooks/hooks.json \
+  | jq -c '.hooks | keys'
+curl -s https://raw.githubusercontent.com/anthropics/claude-code/main/plugins/commit-commands/commands/commit.md \
+  | head -4
+curl -s https://raw.githubusercontent.com/anthropics/claude-plugins-official/main/external_plugins/github/.mcp.json
 ```
 
-**Found Issue?** Contribute back:
-1. Fork → Create branch → Fix → Test → PR
-2. Example: Update deprecated Ingress API (networking.k8s.io/v1)
-3. Your fix helps 250+ users
+```text
+# Output may vary
+["PostToolUse","SessionStart","Stop","UserPromptSubmit"]
+---
+allowed-tools: Bash(git add:*), Bash(git status:*), Bash(git commit:*)
+description: Create a git commit
+---
+{
+  "github": {
+    "type": "http",
+    "url": "https://api.githubcopilot.com/mcp/",
+    "headers": {
+      "Authorization": "Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}"
+    }
+  }
+}
+```
+
+`security-guidance` hooks four events, including every prompt and every stop: that is its job, but
+know it before it runs on a repo with secrets. `commit-commands` is three command files limited to
+`git add/status/commit`. The official `github` plugin is an HTTP MCP server that sends your
+`GITHUB_PERSONAL_ACCESS_TOKEN` to `api.githubcopilot.com`. None of this is hidden; it is only
+unread.
+
+**Step 4: Install at project scope**
+
+```bash
+# docs: discover-plugins, plugins-reference
+claude plugin install commit-commands@claude-code-plugins --scope project
+cat .claude/settings.json
+```
+
+```text
+# Output may vary
+Installing plugin "commit-commands@claude-code-plugins"...✔ Successfully installed plugin: commit-commands@claude-code-plugins (scope: project)
+{
+  "extraKnownMarketplaces": { "claude-code-plugins": { … } },
+  "enabledPlugins": {
+    "commit-commands@claude-code-plugins": true
+  }
+}
+```
+
+Inside a session, `/plugin install commit-commands@claude-code-plugins` asks for the scope
+instead.
+
+**Step 5: List it from inside a session**
+
+Start `claude` and type `/plugin list`:
+
+```text
+# Output may vary
+❯ /plugin list
+  ⎿  Installed plugins:
+       • commit-commands@claude-code-plugins (v1.0.0, project) ✔ enabled
+       …
+```
+
+`/plugin` → **Installed** shows `commit-commands Plugin · claude-code-plugins · ✔ enabled · 3
+skills`, invoked as `/commit-commands:commit`.
+
+**Step 6: Remove it cleanly**
+
+```bash
+# docs: plugins-reference, plugin-marketplaces
+claude plugin uninstall commit-commands@claude-code-plugins --scope project
+claude plugin marketplace remove claude-code-plugins
+```
+
+```text
+# Output may vary
+✔ Successfully uninstalled plugin: commit-commands (scope: project)
+✔ Successfully removed marketplace: claude-code-plugins
+```
+
+Removing a marketplace "also uninstalls any plugins you installed from it".
 
 ---
 
 ## 4. PRACTICE — Try It Yourself
 
-### Exercise 1: Resource Discovery
+### Exercise 1: Audit a plugin you did not write
 
-**Goal**: Find high-quality community resources for your stack.
+**Goal**: Apply the checklist to `anthropics/skills`.
 
 **Instructions**:
-1. Identify your primary tech stack (e.g., "React + TypeScript")
-2. Search GitHub for "CLAUDE.md" + your stack
-3. Evaluate top 3 results using the quality framework
-4. Document findings in a comparison table
+1. `claude plugin marketplace add anthropics/skills --scope local`.
+2. Read the repo's `.claude-plugin/marketplace.json` and list the plugin names.
+3. For `document-skills`, note the tools each `SKILL.md` needs and whether any hook or
+   `.mcp.json` exists. Then `claude plugin marketplace remove anthropic-agent-skills`.
 
-<details>
-<summary>💡 Hint</summary>
+**Expected result**: One sentence saying what the plugin runs and with which tools.
 
-Use GitHub's sort filters: "Most stars", "Recently updated". Check both repositories and code search.
+### Exercise 2: Lock a team down
 
-</details>
+**Goal**: Managed settings that allow only the official marketplace, your org's repo, and one
+MCP server.
 
 <details>
 <summary>✅ Solution</summary>
 
-Example evaluation for React + TypeScript:
-
-| Resource | Stars | Updated | Documentation | Examples | Score |
-|----------|-------|---------|---------------|----------|-------|
-| react-ts-template | 180 | 1 week | Excellent | 8 | 90/100 |
-| ts-react-claude | 45 | 2 months | Good | 3 | 70/100 |
-| react-templates | 300 | 8 months | Fair | 2 | 60/100 |
-
-**Pick**: react-ts-template (best maintenance + quality balance)
-
-</details>
-
-### Exercise 2: Quality Deep Dive
-
-**Goal**: Thoroughly evaluate one resource before using in production.
-
-**Instructions**:
-1. Pick a template or skill you want to use
-2. Clone/download it locally
-3. Read ALL documentation
-4. Test on a sample project
-5. Identify any gaps or issues
-6. Decide: use as-is, adapt, or skip
-
-<details>
-<summary>💡 Hint</summary>
-
-Create a test project specifically for evaluation. Don't risk your production codebase.
-
-</details>
-
-<details>
-<summary>✅ Solution</summary>
-
-```bash
-$ git clone <repo> /tmp/eval-template
-$ cat /tmp/eval-template/README.md CLAUDE.md
-$ mkdir /tmp/test-project && cp /tmp/eval-template/CLAUDE.md /tmp/test-project/
-$ cd /tmp/test-project && claude  # Try 3-5 tasks
+```json
+{
+  "strictKnownMarketplaces": [
+    { "source": "github", "repo": "anthropics/claude-plugins-official" },
+    { "source": "github", "repo": "your-org/claude-plugins" }
+  ],
+  "allowedMcpServers": [
+    { "serverUrl": "https://mcp.internal.example.com/*" }
+  ]
+}
 ```
 
-**Decision**: 90%+ = use as-is, 70-89% = adapt, <70% = skip
-
+`strictKnownMarketplaces` works only in managed settings; `allowedMcpServers` is a rule only
+there too. Both cover plugin-provided servers.
 </details>
 
-### Exercise 3: Contribute Back
+### Exercise 3: Publish the plugin from Module 15.5 internally
 
-**Goal**: Give back to the community.
-
-**Instructions**:
-1. Choose contribution type: bug fix, documentation, or new template
-2. Follow project's contribution guidelines
-3. Create quality pull request
-4. Respond to feedback professionally
-
-<details>
-<summary>💡 Hint</summary>
-
-Start small: fix typos or improve examples. Don't start with major refactors.
-
-</details>
+**Goal**: A private marketplace your team adds with one command.
 
 <details>
 <summary>✅ Solution</summary>
 
-**Good first contributions**: Fix typos, add examples, update dependencies, clarify docs
-
-**PR Template**:
-```markdown
-## What: Fixed outdated K8s API
-## Why: v1beta1 deprecated in 1.22
-## Testing: Tested on 1.28, all examples work
+```json
+{
+  "name": "acme-tools",
+  "owner": { "name": "ACME Platform Team" },
+  "plugins": [
+    {
+      "name": "cc-lab-plugin",
+      "source": "./plugins/cc-lab-plugin",
+      "description": "Test-writing skill plus post-write test hook"
+    }
+  ]
+}
 ```
 
-**Feedback**: Thank, respond promptly, ask if unclear, be patient
-
+Save as `.claude-plugin/marketplace.json` next to `plugins/cc-lab-plugin/`, run
+`claude plugin validate .` (`✔ Validation passed with warnings` until you add a `description`),
+push, then `/plugin marketplace add your-org/acme-tools` and
+`/plugin install cc-lab-plugin@acme-tools`.
 </details>
 
 ---
 
 ## 5. CHEAT SHEET
 
-### Resource Discovery
-
-| Source | How to Search | Best For |
-|--------|--------------|----------|
-| **GitHub Code** | `"CLAUDE.md" framework language:markdown` | Templates |
-| **GitHub Repos** | `claude code skill topic:kubernetes` | Skills |
-| **Anthropic Docs** | Official documentation | Foundation |
-| **Discord** | Search #claude-code channel | Questions |
-| **Blogs** | Google: "claude code" + topic | Case studies |
-
-### Quality Scoring Rubric
-
-| Criteria | Score | Guide |
-|----------|-------|-------|
-| **Maintenance (30)** | 30/20/10/0 | This week/month/quarter/older |
-| **Quality (40)** | 40/25/10/0 | Excellent/good/basic/no docs |
-| **Adoption (20)** | 20/15/10/5 | 100+/50-99/10-49/<10 stars |
-| **Compatibility (10)** | 10/7/3/0 | Perfect/minor/major/incompatible |
-
-**Total**: /100
-
-### Contribution Guidelines
-
-```bash
-# Before contributing:
-1. Read CONTRIBUTING.md
-2. Check existing issues/PRs
-3. Start with small changes
-4. Test thoroughly
-5. Write clear PR description
-
-# Good PR titles:
-✅ "Fix: Update deprecated K8s API in examples"
-✅ "Docs: Add Next.js 14 App Router example"
-✅ "Feature: Add TypeScript strict mode template"
-
-# Bad PR titles:
-❌ "Updates"
-❌ "Fixed stuff"
-❌ "Changes"
-```
+| Command / setting | Purpose |
+|---|---|
+| `/plugin` | Menu: Discover · Installed · Marketplaces · Errors · Stats |
+| `/plugin marketplace add owner/repo` (`./dir`, git URL, `owner/repo@ref`) | Register a marketplace |
+| `/plugin marketplace list` · `update <name>` · `remove <name>` | Manage marketplaces |
+| `/plugin install name@marketplace` | Install; prompts for scope |
+| `/plugin install name --marketplace owner/repo` | Add + install in one step (v2.1.275+) |
+| `/plugin uninstall name@marketplace` · `enable` · `disable` · `list` | Manage plugins |
+| `claude plugin install name@marketplace -s project` | Shell form; user scope unless `-s` |
+| `claude plugin validate .` | Check a `marketplace.json` or `plugin.json` |
+| `/reload-plugins` | Activate without restarting |
+| `"enabledPlugins": {"name@market": true}` | Per-scope on/off; managed `false` blocks everywhere |
+| `"extraKnownMarketplaces"` | Auto-add for a project (after folder trust) |
+| `"strictKnownMarketplaces": []` | Managed lockdown; list sources to allow |
+| `"allowedMcpServers"` | MCP allowlist; enforced from managed settings |
 
 ---
 
@@ -296,39 +326,34 @@ Start small: fix typos or improve examples. Don't start with major refactors.
 
 | ❌ Mistake | ✅ Correct Approach |
 |---|---|
-| Using first search result without evaluation | Evaluate multiple options systematically |
-| Ignoring last update date | Prefer actively maintained resources |
-| Copying blindly without understanding | Read, understand, then adapt |
-| Not checking license | Verify MIT/Apache/compatible license |
-| Never contributing improvements | Share fixes and learnings back |
-| Trusting GitHub stars alone | Check actual code quality and maintenance |
-| Skipping documentation | Always read the docs first |
-| Using outdated dependencies | Check version compatibility |
-| Not testing before production | Test in safe environment first |
-| Expecting perfect match | Good-enough is often better than perfect |
+| Install counts, star counts or awesome-lists as due diligence | They say something exists and is popular. Run the five-question checklist yourself |
+| Installing at user scope for a team tool | `--scope project` writes `enabledPlugins` to `.claude/settings.json`; commit it |
+| "It's an official plugin, so it's safe" | Official plugins carry the same warning. `github@claude-plugins-official` sends a token to an HTTP server: fine if you meant that |
+| Putting `strictKnownMarketplaces` in `.claude/settings.json` | It is managed-only. Project settings get `enabledPlugins` / `extraKnownMarketplaces` |
+| Treating a plugin's hook as harmless because it "only reminds" | A hook runs a script with your privileges on each event; read the script, not the description |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: Vietnamese fintech startup, 6 teams building microservices. Each team spending 2-3 hours setting up CLAUDE.md per service, repeating same mistakes.
+**Scenario**: A Hanoi outsourcing company runs Claude Code across a dozen client repos, some with
+banking credentials in CI. Developers added marketplaces freely; nobody could list which hooks ran
+where.
 
-**Solution**:
-- **Week 1**: Found nodejs-microservices-template (175 stars) on GitHub
-- **Week 2**: Customized with company auth, monitoring, payment gateway patterns
-- **Week 3**: Rolled out to all 6 teams
-- **Week 4**: Contributed generic payment integration patterns back via PR
+**Problem**: A client security review asked "what third-party code executes when your engineers
+open our repo?" The honest answer was "we don't know".
 
-**Results**:
-| Metric | Before | After |
-|--------|--------|-------|
-| Setup time | 2-3 hours | 15 minutes |
-| Consistency | 30% | 95% |
-| OSS contributions | 0 | 3 PRs merged |
+**Solution**: Plugins became a reviewed artefact. Every proposal is a PR to
+`your-org/claude-plugins` that copies the plugin in with a filled checklist: events in
+`hooks/hooks.json`, endpoints and tokens in `.mcp.json`, `allowed-tools` per skill. Managed
+settings set `strictKnownMarketplaces` to the official marketplace plus that repo, and
+`allowedMcpServers` to the two internal servers. Each project's `.claude/settings.json` carries
+`extraKnownMarketplaces` and `enabledPlugins`, so a checkout declares what runs in it. Same rule
+Anthropic applies to its own agents (S4): "Give every agent a single-purpose identity with the
+minimum permissions for its job".
 
-**Impact**: Teams felt part of larger community. Junior devs learned from examples. Community feedback improved internal templates. Company's PRs led to partner conversations.
-
-**CTO Quote**: "We saved weeks by starting with community templates. Contributing back improved our own work. Win-win."
+**Result**: The client question now has a file as its answer, and a new hook cannot reach a repo
+without a PR review. Adding a plugin takes a day instead of a minute, which is the point.
 
 ---
 
