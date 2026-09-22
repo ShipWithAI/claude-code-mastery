@@ -1,6 +1,8 @@
 ---
 title: 'Think + Plan Combo'
-description: 'Combine Think and Plan modes in Claude Code for the most powerful workflow on complex software tasks.'
+description: 'Pick the right effort level, permission mode and plan decision for a task instead of reaching for the same settings every time.'
+verified: 2026-09-22
+claude_version: 2.1.278
 ---
 
 # Module 6.3: Think + Plan Combo
@@ -9,361 +11,259 @@ description: 'Combine Think and Plan modes in Claude Code for the most powerful 
 >
 > **Prerequisite**: Module 6.2 (Plan Mode)
 >
-> **Outcome**: After this module, you will master the Think→Plan→Execute workflow — knowing exactly when to use Think alone, Plan alone, or the full combo. This is the single most powerful workflow pattern for complex software tasks with Claude Code.
+> **Outcome**: After this module, you will be able to choose an effort level, a permission
+> mode and a plan-or-not decision for a task in one pass, and justify each choice from what
+> the feature actually does.
 
 ---
 
 ## 1. WHY — Why This Matters
 
-You know Think Mode (6.1) and Plan Mode (6.2) separately. But when do you use which — or both? Sometimes you think deeply but plan poorly. Sometimes you plan meticulously but the plan is based on shallow analysis.
+Module 6.1 gave you a dial (effort) and Module 6.2 gave you a gate (plan mode). Most people
+then pick one setting and use it for everything: always `max`, always plan mode, or never
+either. Both habits cost you.
 
-The problem: **Think without Plan** = great analysis, chaotic execution. **Plan without Think** = organized steps toward a mediocre solution.
-
-The combo is greater than the sum of its parts. Think first to choose the RIGHT approach, then Plan to execute it the RIGHT way. This is how expert developers work — they don't just think OR plan. They think THEN plan.
+Always planning means a five-minute plan for a typo fix. Never planning means eleven-file
+diffs you did not read. The skill is not "use Think + Plan" — it is reading a task in ten
+seconds and knowing which of the three dials it deserves.
 
 ---
 
 ## 2. CONCEPT — Core Ideas
 
-### The Think→Plan→Execute (TPE) Workflow
+Three independent settings, chosen per task, not per person:
+
+1. **Effort** — how hard Claude reasons. `/effort low|medium|high|xhigh|max`, or `ultrathink`
+   for one turn.
+2. **Plan or not** — is a written, approved plan worth the turn?
+3. **Permission mode** — what you let it do once it starts: `default`, `acceptEdits`, `plan`,
+   `auto`, `dontAsk`, `bypassPermissions`.
+
+Anthropic's guidance decides the second one for you: "Planning is most useful when you're
+uncertain about the approach, when the change modifies multiple files, or when you're
+unfamiliar with the code being modified. If you could describe the diff in one sentence, skip
+the plan." (S1)
+
+### The mode-decision matrix
+
+| Task shape | Effort | Plan? | Permission mode |
+|---|---|---|---|
+| One-sentence diff (typo, log line, rename) | `low`–`high` | No | `acceptEdits` |
+| Single-file change, familiar code | `high` | No | `acceptEdits` |
+| Multi-file change, familiar code | `high` | Yes | approve into `acceptEdits` |
+| Unfamiliar code, any size | `high`–`xhigh` | Yes | approve into **manually approve edits** |
+| Architecture or migration | `xhigh`, `ultrathink` on the hard call | Yes, and challenge it | **manually approve edits** |
+| Unattended batch or CI | `low`–`medium` | No | `dontAsk` + `--allowedTools` |
+
+The matrix has no "Level 1-3 think ladder" row, because there is no ladder: Claude Code
+"passes other phrases such as 'think', 'think hard', and 'think more' through as ordinary
+prompt text."
 
 ```mermaid
 graph TD
-    A[Complex Task] --> B{Needs Analysis?}
-    B -->|Yes| C[THINK<br/>Analyze approaches,<br/>trade-offs, risks]
-    B -->|No| D[PLAN<br/>Create execution steps]
-    C --> E{Clear approach?}
-    E -->|No| F[Think Deeper]
-    F --> C
-    E -->|Yes| D
-    D --> G[CONFIRM<br/>Validate plan]
-    G --> H[EXECUTE<br/>Step by step]
-    H --> I{Checkpoint}
-    I -->|Continue| H
-    I -->|Done| J[Complete]
-
-    style C fill:#e3f2fd
-    style D fill:#fff3e0
-    style H fill:#e8f5e9
+    A[Read the task] --> B{Describable in<br/>one sentence?}
+    B -->|yes| C[Skip the plan<br/>effort low-high · acceptEdits]
+    B -->|no| D{Familiar code?}
+    D -->|yes| E[Plan mode<br/>effort high]
+    D -->|no| F[Plan mode + xhigh<br/>ultrathink on the hard call]
+    E --> G[Approve into the<br/>narrowest mode that works]
+    F --> G
 ```
-
-1. **THINK**: "Think carefully about the best approach for X. Consider trade-offs, edge cases, alternatives. Don't plan or code yet — just analyze."
-2. **PLAN**: "Based on your analysis, create a step-by-step execution plan. List files, dependencies, risks. Don't code yet."
-3. **EXECUTE**: "Implement step 1." (with checkpoints)
-
-This is a SUPERSET of PCE from Module 6.2 — adding a Think phase before Planning.
-
-### When to Use Which Mode
-
-| Task Type | Just Code | Plan Only | Think Only | Think + Plan |
-|-----------|-----------|-----------|------------|--------------|
-| Simple (add field, fix typo) | ✅ | ❌ | ❌ | ❌ |
-| Moderate (add endpoint, tests) | ❌ | ✅ | ❌ | ❌ |
-| Complex (new feature, refactor) | ❌ | ❌ | ❌ | ✅ |
-| Architecture (migration, redesign) | ❌ | ❌ | Analysis only | ✅ Implementation |
-| Debugging (root cause) | ❌ | ❌ | ✅ | ❌ |
-
-### The Combo Prompt Pattern
-
-**Phase 1 — THINK:**
-```text
-Think carefully about [problem].
-Consider: [specific trade-offs to evaluate]
-What are the pros/cons of each approach?
-Don't plan or code yet — just analyze.
-```
-
-**Phase 2 — PLAN:**
-```text
-Based on your analysis, [chosen approach] is the best fit.
-Create a detailed execution plan. List all files, steps, risks.
-Don't code yet.
-```
-
-**Phase 3 — EXECUTE:**
-```text
-Plan approved. Implement step 1.
-```
-
-### What Each Mode Adds
-
-- **Think adds**: deeper analysis, edge case discovery, trade-off reasoning, alternative approaches
-- **Plan adds**: execution structure, file mapping, dependency ordering, effort estimation
-- **Combo adds**: RIGHT approach executed the RIGHT way
 
 ---
 
 ## 3. DEMO — Step by Step
 
-**Scenario**: Extract User Service from a monolithic Express API to microservices.
+The same lab repo, three tasks, three different answers from the matrix.
 
-### Step 1: THINK — Deep Analysis First
+**Step 1: A one-sentence diff — skip the plan**
+
+"Add a JSDoc line above `divide()`" is describable in one sentence, so no plan mode and the
+narrowest mode that can write: <!-- docs: cli-reference, permission-modes -->
 
 ```bash
-$ claude
+# docs: cli-reference
+claude -p "Add a one-line JSDoc comment above divide() in src/math.js saying it throws \
+RangeError on a zero divisor. Nothing else." \
+  --permission-mode acceptEdits --allowedTools "Edit"
 ```
 
-Prompt:
 ```text
-Think carefully about extracting the User Service from our monolith.
-Consider:
-1. Sync vs async communication between services
-2. Data ownership — which tables belong to User Service
-3. Authentication flow changes
-4. Backward compatibility during migration
-5. Database strategy — shared DB vs separate DB
-
-Analyze trade-offs for each. Don't plan or code yet.
+# Output may vary
+Added the JSDoc line above `divide()` in `src/math.js:1`.
 ```
 
-Expected output:
-```markdown
-## Analysis: User Service Extraction
-
-### 1. Communication Pattern
-- Sync (REST/gRPC): Simpler, but creates coupling and single point of failure
-- Async (Message Queue): Better resilience, eventual consistency challenges
-→ Recommendation: Async for non-critical ops, sync for auth validation
-
-### 2. Data Ownership
-- users, user_preferences, user_sessions → User Service
-- orders.user_id → stays in Order Service (foreign key reference only)
-→ Risk: JOIN queries spanning services need API composition
-
-### 3. Database Strategy
-- Shared DB: Easier migration, but defeats microservice isolation
-- Separate DB: True isolation, requires data sync strategy
-→ Recommendation: Separate DB with event-driven sync
-...
+```bash
+git diff src/math.js
 ```
 
-### Step 2: Evaluate Think Output
-
-Prompt:
 ```text
-Good analysis. I agree with separate DB + async events.
-One question: what about JOIN queries that currently span user and order tables?
+# Output may vary
++/** Divides a by b; throws RangeError when the divisor is zero. */
+ export function divide(a, b) {
 ```
 
-Claude thinks deeper, suggests API composition pattern with caching.
+`--permission-mode acceptEdits` and `--allowedTools "Edit"` are both required: a headless run
+that writes files must pre-authorize the write, and `Edit` alone is all this task needs.
 
-### Step 3: PLAN — Based on Think Analysis
+**Step 2: A change you cannot describe in one sentence — plan it**
 
-Prompt:
+```bash
+# docs: model-config, permission-modes
+claude --model opusplan --permission-mode plan
+```
+
 ```text
-Based on your analysis: separate DB, async events, API composition.
-Create a detailed execution plan for extracting User Service.
-List all files, new files, migration steps, risks, checkpoints.
-Don't code yet.
+# Output may vary
+ ▐▛███▛█   Claude Code v2.1.278
+▝▜██████▀  Opus Plan · Claude Max
+  ▝▝ ▝▝    ~/cc-lab
+────────────────────────────────────────────────────────────────────────────────────
+❯
+  ⏸ plan mode on (shift+tab to cycle)
 ```
 
-Expected output:
-```markdown
-## Execution Plan: User Service Extraction
+`Opus Plan` in the banner is `opusplan` at work: Opus does the planning, Sonnet the execution.
+You pay Opus prices only for the part where the thinking matters.
 
-### Files Affected (23 files)
-- src/services/user/ → extract to new service
-- src/models/User.ts → move + create shared types
-- src/routes/users.ts → convert to API gateway proxy
-...
+**Step 3: Spend effort where the decision is, not everywhere**
 
-### Execution Steps
-1. Create User Service project structure
-2. Define shared types package
-3. Implement User Service core (auth, profile)
-4. Set up message queue (RabbitMQ)
-5. Migrate database tables
-6. Update monolith to call User Service
-7. Implement API composition for cross-service queries
-...
+Raise the dial for the hard stretch and drop it afterwards, inside the same session:
 
-### Risks Addressed
-- Backward compatibility: API gateway maintains old routes
-- Data sync: Event sourcing for audit trail
-- JOIN queries: Cached API composition
-```
-
-### Step 4: CONFIRM — Validate Against Think Insights
-
-Prompt:
 ```text
-Cross-check: does this plan address all risks from Think phase?
-Specifically: backward compatibility, data ownership, JOIN query issue.
+/effort xhigh
 ```
 
-Claude validates completeness.
-
-### Step 5: EXECUTE — Implement with Confidence
-
-Prompt:
 ```text
-Plan approved. Implement step 1: Create User Service project structure.
+# Output may vary
+   Effort
+                   Faster                                                 Smarter
+                   ────────────────────▲──────────────────────┆──────────────────
+                   low     medium     high     xhigh      max       ultracode
+   ←/→ to adjust · Enter to confirm · s for this session only · Esc to cancel
 ```
 
-Implementation flows smoothly — decisions were made in Think phase.
+Press `s` to apply it to this session only. For a single hard question instead, keep the
+session where it is and put `ultrathink` in that one prompt.
 
-### Step 6: Compare Results
+**Step 4: Approve into the narrowest mode that finishes the job**
 
-| Approach | Result |
-|----------|--------|
-| **Plan Only** | Chose shared DB (shallow analysis) → re-planned at step 8 |
-| **Think + Plan** | Chose separate DB with events → executed smoothly |
-| **Time saved** | 2 days of re-planning avoided |
+Approval is the last dial. **Yes, manually approve edits** keeps you in the loop on every
+write; **Yes, and use auto mode** hands the rest to the classifier. Choose by how much of the
+plan you actually believe — and if you were wrong, `/rewind` restores code, conversation, or
+both.
 
 ---
 
 ## 4. PRACTICE — Try It Yourself
 
-### Exercise 1: Mode Selection Challenge
+### Exercise 1: Classify five real tasks
 
-Choose the appropriate mode for each task:
+**Goal**: Turn the matrix into a reflex.
 
-1. Fix a CSS alignment bug → ?
-2. Add pagination to an API endpoint → ?
-3. Design a caching strategy → ?
-4. Migrate from REST to GraphQL → ?
-5. Write unit tests for existing function → ?
-6. Refactor auth from session to JWT → ?
+**Instructions**:
+1. List five tasks from your current sprint.
+2. For each, write one sentence describing the diff. If you cannot, mark it "plan".
+3. Assign an effort level and a permission mode to each.
+4. Run the two extremes — your smallest and your largest — and check your call.
+
+**Expected result**: A five-row table, and two runs that either confirm or correct it.
 
 <details>
 <summary>💡 Hint</summary>
-
-Ask yourself:
-- How many files involved? (1 = code, 2-5 = plan, 5+ = think+plan)
-- Are there architectural decisions? (Yes = need think)
-- Is the pattern well-known? (Yes = plan enough)
+The one-sentence test is the whole decision for column three. Do not overthink the other two:
+`high` and `acceptEdits` are correct far more often than not.
 </details>
 
 <details>
 <summary>✅ Solution</summary>
 
-| Task | Mode | Reason |
-|------|------|--------|
-| CSS fix | Just code | 1 file, clear fix |
-| Pagination | Plan only | Known pattern, 2-3 files |
-| Caching strategy | Think + Plan | Architectural decision + implementation |
-| REST → GraphQL | Think + Plan | Major architecture change |
-| Unit tests | Plan only | Known pattern, structured approach |
-| Session → JWT | Think + Plan | Security implications, multiple approaches |
+Typical outcome: three of five need no plan. That matches (S1) — "If you could describe the
+diff in one sentence, skip the plan." The two that do need one are usually the ones touching
+code you have not read this quarter, which is the "unfamiliar with the code being modified"
+case, not the "big" case.
 </details>
 
----
+### Exercise 2: Cost the combo
 
-### Exercise 2: Quality Comparison
+**Goal**: Measure what the combo costs against the cheap path on one real task.
 
-Take ONE complex task and try THREE approaches:
-1. Code directly (no think, no plan)
-2. Plan only (skip think)
-3. Think + Plan combo
+**Instructions**:
+1. Pick a two- or three-file change.
+2. Run A: `claude --permission-mode acceptEdits`, no plan, default effort.
+3. `/rewind` back to the start, or `git checkout -- .`.
+4. Run B: `claude --model opusplan --permission-mode plan`, `/effort xhigh`, challenge the
+   plan once, then approve.
+5. Compare wall-clock time and how many corrections each needed afterwards.
 
-Compare results: What did Think add that Plan alone missed?
-
-<details>
-<summary>💡 Hint</summary>
-
-Good tasks for this exercise:
-- "Add rate limiting to the API"
-- "Implement file upload with S3"
-- "Add search functionality"
-
-Track: decisions made, issues discovered, rework needed.
-</details>
+**Expected result**: A number you can quote next time someone says planning is overhead.
 
 <details>
 <summary>✅ Solution</summary>
 
-Example with "Add rate limiting":
-
-**Code directly**: Chose token bucket, hardcoded limits → discovered need for per-user limits later, reworked
-
-**Plan only**: 8-step plan → chose wrong storage (memory instead of Redis) → failed in production with multiple instances
-
-**Think + Plan**: Analyzed storage options, user tiers, distributed systems → chose Redis + sliding window → plan accounted for all edge cases → zero rework
-
-Think caught: distributed system implications, user tier requirements, storage choice
+Run B usually costs more up front and less overall on multi-file work, because the corrections
+after run A each cost a turn and pollute the context. On a one-file change the order flips —
+which is exactly why the matrix has rows instead of one answer.
 </details>
 
 ---
 
 ## 5. CHEAT SHEET
 
-### Mode Decision Matrix
+| Question | Setting | Values |
+|---|---|---|
+| How hard should it reason? | `/effort`, `--effort`, `effortLevel` | `low`, `medium`, `high`, `xhigh`, `max`, `ultracode` |
+| Just this one turn? | `ultrathink` in the prompt | — |
+| Should it plan first? | `Shift+Tab`, `/plan`, `--permission-mode plan` | one-sentence diff → no |
+| Who plans, who builds? | `--model opusplan` | Opus plans, Sonnet executes |
+| What may it do? | `--permission-mode` | `default`, `acceptEdits`, `plan`, `auto`, `dontAsk`, `bypassPermissions` |
+| What may it call? | `--allowedTools` | e.g. `"Edit"`, `"Bash(npm test)"` |
+| Undo | `/rewind`, `Esc` twice | conversation, code, or both |
 
-| Task Type | Mode | Why |
-|-----------|------|-----|
-| Simple (1 file) | Just code | Over-processing wastes time |
-| Moderate (2-5 files) | Plan only | Structure helps, deep analysis unnecessary |
-| Complex (5+ files) | Think + Plan | Need right approach AND right execution |
-| Architecture | Think + Plan | Wrong decisions are expensive |
-| Debugging | Think only | Analysis matters, no execution plan needed |
-| Research | Think only | Reasoning matters, no code |
-
-### TPE Workflow Template
-
-**Phase 1 — THINK:**
-```text
-Think carefully about [problem]. Consider [trade-offs].
-Don't plan or code yet.
-```
-
-**Phase 2 — PLAN:**
-```text
-Based on analysis, create execution plan.
-List files, steps, risks. Don't code yet.
-```
-
-**Phase 3 — EXECUTE:**
-```text
-Plan approved. Implement step 1.
-```
-
-### /compact Timing Guide
-
-- After THINK → `/compact` → preserve key decisions
-- Every 4-5 EXECUTE steps → `/compact` → review progress
-- Before asking "are we on track?" → `/compact`
-
-### Quick Self-Check
-
-- "Am I thinking when I should be planning?"
-- "Am I planning when I should be thinking?"
-- "Did I convert Think insights into Plan steps?"
+Rules of thumb: default to `high` + `acceptEdits`; add plan mode when the diff needs more than
+one sentence; add `xhigh` or `ultrathink` only where a decision forks.
 
 ---
 
 ## 6. PITFALLS — Common Mistakes
 
 | ❌ Mistake | ✅ Correct Approach |
-|-----------|---------------------|
-| Using Think+Plan for simple tasks | Simple (1 file) → just code. Combo is for complex tasks. |
-| Thinking and planning in SAME prompt | Separate them. Think FIRST, Plan SECOND. Mixing produces shallow versions of both. |
-| Skipping Think for architecture decisions | Architecture needs deep analysis first. Plan without Think = organized march wrong direction. |
-| Great analysis but no plan | Think output must feed into Plan. Otherwise analysis sits unused. |
-| No `/compact` between Think and Plan | Think fills context. `/compact` to preserve decisions before planning. |
-| Re-thinking during Execute | If questioning approach during execution, STOP. Go back to Think. |
+|---|---|
+| Planning every task | "If you could describe the diff in one sentence, skip the plan." (S1) |
+| Never planning | Plan when the approach is uncertain, multi-file, or the code is unfamiliar (S1) |
+| Running everything at `max` | `max` "may show diminishing returns and is prone to overthinking" |
+| `/compact` between thinking and planning | No docs page says thinking or a plan survives or dies at a compact. Use `/clear` between unrelated tasks instead |
+| Writing "think first, then plan" in the prompt | Plan mode is the gate; those words are ordinary prompt text |
+| Approving into `auto` out of habit | Pick the approve option that matches how much of the plan you believe |
+| Headless writes with no permission flag | Every `claude -p` that edits needs `--permission-mode` or `--allowedTools` |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: Vietnamese fintech team redesigning payment processing. Support VNPay, Momo, ZaloPay, Stripe. 60+ files, 5 DB tables, 4 external APIs.
+**Scenario**: A Vietnamese fintech team was adding a fourth payment provider (ZaloPay) beside
+VNPay, Momo and a card gateway. The provider interface, a DB enum, the reconciliation job and
+a webhook route all had to change — plus an `expect`/`actual` pair in the mobile client.
 
-**Think Only (first attempt)**:
-- Great analysis of provider differences, VND handling, settlement cycles
-- No structured execution → chaotic implementation, 3 devs stepping on each other
-- **Result**: Abandoned after 4 days
+**Problem**: Their house style had become "always plan, always `max`". A two-line enum
+addition sat behind a four-minute planning turn, and the reconciliation change — the one part
+nobody understood — got the same treatment as the enum, so the plan's risky step was buried
+in a list of trivial ones.
 
-**Plan Only (second attempt)**:
-- Organized 15-step plan, clean file assignments
-- Shallow analysis → chose Strategy Pattern when Adapter Pattern was better
-- **Result**: Discovered mismatch at step 8, had to re-plan. 5 days wasted.
+**Solution**: They split the work by the matrix instead of the calendar. The enum and the
+webhook route went through headless runs with `--permission-mode acceptEdits` and a scoped
+`--allowedTools`, no plan. The reconciliation job got `claude --model opusplan
+--permission-mode plan` with `/effort xhigh`, one `ultrathink` turn on the settlement-window
+question, and a challenge round before approval. They approved that one with **Yes, manually
+approve edits**.
 
-**Think + Plan (third attempt)**:
-1. **THINK**: Deep analysis of API contracts, VND decimals, settlement timing → chose Adapter Pattern + Event Sourcing
-2. **PLAN**: 18-step plan grounded in analysis, clear file ownership, checkpoints every 4 steps
-3. **EXECUTE**: 5 days, zero re-planning
-
-**Result**: Third attempt took 5 days. First two combined took 9 days. Team rule now: "Payment features = always Think+Plan."
+**Result**: The trivial parts landed in minutes rather than sitting behind planning turns, and
+the risky part got a plan that named the settlement-window assumption out loud. The rule they
+kept was the one-sentence test — everything else followed from it. For the automation side of
+this, see [Module 7.2: Full Auto
+Workflow](../../phase-07-multi-agent-auto/02-full-auto-workflow/); to make a check
+non-optional, see [Module 11.3: Hooks
+System](../../phase-11-automation-headless/03-hooks-system/).
 
 ---
 
