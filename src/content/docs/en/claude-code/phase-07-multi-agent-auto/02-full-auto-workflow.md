@@ -20,8 +20,9 @@ claude_version: 2.1.278
 ## 1. WHY — Why This Matters
 
 The old way to keep Claude out of `src/legacy/` was a sentence in the prompt: "please don't touch
-X". That is a request, not a boundary. The docs say it plainly: *"Instructions in your prompt or
-`CLAUDE.md` shape what Claude tries to do, but they don't change what Claude Code allows."*
+X". That is a request, not a boundary. The permissions page says it plainly: *"Instructions in
+your prompt or `CLAUDE.md` shape what Claude tries to do, but they don't change what Claude Code
+allows."*
 
 Full auto is a protocol, not a flag. The four phases below are the same as before; what changed
 is that every boundary now has a mechanism behind it.
@@ -68,7 +69,8 @@ classifier's prompt-reduction is worth it. Never `bypassPermissions` outside a c
 
 - **`Esc`** interrupts the current turn; the session and context stay. (`Ctrl+C` twice *exits*.)
 - **`/rewind`**, or `Esc` `Esc` on an empty input, opens the checkpoint menu: restore code,
-  conversation, or both, per prompt you sent. Checkpoints hold the last 100 turns.
+  conversation, or both, per prompt you sent. Claude Code keeps snapshots for the 100 most recent
+  checkpoints; a message you queue mid-turn joins that turn and gets no checkpoint of its own.
 - Limitation (S15): *"Checkpointing does not track files modified by Bash commands"* (`rm`, `mv`,
   `cp`), and edits made by subagents aren't restored — use git for those.
 

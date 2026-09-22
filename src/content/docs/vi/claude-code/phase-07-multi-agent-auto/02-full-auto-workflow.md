@@ -20,8 +20,8 @@ claude_version: 2.1.278
 ## 1. WHY — Tại sao quan trọng
 
 Cách cũ để giữ Claude tránh xa `src/legacy/` là một câu trong prompt: "please don't touch X".
-Đó là lời nhờ, không phải ranh giới. Docs nói thẳng: *"Instructions in your prompt or
-`CLAUDE.md` shape what Claude tries to do, but they don't change what Claude Code allows."*
+Đó là lời nhờ, không phải ranh giới. Trang permissions nói thẳng: *"Instructions in your prompt
+or `CLAUDE.md` shape what Claude tries to do, but they don't change what Claude Code allows."*
 
 Full auto là một quy trình, không phải một cờ. Bốn pha bên dưới vẫn như trước; điều thay đổi là
 mỗi ranh giới giờ có cơ chế đứng sau.
@@ -68,7 +68,8 @@ prompt của classifier đáng giá. Không bao giờ `bypassPermissions` ngoài
 
 - **`Esc`** ngắt lượt hiện tại; session và context vẫn còn. (`Ctrl+C` hai lần là *thoát*.)
 - **`/rewind`**, hoặc `Esc` `Esc` khi ô nhập trống, mở menu checkpoint: khôi phục code, hội
-  thoại, hoặc cả hai, theo từng prompt bạn đã gửi. Checkpoint giữ 100 lượt gần nhất.
+  thoại, hoặc cả hai, theo từng prompt bạn đã gửi. Claude Code giữ snapshot cho **100 checkpoint
+  gần nhất**; tin nhắn bạn xếp hàng giữa lượt nhập vào lượt đó và không có checkpoint riêng.
 - Giới hạn (S15): *"Checkpointing does not track files modified by Bash commands"* — checkpoint
   không theo dõi file bị `rm`, `mv`, `cp` qua Bash, và edit do subagent làm cũng không khôi phục
   được — dùng git cho những trường hợp đó.

@@ -20,12 +20,11 @@ claude_version: 2.1.278
 
 ## 1. WHY — Why This Matters
 
-One afternoon you press "Yes" 40 times to add logging to ten functions. The next day you switch
-everything off, and Claude "cleans up" a config file you needed. Same mistake both times:
-treating automation as a switch.
+You press "Yes" 40 times to add logging to ten functions. Next day you switch everything off and
+Claude "cleans up" a config file you needed. Same mistake twice: treating automation as a switch.
 
-Claude Code ships that spectrum as **permission modes**. The three "levels" this course uses are
-labels; the modes are the mechanism, and they are enforced by Claude Code, not by the model.
+Claude Code ships that spectrum as **permission modes**. The three "levels" here are labels; the
+modes are the mechanism, enforced by Claude Code, not by the model.
 
 ---
 
@@ -38,11 +37,15 @@ The permissions page lists **six modes plus one alias**. This course groups them
 | Level | Mode | What runs without asking | Best for |
 |---|---|---|---|
 | **1 — Manual** | `default` (alias `manual`) | Reads only | Reviewing every action, sensitive work |
-| 1 | `plan` | Reads; no source edits until you approve a plan | Exploring before changing anything |
-| **2 — Semi-Auto** | `acceptEdits` | Reads, file edits, `mkdir`/`touch`/`mv`/`cp` in the working dir | Iterating on code you'll review in `git diff` |
+| 1 | `plan` | Reads, plus classifier-approved commands when auto mode is available; no source edits until you approve a plan | Exploring before changing anything |
+| **2 — Semi-Auto** | `acceptEdits` | Reads, file edits, and `mkdir`/`touch`/`rm`/`rmdir`/`mv`/`cp`/`sed` inside the working dir | Iterating on code you'll review in `git diff` |
 | 2 | `auto` | Everything, with a **classifier** reviewing each action | Long tasks, prompt fatigue |
 | 2 (CI) | `dontAsk` | Reads + pre-approved tools; anything that would prompt is **denied** | Locked-down scripts |
 | **3 — Full Auto** | `bypassPermissions` | Everything | Isolated containers/VMs **only** |
+
+Read the `acceptEdits` row twice: `rm` and `rmdir` are in that set. Auto-approval is scoped to
+your working directory and `additionalDirectories` — but inside that scope, a delete runs
+without asking.
 
 ```mermaid
 graph LR
@@ -57,8 +60,8 @@ graph LR
   `dontAsk` never does.
 - **One session**: `claude --permission-mode plan` (also works with `-p`).
 - **Every session in a project**: `permissions.defaultMode` in `.claude/settings.json`. Terminal
-  sessions honor every value there **except** `auto` and `bypassPermissions` — those two only
-  apply from user or managed settings.
+  sessions honor every value there **except** `auto` and `bypassPermissions`, which apply only
+  from user or managed settings.
 - **Org-wide off switch**: `permissions.disableBypassPermissionsMode` / `disableAutoMode` =
   `"disable"` in managed settings.
 
@@ -68,21 +71,21 @@ graph LR
 each action and blocks anything that "escalates beyond your request, targets unrecognized
 infrastructure, or appears driven by hostile content Claude read". Anthropic reports **84% fewer
 prompts** in internal use with this two-layer classifier design (S13, "How we built Claude Code
-auto mode", 2026-03-25). The docs are equally blunt: *"Auto mode reduces permission prompts but
-does not guarantee safety."* It is Level 2 with a reviewer, not Level 3. If the classifier blocks
-3 actions in a row (or 20 total), auto mode pauses and you're prompted again.
+auto mode", 2026-03-25). The docs are blunt: *"Auto mode reduces permission prompts but does not
+guarantee safety."* Level 2 with a reviewer, not Level 3. If the classifier blocks 3 actions in a
+row (or 20 total), auto mode pauses and you're prompted again.
 
 ### Risk × Familiarity matrix (keep this)
 
-| Task risk | Codebase familiarity | Mode |
+| Task risk | Familiarity | Mode |
 |---|---|---|
 | Low (formatting, tests) | High | `acceptEdits` or `auto` |
 | Low | Low | `plan` first, then `acceptEdits` |
-| High (DB, auth, payments) | High | `default`, with `permissions.deny` on hot paths |
+| High (DB, auth, payments) | High | `default` + `permissions.deny` on hot paths |
 | High | Low | **`default` — always** |
 
 Modes set the baseline. `permissions.allow/deny/ask` rules layer on top, and **deny rules block
-in every mode, including `bypassPermissions`** (Module 2.2). CLAUDE.md and prompts are advisory.
+in every mode, including `bypassPermissions`** (Module 2.2). CLAUDE.md is advisory.
 
 > `(S13)`: `docs/references/anthropic-sources.md`.
 
@@ -91,7 +94,7 @@ in every mode, including `bypassPermissions`** (Module 2.2). CLAUDE.md and promp
 ## 3. DEMO — Step by Step
 
 Run in `~/cc-lab` (`src/math.js`, `tests/math.test.mjs`, `npm test`). This machine's user
-settings start sessions in `auto`, so each command pins a mode explicitly.
+settings start sessions in `auto`, so each command pins a mode.
 
 **Step 1: Read the mode indicator, then cycle it**
 
@@ -110,7 +113,7 @@ Status bar on start, then after each `Shift+Tab`:
   ⏵⏵ auto mode on (shift+tab to cycle)
 ```
 
-Why: the label under the prompt is the only place the mode is shown — read it before risky work.
+Why: that label is the only place the mode is shown — read it before risky work.
 
 **Step 2: Level 1 headless — plan mode proposes, never edits**
 
@@ -129,7 +132,7 @@ Here's the proposal (no files touched; the plan is saved at `~/.claude/plans/pro
 Run `npm test` — expect 2 passing tests (`add`, `subtract`), 0 failing.
 ```
 
-`git status` prints nothing: plan mode read the repo and wrote only the plan file.
+`git status` prints nothing: plan mode read the repo and wrote only the plan.
 
 **Step 3: Level 1 interactive — the real permission prompt**
 
@@ -154,9 +157,9 @@ Prompt: `Create a file hello.txt containing hi`
  Esc to cancel · Tab to amend
 ```
 
-Option 2 *is* the jump to Level 2. A Bash prompt offers a different second option:
-`Yes, and don't ask again for: npm test *` — that one is saved to `.claude/settings.local.json`
-as `Bash(npm test *)`. Press `Esc` and Claude reports `User rejected write to hello.txt`.
+Option 2 *is* the jump to Level 2. A Bash prompt offers a different second option,
+`Yes, and don't ask again for: npm test *`, saved to `.claude/settings.local.json` as
+`Bash(npm test *)`. Press `Esc` and Claude reports `User rejected write to hello.txt`.
 
 **Step 4: Headless has no prompt — so the mode decides**
 
@@ -173,7 +176,7 @@ ls: hello.txt: No such file or directory
 ```
 
 `--permission-mode default` forces the stock behavior; on a fresh install you get the same
-result without it unless `settings.json` sets `permissions.defaultMode`. Now Level 2:
+result without it unless `settings.json` sets `permissions.defaultMode`. Level 2:
 
 ```bash
 claude -p "Create a file hello.txt containing hi" --permission-mode acceptEdits
@@ -205,7 +208,7 @@ claude
   ⏵⏵ accept edits on (shift+tab to cycle)
 ```
 
-Project settings outrank the user file, so the session starts at Level 2 without a flag.
+Project settings outrank the user file, so the session starts at Level 2 with no flag.
 
 **Step 6: Level 3 — real flag, sandbox only**
 
@@ -215,7 +218,7 @@ claude --dangerously-skip-permissions
 ```
 
 The flag is real; don't run it on your host. Use it only inside a sandbox or container (Module
-2.3). It refuses to start as root, and deny rules still apply — but every prompt and the
+2.3). It refuses to start as root and deny rules still apply — but every prompt and the
 classifier are gone.
 
 Clean up: `rm hello.txt .claude/settings.json`.
@@ -230,8 +233,7 @@ Clean up: `rm hello.txt .claude/settings.json`.
 **Instructions**:
 1. `claude --permission-mode default`, prompt: "Add a one-line JSDoc comment above each function
    in src/math.js". Count the prompts.
-2. `git checkout -- src`, then repeat with `--permission-mode acceptEdits`.
-3. Which mode matched the risk?
+2. `git checkout -- src`, repeat with `--permission-mode acceptEdits`. Which matched the risk?
 
 **Expected result**: one prompt per edit in `default`; zero in `acceptEdits`.
 
@@ -296,18 +298,17 @@ directory, so the run is silent; `git diff src/math.js` is your review step.
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: A Vietnamese team onboarding onto a 15-service backend with shared libraries and
-internal RPC.
+**Scenario**: A Vietnamese team onboarding onto a 15-service backend with shared libraries.
 
-**Problem**: Week 1 in `default` was slow but caught misunderstandings. By week 2 the team had
-moved to `acceptEdits` for repetitive work and CI docs ran headless with `--permission-mode
-acceptEdits` in a container. Then a developer ran a schema change in `auto` with a vague prompt:
-"Add user preferences table". Claude guessed the column types; the migration failed in staging.
+**Problem**: Week 1 in `default` was slow but caught misunderstandings. By week 2 repetitive work
+ran in `acceptEdits` and CI docs ran headless with `--permission-mode acceptEdits` in a
+container. Then a developer ran a schema change in `auto` with a vague prompt: "Add user
+preferences table". Claude guessed the column types; the migration failed in staging.
 
 **Solution**: The team rule became the matrix. Unfamiliar + high-risk → `default`, with
 `"deny": ["Edit(./migrations/**)"]` until a human reviews. Familiar + low-risk → `acceptEdits`.
-`bypassPermissions` only in the CI container. The migration was redone in `plan` mode, plan
-approved, then executed with `acceptEdits`.
+`bypassPermissions` only in the CI container. The migration was redone in `plan` mode, then
+executed with `acceptEdits`.
 
 **Result**: No further staging incidents from automation mismatches in the following two months.
 

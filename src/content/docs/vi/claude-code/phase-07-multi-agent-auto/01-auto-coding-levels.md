@@ -20,12 +20,11 @@ claude_version: 2.1.278
 
 ## 1. WHY — Tại sao quan trọng
 
-Một buổi chiều bạn bấm "Yes" 40 lần chỉ để thêm log vào mười hàm. Hôm sau bạn tắt hết
-prompt, và Claude "dọn dẹp" luôn file config bạn đang cần. Hai lần cùng một lỗi: coi tự động
-hoá là công tắc bật/tắt.
+Bạn bấm "Yes" 40 lần chỉ để thêm log vào mười hàm. Hôm sau tắt hết prompt, và Claude "dọn dẹp"
+luôn file config bạn đang cần. Hai lần cùng một lỗi: coi tự động hoá là công tắc bật/tắt.
 
-Claude Code cung cấp cả dải đó dưới tên **permission mode**. Ba "level" của khoá học chỉ là nhãn;
-mode mới là cơ chế, và cơ chế này do Claude Code cưỡng chế, không phải do model.
+Claude Code cung cấp cả dải đó dưới tên **permission mode**. Ba "level" ở đây chỉ là nhãn; mode
+mới là cơ chế, do Claude Code cưỡng chế, không phải do model.
 
 ---
 
@@ -38,11 +37,15 @@ Trang permissions liệt kê **sáu mode cộng một alias**. Khoá học gom t
 | Level | Mode | Chạy không cần hỏi | Hợp với |
 |---|---|---|---|
 | **1 — Manual** | `default` (alias `manual`) | Chỉ đọc | Duyệt từng thao tác, việc nhạy cảm |
-| 1 | `plan` | Đọc; không sửa source cho tới khi bạn duyệt plan | Khảo sát trước khi đổi gì |
-| **2 — Semi-Auto** | `acceptEdits` | Đọc, sửa file, `mkdir`/`touch`/`mv`/`cp` trong working dir | Sửa code bạn sẽ xem lại bằng `git diff` |
+| 1 | `plan` | Đọc, cộng lệnh được classifier duyệt khi auto mode khả dụng; không sửa source cho tới khi bạn duyệt plan | Khảo sát trước khi đổi gì |
+| **2 — Semi-Auto** | `acceptEdits` | Đọc, sửa file, và `mkdir`/`touch`/`rm`/`rmdir`/`mv`/`cp`/`sed` trong working dir | Sửa code bạn sẽ xem lại bằng `git diff` |
 | 2 | `auto` | Mọi thứ, có **classifier** duyệt từng hành động | Task dài, mỏi tay bấm prompt |
 | 2 (CI) | `dontAsk` | Đọc + tool đã pre-approve; thứ gì lẽ ra phải hỏi thì **bị deny** | Script khoá chặt |
 | **3 — Full Auto** | `bypassPermissions` | Mọi thứ | **Chỉ** container/VM cô lập |
+
+Đọc kỹ dòng `acceptEdits`: `rm` và `rmdir` nằm trong bộ đó. Việc tự duyệt chỉ áp dụng cho đường
+dẫn trong working directory và `additionalDirectories` — nhưng trong phạm vi đó, một lệnh xoá
+chạy mà không hỏi.
 
 ```mermaid
 graph LR
@@ -57,8 +60,8 @@ graph LR
   `dontAsk` không bao giờ.
 - **Một session**: `claude --permission-mode plan` (dùng được cả với `-p`).
 - **Mọi session trong project**: `permissions.defaultMode` trong `.claude/settings.json`. Session
-  terminal nhận mọi giá trị ở đó **trừ** `auto` và `bypassPermissions` — hai giá trị này chỉ có
-  hiệu lực từ user settings hoặc managed settings.
+  terminal nhận mọi giá trị ở đó **trừ** `auto` và `bypassPermissions`, hai giá trị chỉ có hiệu
+  lực từ user settings hoặc managed settings.
 - **Khoá toàn tổ chức**: `permissions.disableBypassPermissionsMode` / `disableAutoMode` =
   `"disable"` trong managed settings.
 
@@ -68,21 +71,21 @@ graph LR
 hành động và chặn thứ gì "vượt quá yêu cầu của bạn, nhắm vào hạ tầng lạ, hoặc có vẻ bị nội
 dung độc hại Claude vừa đọc điều khiển". Anthropic báo cáo **84% ít prompt hơn** khi dùng nội
 bộ với thiết kế classifier hai lớp này (S13, "How we built Claude Code auto mode", 2026-03-25).
-Docs cũng nói thẳng: *"Auto mode reduces permission prompts but does not guarantee safety."*
-Đây là Level 2 có người duyệt, không phải Level 3. Nếu classifier chặn 3 lần liên tiếp (hoặc 20
-lần tổng), auto mode tạm dừng và bạn được hỏi lại.
+Docs nói thẳng: *"Auto mode reduces permission prompts but does not guarantee safety."* Level 2
+có người duyệt, không phải Level 3. Nếu classifier chặn 3 lần liên tiếp (hoặc 20 lần tổng), auto
+mode tạm dừng và bạn được hỏi lại.
 
 ### Ma trận Risk × Familiarity (giữ nguyên)
 
-| Rủi ro task | Độ quen codebase | Mode |
+| Rủi ro task | Độ quen | Mode |
 |---|---|---|
 | Thấp (format, test) | Cao | `acceptEdits` hoặc `auto` |
 | Thấp | Thấp | `plan` trước, rồi `acceptEdits` |
-| Cao (DB, auth, payment) | Cao | `default`, thêm `permissions.deny` cho đường nóng |
+| Cao (DB, auth, payment) | Cao | `default` + `permissions.deny` cho đường nóng |
 | Cao | Thấp | **`default` — luôn luôn** |
 
 Mode là nền. Rule `permissions.allow/deny/ask` xếp lên trên, và **deny rule chặn ở mọi mode, kể
-cả `bypassPermissions`** (Module 2.2). CLAUDE.md và prompt chỉ là lời khuyên.
+cả `bypassPermissions`** (Module 2.2). CLAUDE.md chỉ là lời khuyên.
 
 > `(S13)`: `docs/references/anthropic-sources.md`.
 
@@ -91,7 +94,7 @@ cả `bypassPermissions`** (Module 2.2). CLAUDE.md và prompt chỉ là lời kh
 ## 3. DEMO — Từng bước
 
 Chạy trong `~/cc-lab` (`src/math.js`, `tests/math.test.mjs`, `npm test`). Máy này có user
-settings khởi động ở `auto`, nên mỗi lệnh ghim mode tường minh.
+settings khởi động ở `auto`, nên mỗi lệnh đều ghim mode.
 
 **Bước 1: Đọc mode indicator, rồi xoay vòng**
 
@@ -110,7 +113,7 @@ Status bar lúc khởi động, rồi sau mỗi lần `Shift+Tab`:
   ⏵⏵ auto mode on (shift+tab to cycle)
 ```
 
-Vì sao: dòng dưới ô nhập là nơi duy nhất hiện mode — đọc nó trước khi làm việc rủi ro.
+Vì sao: dòng đó là nơi duy nhất hiện mode — đọc trước khi làm việc rủi ro.
 
 **Bước 2: Level 1 headless — plan mode đề xuất, không sửa**
 
@@ -129,7 +132,7 @@ Here's the proposal (no files touched; the plan is saved at `~/.claude/plans/pro
 Run `npm test` — expect 2 passing tests (`add`, `subtract`), 0 failing.
 ```
 
-`git status` không in gì: plan mode chỉ đọc repo và ghi mỗi file plan.
+`git status` không in gì: plan mode chỉ đọc repo và ghi mỗi plan.
 
 **Bước 3: Level 1 tương tác — permission prompt thật**
 
@@ -154,10 +157,9 @@ Prompt: `Create a file hello.txt containing hi`
  Esc to cancel · Tab to amend
 ```
 
-Lựa chọn 2 *chính là* cú nhảy lên Level 2. Prompt cho Bash có lựa chọn thứ hai khác:
-`Yes, and don't ask again for: npm test *` — lựa chọn đó được lưu vào
-`.claude/settings.local.json` dưới dạng `Bash(npm test *)`. Bấm `Esc`, Claude báo
-`User rejected write to hello.txt`.
+Lựa chọn 2 *chính là* cú nhảy lên Level 2. Prompt cho Bash có lựa chọn thứ hai khác,
+`Yes, and don't ask again for: npm test *`, được lưu vào `.claude/settings.local.json` dưới dạng
+`Bash(npm test *)`. Bấm `Esc`, Claude báo `User rejected write to hello.txt`.
 
 **Bước 4: Headless không có prompt — nên mode quyết định**
 
@@ -174,7 +176,7 @@ ls: hello.txt: No such file or directory
 ```
 
 `--permission-mode default` ép hành vi gốc; trên máy mới cài bạn nhận kết quả y hệt mà không
-cần cờ, trừ khi `settings.json` đặt `permissions.defaultMode`. Giờ Level 2:
+cần cờ, trừ khi `settings.json` đặt `permissions.defaultMode`. Level 2:
 
 ```bash
 claude -p "Create a file hello.txt containing hi" --permission-mode acceptEdits
@@ -206,7 +208,7 @@ claude
   ⏵⏵ accept edits on (shift+tab to cycle)
 ```
 
-Project settings thắng file user, nên session vào thẳng Level 2 không cần cờ.
+Project settings thắng file user, nên session vào thẳng Level 2, không cần cờ.
 
 **Bước 6: Level 3 — cờ thật, chỉ trong sandbox**
 
@@ -216,7 +218,7 @@ claude --dangerously-skip-permissions
 ```
 
 Cờ này có thật; đừng chạy trên máy host. Chỉ dùng trong sandbox hoặc container (Module 2.3).
-Nó từ chối chạy dưới root, deny rule vẫn áp dụng — nhưng mọi prompt và classifier đều biến mất.
+Nó từ chối chạy dưới root và deny rule vẫn áp dụng — nhưng mọi prompt và classifier đều biến mất.
 
 Dọn dẹp: `rm hello.txt .claude/settings.json`.
 
@@ -230,10 +232,9 @@ Dọn dẹp: `rm hello.txt .claude/settings.json`.
 **Hướng dẫn**:
 1. `claude --permission-mode default`, prompt: "Add a one-line JSDoc comment above each function
    in src/math.js". Đếm số prompt.
-2. `git checkout -- src`, rồi lặp lại với `--permission-mode acceptEdits`.
-3. Mode nào khớp với mức rủi ro?
+2. `git checkout -- src`, lặp lại với `--permission-mode acceptEdits`. Mode nào khớp rủi ro?
 
-**Kết quả mong đợi**: một prompt cho mỗi edit ở `default`; không prompt nào ở `acceptEdits`.
+**Kết quả mong đợi**: mỗi edit một prompt ở `default`; không prompt nào ở `acceptEdits`.
 
 <details>
 <summary>💡 Gợi ý</summary>
@@ -242,8 +243,8 @@ Nhìn status bar; ở `acceptEdits` bạn xem lại kết quả bằng `git diff
 
 <details>
 <summary>✅ Lời giải</summary>
-`default` hỏi một lần cho mỗi `Edit`. `acceptEdits` tự duyệt edit trong working directory, nên
-lượt chạy im lặng; `git diff src/math.js` là bước review của bạn.
+`default` hỏi một lần cho mỗi `Edit`. `acceptEdits` tự duyệt edit trong working directory nên
+lượt chạy im lặng; `git diff src/math.js` là bước review.
 </details>
 
 ### Bài 2: Chọn mode
@@ -296,18 +297,17 @@ lượt chạy im lặng; `git diff src/math.js` là bước review của bạn.
 
 ## 7. REAL CASE — Câu chuyện thực tế
 
-**Bối cảnh**: Một team Việt Nam onboarding vào backend 15 service với shared library và RPC
-nội bộ.
+**Bối cảnh**: Một team Việt Nam onboarding vào backend 15 service với shared library.
 
-**Vấn đề**: Tuần 1 ở `default` chậm nhưng bắt được nhiều hiểu nhầm. Sang tuần 2 team chuyển
-sang `acceptEdits` cho việc lặp lại, còn CI sinh docs chạy headless với
-`--permission-mode acceptEdits` trong container. Rồi một dev chạy đổi schema ở `auto` với
-prompt mơ hồ: "Add user preferences table". Claude đoán kiểu cột; migration fail ở staging.
+**Vấn đề**: Tuần 1 ở `default` chậm nhưng bắt được nhiều hiểu nhầm. Sang tuần 2 việc lặp lại
+chạy ở `acceptEdits`, còn CI sinh docs chạy headless với `--permission-mode acceptEdits` trong
+container. Rồi một dev đổi schema ở `auto` với prompt mơ hồ: "Add user preferences table".
+Claude đoán kiểu cột; migration fail ở staging.
 
 **Giải pháp**: Quy tắc team trở thành ma trận. Chưa quen + rủi ro cao → `default`, kèm
 `"deny": ["Edit(./migrations/**)"]` tới khi có người review. Quen + rủi ro thấp →
-`acceptEdits`. `bypassPermissions` chỉ trong container CI. Migration được làm lại ở `plan`
-mode, duyệt plan, rồi chạy với `acceptEdits`.
+`acceptEdits`. `bypassPermissions` chỉ trong container CI. Migration làm lại ở `plan` mode, rồi
+chạy với `acceptEdits`.
 
 **Kết quả**: Hai tháng sau không còn sự cố staging nào do chọn sai mức tự động hoá.
 
