@@ -92,15 +92,19 @@ Lệnh `/compact` là công cụ quan trọng nhất cho session dài. Đây là
 
 Claude Code hỗ trợ custom slash commands thông qua file Markdown trong thư mục `.claude/commands/`:
 
+Project commands nằm ở `.claude/commands/<name>.md` và gọi bằng `/<name>`.
+User commands nằm ở `~/.claude/commands/<name>.md` (có sẵn trong mọi project) và cũng
+gọi bằng `/<name>`.
+
 **Lệnh cấp project** (chia sẻ với team qua git):
-```
-.claude/commands/review.md     → hiển thị là /project:review
-.claude/commands/test.md       → hiển thị là /project:test
+```text
+.claude/commands/review.md     → hiển thị là /review
+.claude/commands/test.md       → hiển thị là /test
 ```
 
-**Lệnh toàn cục** (có sẵn trong mọi project):
-```
-~/.claude/commands/my-prompt.md  → hiển thị là /user:my-prompt
+**Lệnh cấp user** (có sẵn trong mọi project):
+```text
+~/.claude/commands/my-prompt.md  → hiển thị là /my-prompt
 ```
 
 **Ví dụ:** Tạo lệnh code review tái sử dụng:
@@ -116,7 +120,7 @@ Review các thay đổi hiện tại với focus vào:
 Dùng coding conventions của project từ CLAUDE.md.
 ```
 
-Giờ gõ `/project:review` trong bất kỳ REPL session nào để sử dụng. Custom commands cũng có thể dùng placeholder `$ARGUMENTS` để nhận tham số.
+Giờ gõ `/review` trong bất kỳ REPL session nào để sử dụng. Custom commands cũng có thể dùng placeholder `$ARGUMENTS` để nhận tham số.
 
 ---
 
@@ -136,12 +140,12 @@ $ claude
 
 Bạn đã vào session. Đầu tiên, xem có gì:
 
-```
+```text
 /help
 ```
 
 Kết quả mong đợi:
-```
+```text
 Available commands:
   /help     - Show this help message
   /compact  - Compress conversation history to free context space
@@ -160,12 +164,12 @@ Type a command or describe what you want to build.
 
 Bạn đang bắt đầu với một dự án mới. Setup bộ nhớ cho dự án:
 
-```
+```text
 /init
 ```
 
 Kết quả mong đợi:
-```
+```text
 Creating CLAUDE.md in current directory...
 
 I've created a starter CLAUDE.md file. Let me open it so we can configure
@@ -184,12 +188,12 @@ What kind of project is this? I'll help you customize the configuration.
 
 Bạn đã implement xong hai API endpoints đầu tiên. Giờ check chi phí:
 
-```
+```text
 /cost
 ```
 
 Kết quả mong đợi:
-```
+```text
 Session Token Usage:
   Input tokens:  12,847
   Output tokens:  8,392
@@ -209,12 +213,12 @@ Context window: ~21% full
 
 Bạn đã vào phút thứ 40. Câu trả lời thấy kém chính xác hơn chút. Check cost lại, rồi compact:
 
-```
+```text
 /cost
 ```
 
 Kết quả mong đợi:
-```
+```text
 Session Token Usage:
   Input tokens:  38,291
   Output tokens: 24,103
@@ -228,12 +232,12 @@ Context window: ~62% full
 
 Giờ compact:
 
-```
+```text
 /compact
 ```
 
 Kết quả mong đợi:
-```
+```text
 Compacting conversation history...
 
 ✓ Compressed 62,394 tokens → 18,203 tokens (71% reduction)
@@ -254,22 +258,22 @@ You can continue working. Context window freed.
 
 API xong rồi. Giờ bạn cần làm React dashboard (codebase hoàn toàn khác). Clear tất cả:
 
-```
+```text
 /clear
 ```
 
 Kết quả mong đợi:
-```
+```text
 Are you sure you want to clear all conversation history? This cannot be undone.
 Type 'yes' to confirm, or anything else to cancel.
 ```
 
-```
+```text
 yes
 ```
 
 Kết quả mong đợi:
-```
+```text
 ✓ Conversation history cleared.
 ✓ Context window reset.
 
@@ -350,7 +354,7 @@ Dùng `/compact` khi chuyển sub-task trong cùng dự án. Dùng `/clear` ch�
 <summary>✅ Giải Pháp</summary>
 
 **Sau /compact:**
-```
+```text
 Bạn: Chúng ta vừa build cái gì?
 
 Claude: Chúng ta đã implement email validation function với regex pattern matching,
@@ -359,7 +363,7 @@ internationalized domains.
 ```
 
 **Sau /clear:**
-```
+```text
 Bạn: Chúng ta vừa build cái gì?
 
 Claude: Tôi không có context về những gì chúng ta build trước đó. Lịch sử hội thoại

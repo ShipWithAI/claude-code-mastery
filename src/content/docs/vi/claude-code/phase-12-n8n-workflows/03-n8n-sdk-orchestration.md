@@ -41,7 +41,7 @@ const client = new Anthropic({
 });
 
 const response = await client.messages.create({
-  model: "claude-sonnet-4-20250514",
+  model: "sonnet",
   max_tokens: 1024,
   messages: [{ role: "user", content: $json.prompt }]
 });
@@ -61,7 +61,7 @@ return { response: response.content[0].text };
     "content-type": "application/json"
   },
   "body": {
-    "model": "claude-sonnet-4-20250514",
+    "model": "sonnet",
     "max_tokens": 1024,
     "messages": [{"role": "user", "content": "={{ $json.prompt }}"}]
   }
@@ -89,7 +89,7 @@ const client = new Anthropic({ apiKey: $env.ANTHROPIC_API_KEY });
 const userPrompt = $input.first().json.prompt;
 
 const response = await client.messages.create({
-  model: "claude-sonnet-4-20250514",
+  model: "sonnet",
   max_tokens: 2048,
   system: "Bạn là assistant hữu ích. Luôn trả lời JSON format.",
   messages: [{ role: "user", content: userPrompt }]
@@ -124,7 +124,7 @@ const tools = [{
 }];
 
 const response = await client.messages.create({
-  model: "claude-sonnet-4-20250514",
+  model: "sonnet",
   max_tokens: 1024,
   tools: tools,
   messages: [{ role: "user", content: $json.prompt }]
@@ -182,7 +182,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const client = new Anthropic({ apiKey: $env.ANTHROPIC_API_KEY });
 
 const response = await client.messages.create({
-  model: "claude-sonnet-4-20250514",
+  model: "sonnet",
   max_tokens: 1024,
   system: "Chỉ trả lời valid JSON format.",
   messages: [{ role: "user", content: $json.prompt }]
@@ -229,7 +229,7 @@ const tools = [{
 }];
 
 const response = await client.messages.create({
-  model: "claude-sonnet-4-20250514",
+  model: "sonnet",
   max_tokens: 1024,
   tools: tools,
   messages: [{ role: "user", content: "42 nhân 17 bằng mấy?" }]
@@ -292,7 +292,7 @@ const client = new Anthropic({ apiKey: $env.ANTHROPIC_API_KEY });
 
 ```javascript
 const response = await client.messages.create({
-  model: "claude-sonnet-4-20250514",
+  model: "sonnet",
   max_tokens: 1024,
   messages: [{ role: "user", content: prompt }]
 });

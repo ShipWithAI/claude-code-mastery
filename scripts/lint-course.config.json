@@ -4,7 +4,10 @@
     "src/content/docs/en/claude-code/cheat-sheet.mdx",
     "src/content/docs/vi/claude-code/cheat-sheet.mdx",
     "src/content/docs/en/claude-code/tips-tricks.mdx",
-    "src/content/docs/vi/claude-code/tips-tricks.mdx"
+    "src/content/docs/vi/claude-code/tips-tricks.mdx",
+    "templates/claude-md-security-example.md",
+    "templates/security-checklists.md",
+    "templates/onboarding-security.md"
   ],
   "h2Count": 7,
   "words": { "warn": 1500, "max": 2200, "maxLevel": "warn" },

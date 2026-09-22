@@ -60,7 +60,8 @@ const report = (file, issues) => {
 for (const f of files) {
   const text = fs.readFileSync(path.join(ROOT, f), 'utf8');
   const rel = f.replace(`${DOCS}/`, '');
-  report(f, checkDoc(parseDoc(text), { relPath: rel, config, isModule: moduleSet.has(f) }));
+  const isContent = f.startsWith(`${DOCS}/`);
+  report(f, checkDoc(parseDoc(text), { relPath: rel, config, isModule: moduleSet.has(f), checkFrontmatter: isContent }));
 }
 if (!explicit.length) {
   report('(pairs)', checkPairs(moduleFiles.map((f) => f.replace(`${DOCS}/`, ''))));

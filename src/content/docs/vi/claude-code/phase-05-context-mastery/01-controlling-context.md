@@ -83,11 +83,11 @@ Hãy xem kiểm soát context thực tế với 1 project thật.
 claude
 ```
 Sau khi vào session:
-```
+```text
 /cost
 ```
 Output mong đợi:
-```
+```text
 Session cost: $0.02
 Input tokens: 1,247 | Output tokens: 0
 Context usage: 1,247 tokens (0.6%)
@@ -97,15 +97,15 @@ Context usage: 1,247 tokens (0.6%)
 ---
 
 **Bước 2: Đọc 1 file và đo tác động**
-```
+```text
 Read src/auth/login.ts
 ```
 Sau đó:
-```
+```text
 /cost
 ```
 Output mong đợi:
-```
+```text
 Session cost: $0.08
 Input tokens: 5,834 | Output tokens: 342
 Context usage: 6,176 tokens (3.1%)
@@ -115,14 +115,14 @@ Context usage: 6,176 tokens (3.1%)
 ---
 
 **Bước 3: Cách SAI — làm tràn context**
-```
+```text
 Read all files in src/ recursively
 ```
-```
+```text
 /cost
 ```
 Output mong đợi:
-```
+```text
 Session cost: $1.47
 Input tokens: 87,253 | Output tokens: 1,205
 Context usage: 88,458 tokens (44.2%)
@@ -133,18 +133,18 @@ Context usage: 88,458 tokens (44.2%)
 
 **Bước 4: Cách ĐÚNG — đọc có chọn lọc**
 Bắt đầu lại:
-```
+```text
 /clear
 ```
 Giờ hỏi chiến lược:
-```
+```text
 Show me only the function signatures in src/auth/ files
 ```
-```
+```text
 /cost
 ```
 Output mong đợi:
-```
+```text
 Session cost: $0.12
 Input tokens: 7,429 | Output tokens: 856
 Context usage: 8,285 tokens (4.1%)
@@ -172,28 +172,28 @@ Output: Chỉ 20 commit gần nhất.
 
 **Bước 6: Dùng /compact chiến lược**
 Sau khi làm việc 15 phút:
-```
+```text
 /cost
 ```
 Output mong đợi:
-```
+```text
 Context usage: 62,847 tokens (31.4%)
 ```
 Trước khi tiếp tục:
-```
+```text
 /compact
 ```
 Output mong đợi:
-```
+```text
 ✓ Context compacted
 Reduced from 62,847 to 38,492 tokens
 Preserved: Current task, recent context, key files
 ```
-```
+```text
 /cost
 ```
 Output mong đợi:
-```
+```text
 Context usage: 38,492 tokens (19.2%)
 ```
 **Tại sao quan trọng**: `/compact` xóa lịch sử hội thoại nhưng giữ context quan trọng. Bạn vừa mua cho mình thêm 30 phút làm việc chất lượng cao.

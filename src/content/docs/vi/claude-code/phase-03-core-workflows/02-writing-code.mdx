@@ -76,12 +76,12 @@ Chu trình này thường mất 2-3 vòng, nhưng kết quả production-ready.
 
 ### Bước 1: Set context trước
 
-```
+```text
 Xem src/routes/auth/login.ts và src/middleware/errorHandler.ts. Tôi cần thêm flow quên mật khẩu theo cùng pattern.
 ```
 
 Expected response:
-```
+```text
 Tôi đã phân tích pattern:
 - Route dùng asyncHandler wrapper để xử lý error
 - Response theo format { success: boolean, data?: T, error?: string }
@@ -97,7 +97,7 @@ Sẵn sàng generate endpoint forgot-password theo convention này.
 
 ### Bước 2: Generate code mới với ràng buộc
 
-```
+```text
 Tạo POST /auth/forgot-password. Yêu cầu:
 - Dùng emailService có sẵn từ src/services/email.ts
 - Theo error handling như route login
@@ -147,7 +147,7 @@ export const forgotPassword = asyncHandler(async (req, res) => {
 
 ### Bước 3: Edit code hiện tại
 
-```
+```text
 Thêm route forgot-password vào src/routes/auth/index.ts theo pattern đăng ký route có sẵn.
 ```
 
@@ -170,7 +170,7 @@ router.post('/forgot-password',
 
 ### Bước 4: Refactor trong khi thêm feature
 
-```
+```text
 Các route auth hiện tại có logic validate email trùng lặp. Tách validateEmail middleware dùng chung cho cả login và forgot-password.
 ```
 
@@ -193,7 +193,7 @@ export const validateEmail = [
 
 ### Bước 5: Generate test
 
-```
+```text
 Viết test cho forgot-password theo structure của login.test.ts. Dùng test helper và mock pattern có sẵn.
 ```
 
@@ -238,12 +238,12 @@ describe('POST /auth/forgot-password', () => {
 
 ### Bước 6: Tự review
 
-```
+```text
 Review code bạn vừa viết. Có đúng convention project không? Thiếu edge case nào? Có concern về security không?
 ```
 
 Expected response:
-```
+```text
 Kết quả review:
 ✅ Đúng asyncHandler pattern
 ✅ Dùng format response chuẩn
@@ -274,7 +274,7 @@ Bạn muốn tôi thêm các cải thiện này không?
    $ claude
    ```
 3. Bảo Claude nhận diện convention:
-   ```
+   ```text
    Phân tích coding convention của project này. Xem:
    - Naming pattern (camelCase, snake_case?)
    - Cách xử lý error
@@ -283,7 +283,7 @@ Bạn muốn tôi thêm các cải thiện này không?
    - Style comment
    ```
 4. Bảo Claude generate module mới:
-   ```
+   ```text
    Tạo module UserPreferences mới theo đúng convention vừa nhận diện.
    ```
 5. So sánh code được tạo với module có sẵn. Có "thuộc về" project không?
@@ -328,11 +328,11 @@ Bước so sánh là chìa khóa — nó bắt được những sai lệch nhỏ
 **Hướng dẫn**:
 1. Tìm function 50+ dòng trong project của bạn
 2. Bảo Claude phân tích:
-   ```
+   ```text
    Phân tích function này. Nó làm gì? Có bao nhiêu responsibility?
    ```
 3. Yêu cầu kế hoạch refactor:
-   ```
+   ```text
    Function này có quá nhiều responsibility. Đề xuất kế hoạch refactor từng bước.
    ```
 4. Thực thi từng bước một
@@ -420,7 +420,7 @@ Không bao giờ bỏ qua bước "test có pass" giữa các bước.
 **Bối cảnh**: Team startup fintech ở Hà Nội đang build app quản lý chi tiêu bằng KMP (Kotlin Multiplatform). Cần thêm tính năng scan hóa đơn để tự động nhập chi tiêu. Developer duy nhất — Nam — chưa quen OCR library nhưng phải ship trước thứ Sáu (còn 3 ngày).
 
 **Ngày 1 — Hiểu (Module 3.1)**:
-```
+```text
 $ claude
 
 > Phân tích pattern của module camera có sẵn. Tôi cần làm tính năng scan hóa đơn tương tự.
@@ -436,7 +436,7 @@ Tính năng scan hóa đơn nên follow pattern này.
 ```
 
 **Ngày 1 — Generate ViewModel**:
-```
+```text
 > Tạo ReceiptScannerViewModel theo pattern trong CameraViewModel.kt.
 > Dùng ImageProcessor có sẵn cho preprocessing.
 > State cần có: scanning, processing, result, error.
@@ -445,7 +445,7 @@ Claude: [Generated ReceiptScannerViewModel.kt với đúng pattern MVVM, reuse I
 ```
 
 **Ngày 2 — Generate data models**:
-```
+```text
 > Thêm OCR result data class vào shared/models/ theo pattern Receipt.kt có sẵn.
 > Include: rawText, extractedAmount, extractedDate, confidence score.
 
@@ -453,7 +453,7 @@ Claude: [Generated OcrResult.kt match naming convention và serialization patter
 ```
 
 **Ngày 2 — Refactor để reuse code**:
-```
+```text
 > Image processing pipeline trong CameraViewModel có compression logic trùng lặp.
 > Tách thành ImageProcessor.prepareForOCR() và dùng cho cả camera lẫn receipt scanner.
 
@@ -467,7 +467,7 @@ Claude: Tôi sẽ:
 ```
 
 **Ngày 3 — Platform-specific implementation**:
-```
+```text
 > Generate iOS implementation của ReceiptScanner theo pattern expect/actual có sẵn
 > trong shared/platform/. Dùng Vision framework cho OCR.
 

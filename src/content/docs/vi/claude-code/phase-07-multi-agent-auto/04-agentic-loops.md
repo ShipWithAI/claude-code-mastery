@@ -48,7 +48,7 @@ graph LR
 Loop tiếp tục từ VERIFY về READ cho đến khi:
 1. Verification pass (success condition)
 2. Đạt max iteration limit
-3. Human can thiệp (Ctrl+C hoặc command)
+3. Human can thiệp (nhấn Esc để ngắt turn hiện tại, hoặc command)
 
 ### Pattern 1: Self-Correction Loop
 
@@ -57,7 +57,7 @@ Loop phổ biến nhất — đây là cách Claude "tự debug".
 **Trigger**: Test fail, linter error, build break — bất cứ khi nào có verifiable failure.
 
 **Cycle**:
-```
+```text
 Analyze error → Hypothesize nguyên nhân → Fix code → Re-test → Repeat if needed
 ```
 
@@ -72,7 +72,7 @@ Analyze error → Hypothesize nguyên nhân → Fix code → Re-test → Repeat 
 - Không có progress toward goal
 
 **Prompt mẫu**:
-```
+```text
 Run npm test.
 
 Nếu test nào fail:
@@ -93,7 +93,7 @@ Loop dùng để cải tiến dần — optimize performance, improve quality, r
 **Trigger**: Prompt chứa "improve", "optimize", "refine", "làm tốt hơn" — signal rằng "good enough" chưa rõ ràng.
 
 **Cycle**:
-```
+```text
 Evaluate current state → Identify improvement opportunity → Implement change →
 Measure result → Compare with previous → Repeat if better
 ```
@@ -109,7 +109,7 @@ Measure result → Compare with previous → Repeat if better
 - Oscillating back and forth giữa các approach
 
 **Prompt mẫu**:
-```
+```text
 Optimize function calculateDiscount() để faster.
 
 Benchmark hiện tại:
@@ -135,7 +135,7 @@ Loop dùng khi có uncertainty — thử nhiều approach khác nhau, so sánh, 
 **Trigger**: Nhiều approach có thể, prompt chứa "thử các cách", "so sánh", "tìm best approach".
 
 **Cycle**:
-```
+```text
 Generate approach A → Implement & evaluate → Generate approach B → Implement & evaluate →
 Compare results → Make decision
 ```
@@ -151,7 +151,7 @@ Compare results → Make decision
 - Try random approach không systematic
 
 **Prompt mẫu**:
-```
+```text
 Implement caching cho product catalog API.
 
 Try 3 approach:
@@ -179,10 +179,10 @@ Mọi loop PHẢI có điều kiện dừng rõ ràng. Không có = loop chạy 
 | **Iteration limit** | "Tối đa 5 lần", "Thử 3 approach" | Mọi loop nên có hard limit |
 | **Threshold** | "Response time < 100ms", "Improvement < 5%" | Optimization loop |
 | **Timeout** | "Dừng sau 10 phút", "Token budget < $2" | Long-running task |
-| **Human intervention** | "Stop", Ctrl+C, "đủ rồi" | Mọi loop — always có escape hatch |
+| **Human intervention** | "Stop", nhấn **Esc** để ngắt, "đủ rồi" | Mọi loop — always có escape hatch |
 
 **Best practice**: Combine nhiều condition với AND logic:
-```
+```text
 Dừng khi (test pass) HOẶC (đã thử 5 lần) HOẶC (10 phút)
 ```
 
@@ -215,7 +215,7 @@ $ claude
 ```
 
 Output:
-```
+```text
 Claude Code v1.x
 Context: /Users/dev/ecommerce-api
 Type /help for commands
@@ -225,7 +225,7 @@ Type /help for commands
 **Step 2: Invoke self-correction loop với termination condition rõ ràng**
 
 Prompt:
-```
+```text
 Run npm test.
 
 Nếu có test nào fail:
@@ -245,7 +245,7 @@ Sau mỗi iteration, report:
 **Step 3: Observe healthy loop — Progress tốt**
 
 Claude output:
-```
+```text
 Running npm test...
 
 FAIL src/services/userService.test.ts
@@ -347,14 +347,14 @@ Loop kết thúc: success condition đạt.
 Giờ thử scenario khác — loop bị stuck:
 
 Prompt:
-```
+```text
 Fix linter error trong paymentService.ts.
 Run eslint sau mỗi fix.
 Lặp đến khi clean.
 ```
 
 Claude output (unhealthy):
-```
+```text
 Running eslint src/paymentService.ts...
 
 Error: 'usr' is not defined (no-undef)
@@ -396,7 +396,7 @@ Error: 'usr' is not defined (no-undef)
 **Step 5: Can thiệp để break loop**
 
 Human intervention:
-```
+```text
 Stop. Bạn đang lặp lại cùng fix 3 lần mà error vẫn giữ nguyên.
 
 Điều tra:
@@ -406,7 +406,7 @@ Stop. Bạn đang lặp lại cùng fix 3 lần mà error vẫn giữ nguyên.
 ```
 
 Claude response:
-```
+```text
 Showing src/paymentService.ts lines 40-50:
 
   function processPayment(userId) {
@@ -437,12 +437,12 @@ Running eslint...
 
 **Step 6: Check token usage**
 
-```
+```text
 /cost
 ```
 
 Output:
-```
+```text
 Session cost: $0.18
 Tokens used:
   Input:  52,000
@@ -474,7 +474,7 @@ Tokens used:
 
 Prompt structure tốt cho practice này:
 
-```
+```text
 [TASK]: Fix failing test trong userService.test.ts
 
 [LOOP INSTRUCTION]:
@@ -542,28 +542,28 @@ Nếu thấy iteration 3 vẫn 2 fail, iteration 4 vẫn 2 fail → stuck, can t
 Stuck loop sign cụ thể:
 
 **Same error 3+ lần**:
-```
+```text
 Iteration 1: Error: Cannot read property 'id' of undefined
 Iteration 2: Error: Cannot read property 'id' of undefined
 Iteration 3: Error: Cannot read property 'id' of undefined
 ```
 
 **Same file edited lặp**:
-```
+```text
 Iteration 1: Editing src/api.ts line 45...
 Iteration 2: Editing src/api.ts line 45...
 Iteration 3: Editing src/api.ts line 45...
 ```
 
 **Token spike no progress**:
-```
+```text
 /cost → $0.05
 ... 3 iteration no change ...
 /cost → $0.12
 ```
 
 Can thiệp phrase:
-```
+```text
 Stop. Bạn đang loop 3 lần với same result.
 
 Show me:
@@ -579,19 +579,19 @@ Show me:
 **Intervention strategy khi stuck:**
 
 **Step 1: Identify stuck pattern**
-```
+```text
 Iteration 1-3: Same error "TypeError: user is undefined"
 Action: Same fix "add null check"
 Result: No change
 ```
 
 **Step 2: Stop loop**
-```
+```text
 Human: "Stop. Analyze tại sao fix không work."
 ```
 
 **Step 3: Request diagnosis**
-```
+```text
 Human: "Explain:
 1. Bạn đã thử gì?
 2. Error xuất hiện ở đâu trong call stack?
@@ -607,7 +607,7 @@ Thường stuck vì:
 - Cần approach hoàn toàn khác (refactor instead of patch)
 
 Example redirection:
-```
+```text
 Human: "user undefined xảy ra VÌ API call chưa complete.
 Thay vì null check, wrap logic trong async callback.
 Thử approach đó."
@@ -648,7 +648,7 @@ Mọi loop prompt PHẢI có ít nhất 2 trong số này:
 - [ ] Max iteration: "tối đa 5 lần"
 - [ ] Threshold: "improvement < 5%"
 - [ ] Timeout: "dừng sau 10 phút"
-- [ ] Human escape: luôn có Ctrl+C
+- [ ] Human escape: luôn có Esc để ngắt turn hiện tại
 
 ### Intervention Phrase
 
@@ -658,7 +658,7 @@ Mọi loop prompt PHẢI có ít nhất 2 trong số này:
 | **Sai hướng** | `Approach hiện tại không work. Thử cách hoàn toàn khác: [suggestion].` |
 | **Đủ tốt rồi** | `Good enough. Chuyển task tiếp theo.` |
 | **Unsafe action** | `Stop ngay. [Explain risk]. Chờ approval.` |
-| **Khẩn cấp** | Ctrl+C (hard stop) |
+| **Khẩn cấp** | **Esc** để ngắt ngay lập tức |
 
 ### Context Management Trong Loop
 
@@ -709,7 +709,7 @@ Dev team (2 người) làm manual:
 
 Tech lead quyết định thử Claude Code với self-correction loop:
 
-```
+```text
 Context: /path/to/api-server
 Đọc config/endpoints.json liệt kê 50 REST endpoint.
 
@@ -739,7 +739,7 @@ Termination: Khi tất cả 50 endpoint processed.
 
 Claude chạy loop trong 4 giờ (phần lớn unattended — dev làm việc khác):
 
-```
+```text
 Progress Report 1 (after 1 hour):
 ✓ 10 endpoint done, test pass
 ⚠️ 0 need human review

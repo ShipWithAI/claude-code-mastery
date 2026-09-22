@@ -162,7 +162,7 @@ $ claude
 
 Inside the session, ask Claude to list your home directory:
 
-```
+```text
 > Run: ls -la ~
 ```
 
@@ -173,12 +173,12 @@ without asking, that's important information about your configuration.
 
 Ask Claude to check if it can see your SSH keys:
 
-```
+```text
 > Run: ls ~/.ssh/
 ```
 
 Expected result (if you have SSH keys):
-```
+```text
 # Output may vary
 id_rsa
 id_rsa.pub
@@ -191,7 +191,7 @@ Claude Code CAN see these files if your user can.
 
 **Step 3: Check access to credentials**
 
-```
+```text
 > Run: cat ~/.aws/credentials 2>/dev/null || echo "No AWS credentials file"
 ```
 
@@ -202,7 +202,7 @@ access keys in its context window.
 
 Ask Claude to run something you'll deny:
 
-```
+```text
 > Run: rm -rf ~/Desktop/test-delete-me
 ```
 
@@ -215,13 +215,13 @@ If no permission prompt appears, you have no permission-based protection.
 
 **Step 5: Check what might accidentally get committed**
 
-```
+```text
 > Run: git status --porcelain
 ```
 
 Then check your .gitignore:
 
-```
+```text
 > Run: cat .gitignore
 ```
 
@@ -230,7 +230,7 @@ are NOT in .gitignore but ARE in your project?
 
 **Step 6: Exit and reflect**
 
-```
+```text
 /exit
 ```
 
@@ -279,7 +279,7 @@ tokens, etc.
 <summary>✅ Solution</summary>
 
 Example audit output:
-```
+```text
 CRITICAL:
 - ~/.ssh/id_rsa (SSH private key)
 - ~/.aws/credentials (AWS access keys)
@@ -335,7 +335,7 @@ proposed actions before it acts.
 
 Document your findings:
 
-```
+```text
 My Claude Code permission behavior:
 - Does it ask before running shell commands? [YES/NO]
 - Can I deny commands? [YES/NO]
@@ -354,28 +354,25 @@ full unrestricted access to your system.
 
 **Goal**: Set up practical protections for your sensitive files.
 
-⚠️ **Claude Code may or may not support `.claudeignore` files.** This exercise
-shows the concept; verify if your version supports it.
+**Claude Code has no gitignore-style file blocklist** (no ignore-file mechanism exists).
+The real mechanism is `permissions.deny` in `.claude/settings.json`.
 
 **Instructions**:
 
-**Option A: If .claudeignore exists**
-1. Create a `.claudeignore` file in your home directory:
-```bash
-$ cat > ~/.claudeignore << 'EOF'
-.ssh/
-.aws/
-.env
-*.pem
-*.key
-credentials*
-EOF
+**Option A: Deny sensitive paths in settings.json**
+1. Add a `permissions.deny` list to `~/.claude/settings.json` (user-level, applies to every project):
+```json
+{
+  "permissions": {
+    "deny": ["Read(~/.ssh/**)", "Read(~/.aws/**)", "Read(./.env)", "Read(./.env.*)", "Read(**/*.pem)", "Read(**/*.key)"]
+  }
+}
 ```
 
-2. Verify it works by asking Claude to read an ignored file
+2. Verify it works by asking Claude to read one of the denied paths — the request should be blocked, not just prompted
 
-**Option B: If .claudeignore doesn't exist (more likely)**
-1. Use OS-level protections instead:
+**Option B: OS-level protections (defense in depth, stack with Option A)**
+1. Use OS-level protections as a second layer:
 ```bash
 $ chmod 600 ~/.ssh/*
 $ chmod 600 ~/.aws/credentials
@@ -396,13 +393,15 @@ protected files from Claude Code. Did the protection work?
 <details>
 <summary>💡 Hint</summary>
 
-OS permissions (chmod) work regardless of Claude Code's features. A file with
-`chmod 000` cannot be read even by Claude Code running as your user (unless
-you're root).
-
-Wait — that's wrong. `chmod 600` means owner can read/write. Since Claude runs
-as your user, it CAN read 600 files. For true protection, you need to use a
-different user account or containerization.
+OS permissions only block Claude Code when they actually deny your own user
+account. A file with `chmod 000` cannot be read by anyone except root — that
+does block Claude Code. But `chmod 600` (the common "lock this down" default)
+still gives the owner read/write, and Claude Code runs as your user — so it
+CAN still read 600 files. `chmod` alone is not real protection against
+Claude Code — it runs as your user. The documented mechanism is
+`permissions.deny` in `.claude/settings.json` (see Option A); verify it by
+asking Claude to read the file. For true isolation, use a different user
+account or a container.
 
 </details>
 
@@ -411,16 +410,19 @@ different user account or containerization.
 
 The most reliable protections:
 
-1. **Directory-based**: Only run Claude Code inside project directories, never
+1. **`permissions.deny`**: Block reads of `~/.ssh/`, `~/.aws/`, `.env`, and key/pem
+   files in `.claude/settings.json` (see Option A above)
+
+2. **Directory-based**: Only run Claude Code inside project directories, never
    in ~
 
-2. **Container-based**: Run Claude Code in Docker without mounting sensitive
+3. **Container-based**: Run Claude Code in Docker without mounting sensitive
    directories (see Module 2.3)
 
-3. **Separate user**: Create a dedicated user account for Claude Code work
+4. **Separate user**: Create a dedicated user account for Claude Code work
    (advanced)
 
-4. **Vigilance**: Always read command proposals carefully before approving
+5. **Vigilance**: Always read command proposals carefully before approving
 
 Verification: After each protection, test by trying to access the file from
 Claude Code. If it succeeds, your protection failed.
@@ -490,7 +492,7 @@ connections.
 
 Susan had a `.env` file in her project with real credentials:
 
-```
+```text
 # .env (THESE ARE EXAMPLES — never use real credentials like this)
 DATABASE_URL=postgres://admin:FAKE-PASSWORD-123@db.example.com:5432/prod
 STRIPE_SECRET_KEY=sk-FAKE-DO-NOT-USE-xxxxxxxxxxxx
@@ -553,7 +555,7 @@ damage was done: **$2,847 in charges** from EC2 instances mining cryptocurrency.
    **Verify**: `git status` should NOT show .env
 
 2. **Never let Claude read .env directly** — instead, describe the variables:
-   ```
+   ```text
    > Create docker-compose.yml with these environment variables:
    > DATABASE_URL, STRIPE_SECRET_KEY, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
    > Use ${VARIABLE_NAME} syntax to read from environment

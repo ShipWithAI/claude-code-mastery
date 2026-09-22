@@ -63,20 +63,16 @@ Dù vậy, CLAUDE.md cực kỳ powerful vì:
 
 ### Configuration Settings
 
-⚠️ Cần verification — các configuration commands cụ thể có thể khác nhau tùy Claude Code version.
-
-Claude Code có cả global và project-level configuration:
+**Không có subcommand `claude config`.** Settings là plain JSON files — đọc và sửa trực
+tiếp:
 
 ```bash
-# View current configuration
-claude config show
-
-# Set a configuration value
-claude config set <key> <value>
-
-# Reset to defaults
-claude config reset
+cat ~/.claude/settings.json          # user settings
+cat .claude/settings.json            # project settings (committed)
+cat .claude/settings.local.json      # project-local (gitignored)
 ```
+
+⚠️ Tên field trong các file này chưa được verify trong course — kiểm tra docs chính thức của Claude Code để biết schema settings hiện tại.
 
 **Typical configuration areas:**
 - **Permissions**: Default approval settings (callback to Module 2.2)
@@ -85,9 +81,10 @@ claude config reset
 - **Logging**: Log gì và ở đâu
 
 **Project-level vs Global:**
-- **Global config**: Ở `~/.claude/config` — affects all projects
-- **Project config**: Ở `.claude/config` trong project root — overrides global
-- **Use case**: Global = safe defaults, Project = exceptions for trusted repos
+- **Global settings**: `~/.claude/settings.json` — affects all projects
+- **Project settings**: `.claude/settings.json` trong project root — committed, share với team
+- **Project-local settings**: `.claude/settings.local.json` — gitignored, override riêng theo máy
+- **Use case**: Global = safe defaults, project settings = exceptions cho trusted repos
 
 ### Team Governance
 
@@ -292,7 +289,7 @@ EOF
 ```bash
 $ cat > .env.example << 'EOF'
 # Database
-DATABASE_URL=postgresql://user:password@localhost:5432/banking_dev
+DATABASE_URL=postgresql://username:password@localhost:5432/banking_dev
 DB_POOL_SIZE=10
 
 # Authentication
@@ -356,7 +353,7 @@ EOF
 ```
 
 **Expected result:**
-```
+```bash
 $ git status
 On branch main
 
@@ -381,7 +378,7 @@ $ cat > .git/hooks/pre-commit << 'EOF'
 echo "🔍 Đang chạy gitleaks secret scan..."
 
 # Run gitleaks on staged files only
-gitleaks protect --staged --verbose
+gitleaks git --pre-commit --staged --verbose
 
 EXIT_CODE=$?
 
@@ -414,7 +411,7 @@ $ git commit -m "test"
 ```
 
 **Expected output:**
-```
+```text
 🔍 Đang chạy gitleaks secret scan...
 
     ○
@@ -473,7 +470,7 @@ $ chmod +x sandbox.sh
 
 ### Step 5: Tạo Team Onboarding Document
 
-```bash
+````bash
 $ cat > SECURITY_ONBOARDING.md << 'EOF'
 # Banking API — Security Onboarding cho Claude Code
 
@@ -617,30 +614,34 @@ Bằng cách hoàn thành onboarding này, bạn không chỉ học tools — b�
 security culture của chúng ta. Mọi engineer đều là security engineer.
 
 EOF
-```
+````
 
 **Expected result:** Team members mới có clear, checkable path đến safe Claude Code usage.
 
-### Step 6: Configure Claude Code (⚠️ Cần verification)
+### Step 6: Configure Claude Code
+
+Settings cấp project nằm trong `.claude/settings.json` (commit vào git, chia sẻ với team):
+
+```json
+{
+  "model": "sonnet"
+}
+```
+
+Verify:
 
 ```bash
-# Set project-level configuration
-$ claude config set model claude-3-5-sonnet-20241022
-$ claude config set auto-compact true
-$ claude config set log-level info
+$ cat .claude/settings.json
 ```
 
 **Expected output:**
-```
-Configuration updated:
-  model: claude-3-5-sonnet-20241022
-  auto-compact: true
-  log-level: info
-
-Config saved to: .claude/config
+```text
+{
+  "model": "sonnet"
+}
 ```
 
-**Tại sao quan trọng:** Project-specific settings đảm bảo consistency across team members.
+**Tại sao quan trọng:** Settings cấp project là plain JSON trong git, nên mọi teammate chạy cùng model — và thay đổi có thể review trong PR. Full key list: https://code.claude.com/docs/en/settings
 
 ### Step 7: Run Secure Claude Code Session
 
@@ -682,7 +683,7 @@ $ claude
 
 **Trong session:** Đọc MỌI permission prompt. Ví dụ:
 
-```
+```text
 Claude Code wants to:
   Read file: .env
 
@@ -693,7 +694,7 @@ Allow? [y/N]
 "Không, hãy reference .env.example thay vì .env"
 
 **End session:**
-```
+```text
 /exit
 ```
 
@@ -864,7 +865,7 @@ Onboarding docs tốt nhất được viết bởi người vừa mới đi qua 
 <details>
 <summary>✅ Solution Template</summary>
 
-```markdown
+````markdown
 # [Project Name] — Claude Code Security Onboarding
 
 Chào mừng! Guide này sẽ setup bạn cho safe AI-assisted development.
@@ -947,7 +948,7 @@ Nếu có gì sai:
 - Questions: [Slack channel]
 
 **Estimated time**: [Your estimate]
-```
+````
 
 **Validation**:
 - [ ] New hire có thể complete mà không cần hỏi questions
@@ -1121,16 +1122,18 @@ High-risk, high-likelihood, low-effort fixes đi trước.
 | **Git** | Never push without showing diff | Catches accidental commits |
 | **Database** | Never `DELETE` without `WHERE` | Ngăn data loss |
 
-### Configuration Commands (⚠️ Cần verification)
+### Configuration Files
+
+Settings là plain JSON files — không có CLI subcommand để xem hoặc reset configuration.
 
 | Command | Mục Đích | Scope |
 |---------|---------|-------|
-| `claude config show` | View current settings | Global hoặc project |
-| `claude config set key value` | Change setting | Global hoặc project |
-| `claude config reset` | Restore defaults | Global hoặc project |
+| `cat ~/.claude/settings.json` | View user settings | Global |
+| `cat .claude/settings.json` | View project settings (committed) | Project |
+| `cat .claude/settings.local.json` | View project-local settings (gitignored) | Project |
 
-**Project config**: Ở `.claude/config` (overrides global)
-**Global config**: Ở `~/.claude/config` (default cho all projects)
+**Project settings**: Ở `.claude/settings.json` (overrides global)
+**Global settings**: Ở `~/.claude/settings.json` (default cho all projects)
 
 ### Phase 2 Security Stack Summary
 
@@ -1177,7 +1180,7 @@ High-risk, high-likelihood, low-effort fixes đi trước.
 ```bash
 # Secret scanning
 gitleaks detect                    # Scan entire repo
-gitleaks protect --staged          # Scan staged files only
+gitleaks git --pre-commit --staged          # Scan staged files only
 gitleaks detect --verbose          # Detailed output
 
 # Environment verification
@@ -1344,14 +1347,14 @@ Last updated: 2024-01-15 (sau incident #3)
 
 Khoa's team implement tất cả lessons đó vào single system. Đây là sức mạnh của defense-in-depth.
 
-**Their Actual CLAUDE.md and Checklists**: Available trong course repository như reference templates:
+**Their Actual CLAUDE.md and Checklists**: Available như reference templates trong course repository tại [`https://github.com/ShipWithAI/claude-code-mastery/tree/develop/templates`](https://github.com/ShipWithAI/claude-code-mastery/tree/develop/templates):
 - `templates/claude-md-security-example.md`
 - `templates/security-checklists.md`
 - `templates/onboarding-security.md`
 
 ---
 
-## Phase 2 Hoàn Tất — Security Graduation Của Bạn
+### Phase 2 Hoàn Tất — Security Graduation Của Bạn
 
 Chúc mừng! Bạn đã hoàn thành Phase 2: Security & Sandboxing. Bạn giờ có complete, operational security toolkit:
 

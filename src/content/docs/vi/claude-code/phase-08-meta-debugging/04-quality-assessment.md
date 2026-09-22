@@ -110,7 +110,7 @@ $ npm run lint
 ```
 
 Output:
-```
+```text
 No errors found.
 ```
 
@@ -119,7 +119,7 @@ $ tsc --noEmit
 ```
 
 Output:
-```
+```text
 No errors.
 ```
 
@@ -128,7 +128,7 @@ $ npm test
 ```
 
 Output:
-```
+```text
 PASS src/services/userService.test.ts
   ✓ should search users by name
   ✓ should return empty array for no matches
@@ -143,7 +143,7 @@ $ git diff --stat
 ```
 
 Output:
-```
+```text
  src/services/userService.ts | 100 +++++++++++++++++++++++++++++
  src/routes/users.ts         |  20 ++++++
  2 files changed, 120 insertions(+)
@@ -153,7 +153,7 @@ Review code: Notice large function, no pagination, no rate limiting.
 
 ### Step 4: Ask Claude Self-Review
 
-```
+```text
 Bạn: Review search implementation vừa viết.
 Senior dev sẽ criticize gì?
 
@@ -177,7 +177,7 @@ Categorize issue:
 | No rate limiting | MEDIUM | Fix later |
 | No caching | LOW | Premature optimization |
 
-```
+```text
 Bạn: Feedback tốt. Add:
 1. Pagination (limit 50 per page)
 2. Query sanitization
@@ -275,7 +275,7 @@ git diff          # Review change
 
 ### Self-Review Prompt
 
-```
+```text
 "Senior dev sẽ criticize gì?"
 "Edge case nào fail?"
 "Có cách đơn giản hơn?"

@@ -3,11 +3,6 @@ title: 'Reading & Understanding Codebases'
 description: 'Use Claude Code to rapidly understand unfamiliar codebases, map architecture, and identify key patterns.'
 ---
 
-<!-- Note: This module exceeds standard word count (2802 vs 800-1500) due to
-     comprehensive 7-step DEMO required to demonstrate the 3-layer reading
-     strategy. Each step shows realistic Claude output. Approved by architect
-     review 2026-02-01. -->
-
 # Module 3.1: Reading & Understanding Codebases
 
 > **Estimated time**: ~30 minutes
@@ -84,12 +79,12 @@ Claude starts an interactive session. No output yet — just the prompt.
 **Step 2: Get project overview (Layer 1 start)**
 
 Inside the Claude session, type:
-```
+```text
 What does this project do? Explain the directory structure.
 ```
 
 Expected output:
-```
+```text
 This is a Node.js/Express REST API for managing e-commerce orders.
 
 Directory structure:
@@ -112,12 +107,12 @@ Key technologies: Express 4.x, MongoDB, JWT authentication, Jest for testing.
 **Why this matters**: You now have the map. You know there's a services layer (business logic is separated from controllers), MongoDB is used, and tests exist.
 
 **Step 3: Identify entry points (Layer 1 continued)**
-```
+```text
 Where is the main entry point? Trace the startup flow.
 ```
 
 Expected output:
-```
+```text
 Entry point: src/index.js
 
 Startup flow:
@@ -134,12 +129,12 @@ Critical file: src/routes/index.js — this is where all API endpoints are defin
 **Why this matters**: You know the bootstrap sequence. If the app fails to start, you check config → database connection → routes in that order.
 
 **Step 4: Map dependencies (Layer 1 → Layer 2 transition)**
-```
+```text
 What are the key dependencies and what role does each play?
 ```
 
 Expected output:
-```
+```text
 Production dependencies:
 - express (4.18.x): Web framework
 - mongoose (7.x): MongoDB ODM
@@ -159,12 +154,12 @@ Key insight: This is a standard REST API stack. Authentication is JWT-based.
 **Why this matters**: You know the tech stack. If you see a JWT error, you look at the jsonwebtoken configuration.
 
 **Step 5: Understand architecture (Layer 2)**
-```
+```text
 What architecture pattern does this project follow? Show me the data flow for a typical API request.
 ```
 
 Expected output:
-```
+```text
 Architecture: Layered architecture with separation of concerns
 
 Layers:
@@ -187,12 +182,12 @@ This pattern keeps business logic testable and decoupled from HTTP.
 **Why this matters**: Now you know where to make changes. Need to add a discount feature? That's business logic — add it in services/, not controllers/.
 
 **Step 6: Dive into a specific module (Layer 3)**
-```
+```text
 Explain the authentication module. How does the login flow work end to end?
 ```
 
 Expected output:
-```
+```text
 Authentication module: src/middleware/auth.js + src/controllers/AuthController.js
 
 Login flow (POST /api/auth/login):
@@ -216,12 +211,12 @@ Security note: Tokens expire after 7 days. Refresh token mechanism not implement
 **Why this matters**: You now understand exactly how auth works. If you need to add role-based access control, you know to modify the middleware and add role checks.
 
 **Step 7: Find patterns and conventions (Layer 2 refinement)**
-```
+```text
 What coding conventions does this project follow? What patterns are used consistently?
 ```
 
 Expected output:
-```
+```text
 Conventions:
 - Naming: Controllers end with "Controller", Services with "Service"
 - Error handling: All errors thrown in services are caught by global error middleware
@@ -326,7 +321,7 @@ Be specific about what "onboarding" means for your team. If your team works on f
 <summary>✅ Solution</summary>
 
 **Example prompt**:
-```
+```text
 Generate a new team member onboarding guide for this codebase. Structure:
 
 1. What does this project do? (2 paragraphs)

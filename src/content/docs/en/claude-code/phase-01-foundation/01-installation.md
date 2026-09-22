@@ -61,7 +61,7 @@ $ node --version
 ```
 
 Expected output:
-```
+```text
 v18.0.0   # or higher
 ```
 
@@ -78,7 +78,7 @@ $ npm install -g @anthropic-ai/claude-code
 ```
 
 Expected output:
-```
+```text
 # Output may vary
 added 1 package in Xs
 ```
@@ -88,7 +88,7 @@ current recommended installation method, as this may change.
 
 **Option B: Homebrew (macOS)** ⚠️ Needs verification
 ```bash
-$ brew install claude-code
+$ brew install --cask claude-code
 ```
 
 ⚠️ The exact Homebrew formula name needs verification. Check `brew search claude`
@@ -108,7 +108,7 @@ $ claude --version
 ```
 
 Expected output:
-```
+```text
 # Output may vary
 claude version X.Y.Z
 ```
@@ -151,7 +151,7 @@ This displays all available slash commands. You should see commands like
 Inside the Claude Code session, ask a simple question to verify everything
 works:
 
-```
+```text
 > What's the best practice for error handling in Go?
 ```
 
@@ -284,7 +284,7 @@ $ claude
 | Task | Command | Notes |
 |------|---------|-------|
 | **Install (npm)** | `npm install -g @anthropic-ai/claude-code` | Requires Node.js 18+ |
-| **Install (Homebrew)** | `brew install claude-code` | ⚠️ Verify formula name |
+| **Install (Homebrew)** | `brew install --cask claude-code` | ⚠️ Verify formula name |
 | **Check Version** | `claude --version` | Verify installation works |
 | **Start Session** | `claude` | Opens interactive mode |
 | **One-shot Mode** | `claude -p "prompt"` | Single query, no session |
@@ -293,7 +293,7 @@ $ claude
 | **Clear Context** | `/clear` | Inside session; resets conversation |
 | **Show Cost** | `/cost` | Inside session; shows token usage |
 | **Init Project** | `/init` | Inside session; creates CLAUDE.md |
-| **Exit Session** | `/exit` or Ctrl+C | Leave Claude Code |
+| **Exit Session** | `/exit`, or Ctrl+C twice (or Ctrl+D) | Leave Claude Code |
 | **Set API Key** | `export ANTHROPIC_API_KEY="sk-..."` | Alternative to OAuth |
 | **Configuration** | `claude config` | Manage settings |
 

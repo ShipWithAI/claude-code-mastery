@@ -215,7 +215,7 @@ Bắt đầu với CLAUDE.md hoặc Think mode — dễ demo và có impact ngay
 
 > 🎓 **CHÚC MỪNG!**
 >
-> Bạn đã hoàn thành Claude Code Mastery — 16 phase, 55 module, 200+ technique.
+> Bạn đã hoàn thành Claude Code Mastery — 16 phase, 64 module, 200+ technique.
 >
 > Bạn giờ equipped để:
 > - Master Claude Code cho công việc

@@ -140,7 +140,7 @@ chmod +x notify-slack.sh
 ```
 
 Expected output:
-```
+```text
 # File created and made executable
 ```
 

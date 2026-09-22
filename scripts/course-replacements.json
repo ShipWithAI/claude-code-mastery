@@ -18,5 +18,5 @@
   { "from": "/read ", "to": "@", "files": "phase-01-foundation/03-context-basics" },
   { "from": "/project:review", "to": "/review" },
   { "from": "/user:my-prompt", "to": "/my-prompt" },
-  { "from": "\\.claudeignore", "to": "`permissions.deny` in `.claude/settings.json`", "regex": true, "files": "phase-02-security/(01-threat-model|04-secret-management)" }
+  { "from": "postgresql://user:password@", "to": "postgresql://username:password@" }
 ]

@@ -133,7 +133,7 @@ CMD ["bash"]
 **Tại sao điều này quan trọng**: Chúng ta dùng minimal base image (node:20-slim), tạo non-root user, và set /workspace làm working directory. Đây là nơi chúng ta sẽ mount project.
 
 Output mong đợi khi build:
-```
+```text
 Successfully built abc123def456
 Successfully tagged claude-sandbox:latest
 ```
@@ -147,7 +147,7 @@ docker build -t claude-sandbox .
 **Tại sao điều này quan trọng**: Flag `-t` gắn tag cho image với một tên bạn có thể reference sau này. Building mất 2-5 phút lần đầu chạy.
 
 Output mong đợi:
-```
+```text
 [+] Building 145.2s (8/8) FINISHED
  => [internal] load build definition from Dockerfile
  => => transferring dockerfile: 512B
@@ -179,7 +179,7 @@ docker run -it --rm \
 - `--cpus=2` — giới hạn CPU usage
 
 Output mong đợi:
-```
+```text
 developer@a1b2c3d4e5f6:/workspace$
 ```
 
@@ -195,7 +195,7 @@ cat ~/.aws/credentials
 ```
 
 Output mong đợi:
-```
+```text
 cat: /home/developer/.aws/credentials: No such file or directory
 ```
 
@@ -205,7 +205,7 @@ cat ~/.ssh/id_rsa
 ```
 
 Output mong đợi:
-```
+```text
 cat: /home/developer/.ssh/id_rsa: No such file or directory
 ```
 
@@ -215,7 +215,7 @@ ls -la ~
 ```
 
 Output mong đợi:
-```
+```text
 total 8
 drwxr-xr-x 1 developer developer 4096 Feb  1 12:00 .
 drwxr-xr-x 1 root      root      4096 Feb  1 12:00 ..
@@ -235,7 +235,7 @@ curl https://google.com
 ```
 
 Output mong đợi:
-```
+```text
 curl: (6) Could not resolve host: google.com
 ```
 
@@ -250,7 +250,7 @@ ls /workspace
 ```
 
 Output mong đợi:
-```
+```text
 Dockerfile  README.md  src/  package.json
 ```
 

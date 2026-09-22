@@ -94,7 +94,7 @@ Note: A' ≈ A ≈ A'' — variation nhỏ của cùng approach, đều fail cù
 
 ### Step 1: Observe Loop Hình Thành
 
-```
+```text
 Claude: Tôi sẽ fix type error trong userService.ts...
 [Edit file]
 
@@ -124,7 +124,7 @@ Checklist:
 
 Thay vì để Claude thử lần 4, bạn ngắt:
 
-```
+```text
 Stop. Bạn đã thử type adjustment 3 lần và đều cùng error.
 
 Step back. Trước khi fix tiếp, giải thích:
@@ -137,7 +137,7 @@ Step back. Trước khi fix tiếp, giải thích:
 
 ### Step 4: Claude Reframe Problem
 
-```
+```text
 Claude: Đúng rồi. Để tôi trace data flow...
 
 [Read calling code]
@@ -156,7 +156,7 @@ $ npm run typecheck
 ```
 
 Output:
-```
+```text
 No errors found.
 ```
 
@@ -205,7 +205,7 @@ Watch signal: error lặp, same file edit, apologetic language.
 **Effective intervention pattern**:
 
 Sau 3 type error:
-```
+```text
 Stop. Type error cứ lặp. Trước khi fix tiếp:
 1. console.log actual runtime value
 2. Compare với type expect
@@ -213,7 +213,7 @@ Stop. Type error cứ lặp. Trước khi fix tiếp:
 ```
 
 Sau 3 test failure:
-```
+```text
 Stop. Check assumption:
 1. Test actually assert gì?
 2. Function actually return gì?
@@ -259,7 +259,7 @@ Key: Yêu cầu Claude ANALYZE trước khi attempt lại.
 
 ### Intervention Prompt
 
-```
+```text
 "Stop. Bạn đã thử X ba lần. Giải thích tại sao fail."
 
 "Trước khi fix, analyze: data này actually từ đâu?"
@@ -273,7 +273,7 @@ Key: Yêu cầu Claude ANALYZE trước khi attempt lại.
 
 | Command | Effect |
 |---------|--------|
-| `Ctrl+C` | Emergency stop |
+| `Esc` | Ngắt turn hiện tại ngay lập tức (session và context vẫn giữ nguyên) |
 | `/cost` | Check token burn |
 | `/compact` | Compress context, giữ decision |
 | `/clear` | Nuclear reset (mất progress) |
@@ -302,7 +302,7 @@ Key: Yêu cầu Claude ANALYZE trước khi attempt lại.
 
 **Break**: Sau 7 attempt, dev finally nói:
 
-```
+```text
 Stop. Forget token refresh. Read ACTUAL error log, không chỉ
 error message. Full context là gì?
 ```
