@@ -1,269 +1,349 @@
 ---
 title: 'Claude Code Skills'
-description: 'Tìm hiểu Claude Code Skills: custom slash commands, automated workflows và reusable skill patterns.'
+description: 'Tạo project skill trong .claude/skills/<name>/SKILL.md, gọi bằng /<name> hoặc để Claude tự áp dụng, và kiểm tra skill bằng /skills.'
+verified: 2026-09-22
+claude_version: 2.1.278
 ---
 
 # Module 15.3: Claude Code Skills
 
-> **Thời gian ước tính**: ~30 phút
+> **Thời gian ước tính**: ~35 phút
 >
 > **Yêu cầu trước**: Module 15.2 (Templates lệnh & prompt)
 >
-> **Kết quả**: Sau module này, bạn sẽ hiểu Claude Code Skill, biết find và install, và use để extend Claude capability.
+> **Kết quả**: Sau module này, bạn tạo được project skill trong
+> `.claude/skills/<name>/SKILL.md`, gọi bằng `/<name>` hoặc để Claude tự áp dụng, và kiểm tra
+> skill bằng `/skills`.
 
 ---
 
 ## 1. WHY — Tại sao cần học
 
-Bạn muốn Claude work với Kubernetes, Terraform, hoặc specific framework. Claude có general knowledge, nhưng không có specialized command, best practice, và workflow cho tool của bạn. Bạn phải teach same thing repeatedly.
+Mỗi lần nhờ Claude viết test, bạn lại dán đúng năm dòng: "dùng `node:test`, mỗi export một
+`test()`, có edge case, không sửa source." Đồng nghiệp dán một bản hơi khác. Bạn chuyển nó vào
+`CLAUDE.md`, và giờ file đó dài 400 dòng, Claude đọc ở mọi lượt.
 
-Skill package knowledge này. Install một skill, và Claude immediately biết pattern, best practice, và workflow. No repeated teaching.
+Docs nói thẳng: "Create a skill when you keep pasting the same instructions, checklist, or
+multi-step procedure into chat, or when a section of CLAUDE.md has grown into a procedure rather
+than a fact." Skill chính là quy trình đó, nằm trong một thư mục, chỉ load khi cần.
 
 ---
 
 ## 2. CONCEPT — Khái niệm cốt lõi
 
-### Skill là gì?
+### Skill là một thư mục có `SKILL.md`
 
 ```text
-Skill = Knowledge + Tools + Workflows
-
-- Knowledge: Domain-specific information
-- Tools: Command và integration
-- Workflows: Step-by-step process
+.claude/skills/test-file/
+├── SKILL.md          # frontmatter (khi nào dùng) + hướng dẫn (làm gì)
+├── references/       # tùy chọn: tài liệu dài, chỉ load khi Claude mở
+└── scripts/          # tùy chọn: script Claude chạy, không bao giờ load vào context
 ```
 
-### Skill Type
+Tên thư mục trở thành lệnh (`/test-file`). Dấu `---` phải là dòng đầu tiên của file.
 
-| Type | Source | Examples |
-|------|--------|----------|
-| **Official** | Anthropic | Core development skill |
-| **Community** | Open source | Framework-specific skill |
-| **Custom** | You/team | Company-specific skill |
+### Progressive disclosure: ba lớp (S8)
 
-### Skill Component
+Bài engineering về Agent Skills của Anthropic giải thích vì sao skill rẻ: chỉ name và description
+luôn trong context; body load khi gọi; file liên kết load khi cần.
 
-```text
-⚠️ Structure có thể vary — verify implementation hiện tại
-
-/skill-name/
-├── SKILL.md          # Skill documentation
-├── prompts/          # Prompt template
-├── tools/            # Tool definition
-├── workflows/        # Multi-step workflow
-└── examples/         # Usage example
+```mermaid
+graph LR
+    A["Lớp 1: name + description<br/>luôn trong context (~50 token)"] -->|liên quan?| B["Lớp 2: body SKILL.md<br/>load khi gọi"]
+    B -->|cần chi tiết?| C["Lớp 3: references/ · scripts/<br/>đọc hoặc chạy khi cần"]
 ```
 
-### Skill Extend Claude như thế nào
+Sau khi gọi, body "stays there across later turns": viết điều cần làm, đừng giải thích vì sao.
 
-```text
-Không có Skill:
-Bạn: "Tạo Kubernetes deployment"
-Claude: [Generic YAML, có thể miss best practice]
+### Skill nằm ở đâu
 
-Có Kubernetes Skill:
-Bạn: "Tạo Kubernetes deployment"
-Claude: [Production-ready YAML với health check,
-         resource limit, proper label]
-```
+| Vị trí | Đường dẫn | Load trong |
+|---|---|---|
+| Project | `.claude/skills/<name>/SKILL.md` | Repo này; commit để cả team dùng |
+| Personal | `~/.claude/skills/<name>/SKILL.md` | Mọi project trên máy bạn |
+| Plugin | `<plugin>/skills/<name>/SKILL.md` | Nơi plugin được bật, dưới tên `/plugin-name:name` |
 
-### Skill Discovery
+Enterprise skill đi qua managed settings; trùng tên thì enterprise thắng personal thắng project.
 
-- Official skill repository
-- Community skill registry
-- GitHub search cho Claude Code skill
-- Team internal skill library
+### Ai được gọi skill
+
+| Frontmatter | Bạn | Claude | Trong context |
+|---|---|---|---|
+| (mặc định) | Có | Có | Description luôn có; body khi gọi |
+| `disable-model-invocation: true` | Có | Không | Không có gì cho tới khi bạn gõ `/name` |
+| `user-invocable: false` | Không | Có | Description luôn có; body khi gọi |
+
+Việc có side effect thì đặt `disable-model-invocation: true`: "You don't want Claude deciding to
+deploy because your code looks ready."
+
+### Nội dung động trong body
+
+| Cú pháp | Điều gì xảy ra |
+|---|---|
+| `$ARGUMENTS` | Toàn bộ chuỗi gõ sau `/name` |
+| `$0`, `$1` | Đối số thứ nhất, thứ hai (đếm từ 0) |
+| `` !`git diff HEAD` `` | Chạy **trước** khi Claude thấy skill; output thay thế dòng đó |
+| `@src/math.js` | Đính kèm nội dung file |
+| `${CLAUDE_SKILL_DIR}` | Thư mục của chính skill, dùng cho đường dẫn `scripts/` |
+
+### Command và skill
+
+"Custom commands have been merged into skills." `.claude/commands/deploy.md` và
+`.claude/skills/deploy/SKILL.md` cùng tạo ra `/deploy`; file command cũ vẫn chạy. Skill thêm
+supporting file, kiểm soát ai được gọi, và tự load theo description; trùng tên thì skill chạy.
 
 ---
 
 ## 3. DEMO — Từng bước cụ thể
 
-**Scenario**: Sử dụng skill để improve Claude domain knowledge.
+Chạy trong `~/cc-lab` (git repo, `src/math.js`, `tests/math.test.mjs`, `npm test`).
 
-### Bước 1: Explore Available Skill
-
-```bash
-# ⚠️ Command có thể vary — verify implementation hiện tại
-
-$ claude skill list --available
-
-Official Skills:
-- docker: Docker container management
-- kubernetes: Kubernetes orchestration
-- terraform: Infrastructure as Code
-
-Community Skills:
-- nextjs: Next.js development pattern
-- prisma: Prisma ORM workflow
-```
-
-### Bước 2: Install một Skill
+**Bước 1: Tạo skill**
 
 ```bash
-# ⚠️ Verify implementation hiện tại
+# docs: skills
+mkdir -p .claude/skills/test-file
+cat > .claude/skills/test-file/SKILL.md <<'EOF'
+---
+name: test-file
+description: Write a node:test file for a given source file. Use when the user asks to add tests, write tests, or cover a module with tests.
+argument-hint: "<path>"
+allowed-tools: Read, Write
+---
 
-$ claude skill install kubernetes
+Write a `node:test` test file for the source file `$ARGUMENTS`.
 
-Installing kubernetes skill...
-✓ Downloaded skill package
-✓ Registered tools
-✓ Loaded prompts
-
-Kubernetes skill installed.
+1. Read `$ARGUMENTS` and list every exported function.
+2. Write `tests/<basename>.test.mjs` (replace it if it exists) that imports
+   `test` from `node:test` and `assert` from `node:assert/strict`.
+3. Add one `test()` per exported function plus one edge case
+   (for example dividing by zero).
+4. Do not modify the source file. Do not run the tests; tell the user to run `npm test`.
+EOF
 ```
 
-### Bước 3: Dùng Skill trong Session
+Description = cụm từ kích hoạt; body = quy trình; `allowed-tools` duyệt sẵn `Read` và `Write` cho
+lượt gọi skill.
+
+**Bước 2: Kiểm tra frontmatter parse được**
+
+```bash
+# docs: skills (Troubleshooting) · cần v2.1.233+
+claude plugin validate .claude/skills
+```
 
 ```text
-Bạn: Tạo production-ready deployment cho Node.js app
-với 3 replica.
+# Output may vary
+Validating components in: /Users/luatnq/cc-lab/.claude/skills
 
-Claude: [Dùng kubernetes skill]
-
-Tôi sẽ tạo production-ready deployment:
+✔ Validation passed
 ```
 
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: nodejs-app
-  labels:
-    app: nodejs-app
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: nodejs-app
-  template:
-    spec:
-      containers:
-      - name: nodejs-app
-        image: your-registry/nodejs-app:latest
-        resources:
-          requests:
-            memory: "128Mi"
-            cpu: "100m"
-          limits:
-            memory: "256Mi"
-            cpu: "500m"
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 3000
-        readinessProbe:
-          httpGet:
-            path: /ready
-            port: 3000
-```
+**Bước 3: Gọi theo tên**
 
-**Skill đảm bảo**:
-- Resource limit (prevent runaway container)
-- Health probe (automatic restart on failure)
-- Proper label (cho service discovery)
-
-### Bước 4: Skill-Specific Command
+Mở `claude` và gõ:
 
 ```text
-Bạn: /k8s-debug my-pod đang CrashLoopBackOff
+/test-file src/math.js
+```
 
-Claude: [Skill-guided debugging]
+```text
+# Output may vary
+❯ /test-file src/math.js
 
-Kubernetes debugging workflow:
-1. Check pod status: kubectl describe pod my-pod
-2. Check logs: kubectl logs my-pod --previous
-3. Common cause:
-   - Application error (check log)
-   - Missing config/secret
-   - Resource limit quá thấp
+⏺ Two exports: add and divide. Replacing the existing tests/math.test.mjs.
+  ⎿  $ cat > /Users/luatnq/cc-lab/tests/math.test.mjs <<'EOF'
+     …
+⏺ Wrote tests/math.test.mjs (replaced the existing file). It covers both exports
+  from src/math.js:
+
+  - add — sums two numbers
+  - divide — returns the quotient
+  - edge case — divide(1, 0) is Infinity, divide(0, 0) is NaN
+
+  The source file is untouched. Run npm test to execute them.
+```
+
+`$ARGUMENTS` đã thành `src/math.js`. Máy này chạy auto mode nên Claude dùng heredoc thay vì
+`Write` đã được duyệt sẵn; ở default mode, `Write` chạy không hỏi, tool khác vẫn hỏi.
+
+**Bước 4: Xem trong `/skills`**
+
+Gõ `/skills`, rồi gõ `test-file` để lọc:
+
+```text
+# Output may vary
+Skills
+  1/196 skills · type to filter · ↓/enter to select · esc to clear
+
+╭──────────────────────────────────────────╮
+│ ⌕ test-file                              │
+╰──────────────────────────────────────────╯
+❯ ✔ on         test-file · project · ~50 tok
+```
+
+`~50 tok` là lớp 1, trả ở mọi lượt. `Space` xoay vòng `on` → `name-only` → `user-only` → `off`;
+`Esc` lưu vào `.claude/settings.local.json` dưới khóa `skillOverrides`.
+
+**Bước 5: Để Claude tự kích hoạt từ một câu hỏi thường**
+
+Khôi phục file test (`git checkout -- tests/`), rồi hỏi mà không nhắc tên skill:
+
+```bash
+# docs: skills, cli-reference
+claude -p "add tests for src/math.js" --permission-mode acceptEdits
+```
+
+```text
+# Output may vary
+Wrote `tests/math.test.mjs` (replacing the previous version, which only tested `add`). It covers:
+
+- `add` — positive, negative-cancelling, and float inputs
+- `divide` — exact, negative, and fractional results
+- **divide by zero** edge case — `Infinity`, `-Infinity`, and `NaN` for `0/0`
+
+`src/math.js` is untouched. Per the skill I didn't run the tests — run `npm test` to verify.
+```
+
+"Per the skill" chỉ là gợi ý, chưa phải bằng chứng. Tìm lời gọi tool `Skill` trong event stream:
+
+```bash
+# docs: cli-reference
+claude -p "add tests for src/math.js" --permission-mode acceptEdits \
+  --output-format stream-json --verbose | grep -o '"name":"Skill","input":{[^}]*}'
+```
+
+```text
+# Output may vary
+"name":"Skill","input":{"skill":"test-file","args":"src/math.js"}
+```
+
+**Bước 6: Đo skill tốn bao nhiêu**
+
+```bash
+# docs: skills (Find unused skills) · cần v2.1.252+
+claude -p "/skill-doctor"
+```
+
+```text
+# Output may vary
+Skills loaded this session
+
+  skill                 source            context  7d tokens   uses  last used
+  …
+  test-file             projectSettings       ~50          -     1×  today
+  …
+  context = this skill's one-line listing in the system prompt, included every turn
+  (dash = not in the current listing, costs nothing; full SKILL.md loads only when it runs)
+
+8 skills synced from claude.ai loaded but never invoked. Each one adds to the system prompt every turn.
 ```
 
 ---
 
 ## 4. PRACTICE — Luyện tập
 
-### Bài 1: Explore Available Skill
+### Bài 1: Skill mà Claude không bao giờ được tự chạy
 
-**Mục tiêu**: Discover skill nào tồn tại.
+**Mục tiêu**: Tạo `/changelog` ghi `CHANGELOG.md` từ git history, chỉ người dùng gọi được.
 
 **Hướng dẫn**:
-1. List available official skill
-2. Đọc documentation cho 2-3 skill
-3. Identify skill nào giúp project hiện tại
+1. Tạo `.claude/skills/changelog/SKILL.md` với `disable-model-invocation: true`.
+2. Chèn 20 commit gần nhất bằng `` !`git log --oneline -20` ``.
+3. Hỏi "update the changelog" và quan sát Claude **không** chạy skill; sau đó tự gõ `/changelog`.
+
+**Kết quả mong đợi**: Chỉ `/changelog` mới ghi file: "If Claude tries anyway, Claude Code blocks
+the call".
 
 <details>
 <summary>💡 Gợi ý</summary>
-
-Focus vào skill match tech stack: cloud provider, framework, database.
-
+Với `disable-model-invocation: true`, description không nằm trong context, nên không có gì để
+Claude khớp.
 </details>
 
 <details>
-<summary>✅ Giải pháp</summary>
+<summary>✅ Lời giải</summary>
 
-Useful skill theo role:
-- **Backend**: kubernetes, docker, database skill
-- **Frontend**: nextjs, react, tailwind skill
-- **DevOps**: terraform, aws/gcp, ci-cd skill
-- **Data**: python, pandas, jupyter skill
+```markdown
+---
+description: Write CHANGELOG.md from recent commits
+disable-model-invocation: true
+allowed-tools: Write
+---
 
-Pick 1-2 relevant nhất với công việc hàng ngày.
+**Recent commits**
 
+!`git log --oneline -20`
+
+Group the commits above under Added / Changed / Fixed and write them to CHANGELOG.md
+under a new "Unreleased" heading. Do not edit any other file.
+```
+
+Lệnh `!` thoát khác 0 sẽ hủy cả lượt gọi; thêm `|| true` nếu lệnh có thể lỗi.
 </details>
 
-### Bài 2: Install và Use một Skill
+### Bài 2: Skill có file tham chiếu
 
-**Mục tiêu**: Trải nghiệm skill-enhanced Claude output.
+**Mục tiêu**: Giữ một style guide dài ngoài context cho tới khi cần.
 
 **Hướng dẫn**:
-1. Install skill relevant cho project
-2. Hỏi Claude câu hỏi domain-specific
-3. So sánh output quality với/không có skill
+1. Tạo `.claude/skills/api-style/references/style.md` với 30+ dòng quy ước API.
+2. Link nó từ `SKILL.md` và nhờ Claude thêm một endpoint.
+
+**Kết quả mong đợi**: Dòng Skills trong `/context` vẫn nhỏ; Claude chỉ đọc `style.md` khi viết
+code. Docs: "Keep `SKILL.md` under 500 lines."
+
+<details>
+<summary>✅ Lời giải</summary>
+
+```markdown
+---
+description: API design conventions for this codebase. Use when adding or changing HTTP endpoints.
+user-invocable: false
+---
+
+When writing endpoints, follow the naming and error-format rules in
+[references/style.md](references/style.md). Read it before writing code.
+```
+
+`user-invocable: false`: kiến thức nền, không phải hành động.
+</details>
+
+### Bài 3: Chuyển file command thành skill
+
+**Mục tiêu**: Chuyển `.claude/commands/review-diff.md` sang `.claude/skills/review-diff/SKILL.md`.
+
+**Hướng dẫn**:
+1. Tạo file command và xác nhận `/review-diff` chạy (file command vẫn được hỗ trợ).
+2. `git mv .claude/commands/review-diff.md .claude/skills/review-diff/SKILL.md`.
+3. Thêm `context: fork` và `agent: Explore` để review chạy trong subagent chỉ đọc.
+
+**Kết quả mong đợi**: `/review-diff` chạy skill (skill thắng file command trùng tên) trong một
+subagent không thấy hội thoại của bạn.
 
 <details>
 <summary>💡 Gợi ý</summary>
-
-Try cùng prompt trước và sau khi install skill để thấy difference.
-
+Đừng đặt tên `review`: "the bundled alias `/review` never runs your skill".
 </details>
 
 <details>
-<summary>✅ Giải pháp</summary>
+<summary>✅ Lời giải</summary>
 
-Example so sánh:
-- **Không có skill**: Generic code, missing best practice
-- **Có skill**: Production-ready code, include error handling, follow convention
+```markdown
+---
+description: Review the uncommitted diff for bugs and missing tests
+context: fork
+agent: Explore
+allowed-tools: Bash(git diff *)
+---
 
-Skill provide domain expertise Claude không có otherwise.
+**Diff**
 
-</details>
+!`git diff HEAD`
 
-### Bài 3: Evaluate Skill Quality
-
-**Mục tiêu**: Learn cách assess community skill.
-
-**Hướng dẫn**:
-1. Tìm community skill cho tech stack của bạn
-2. Test trên 3 task khác nhau
-3. Evaluate: documentation, accuracy, maintenance
-
-<details>
-<summary>💡 Gợi ý</summary>
-
-Check: last updated, GitHub star, issue/response, example quality.
-
-</details>
-
-<details>
-<summary>✅ Giải pháp</summary>
-
-Quality checklist:
-- [ ] Clear documentation với example
-- [ ] Updated trong 6 tháng gần đây
-- [ ] Maintainer responsive
-- [ ] Accurate output trên test của bạn
-
-Không install skill fail nhiều check.
+Review the diff above. List bugs, missing error handling, and untested paths,
+with file and line references. Do not edit files.
+```
 
 </details>
 
@@ -271,76 +351,62 @@ Không install skill fail nhiều check.
 
 ## 5. CHEAT SHEET
 
-### Skill Command
+| Trường frontmatter | Ý nghĩa |
+|---|---|
+| `name` | Tên hiển thị; lệnh vẫn lấy từ tên thư mục |
+| `description` | Làm gì và khi nào. Claude khớp yêu cầu với dòng này |
+| `argument-hint` | Gợi ý autocomplete, ví dụ `[filename] [format]` |
+| `disable-model-invocation: true` | Chỉ bạn chạy được |
+| `user-invocable: false` | Chỉ Claude chạy được |
+| `allowed-tools` | Tool được duyệt sẵn chỉ trong lượt gọi skill |
+| `context: fork` + `agent` | Chạy như subagent (`Explore`, `Plan`, `general-purpose`, custom) |
 
-```bash
-# ⚠️ Verify implementation hiện tại
-
-claude skill list             # List installed
-claude skill list --available # List tất cả available
-claude skill install [name]   # Install skill
-claude skill remove [name]    # Remove skill
-claude skill info [name]      # Skill detail
-```
-
-### Popular Skill Category
-
-| Category | Examples |
-|----------|----------|
-| **Cloud** | AWS, GCP, Azure |
-| **DevOps** | Kubernetes, Docker, Terraform |
-| **Databases** | PostgreSQL, MongoDB, Redis |
-| **Frameworks** | Next.js, Django, FastAPI |
-| **Tools** | Git, CI/CD, Testing |
-
-### Skill Quality Checklist
-
-- [ ] Documentation rõ ràng
-- [ ] Real code example
-- [ ] Active maintenance
-- [ ] Positive community feedback
+| Lệnh / cú pháp | Mục đích |
+|---|---|
+| `/<name> args` | Gọi skill; `/a /b args` xếp chồng tối đa sáu skill |
+| `/skills` | Liệt kê, lọc, sắp xếp (`t`), xoay vòng hiển thị (`Space`), lưu (`Esc`) |
+| `/skill-doctor` | Chi phí context và tần suất dùng từng skill; in text khi chạy `-p` |
+| `claude plugin validate .claude/skills` | Tìm `SKILL.md` không parse được |
+| `"skillOverrides": {"deploy": "off"}` | Ẩn skill mà không sửa file |
+| `Skill(deploy *)` trong `permissions.deny` | Chặn Claude gọi skill |
 
 ---
 
 ## 6. PITFALLS — Sai lầm thường gặp
 
-| ❌ Sai | ✅ Đúng |
-|--------|---------|
-| Install mọi skill | Chỉ install cái cần |
-| Trust skill blindly | Review output critically |
-| Dùng outdated skill | Check version và maintenance |
-| Ignore skill conflict | Aware skill interaction |
-| Không đọc skill doc | Understand capability trước |
-| Ignore skill command | Learn shortcut |
-| Require skill để hoạt động | Skill enhance, không nên required |
+| ❌ Sai lầm | ✅ Cách đúng |
+|---|---|
+| Đi tìm subcommand `skill install` | Không có. Skill là thư mục: copy vào `.claude/skills/`, commit, hoặc đóng gói thành plugin (Module 15.5) |
+| `description: Helper for tests` | Viết như brief cho người mới (S9): làm gì **và** khi nào, bằng đúng cụm từ người ta hay gõ |
+| Skill deploy không có `allowed-tools` | Nó chỉ chạy được vì bạn bấm qua các prompt. Khai báo tool chính xác (`Bash(git push *)`) và đặt `disable-model-invocation: true` |
+| Nhét mọi workflow vào `CLAUDE.md` | (S15) "Aim to keep CLAUDE.md under 200 lines by including only essentials"; chuyển quy trình sang skill |
+| Tin `allowed-tools` trong repo không phải của bạn | Quyền này áp dụng cả trong thư mục chưa trust hay khi chạy `-p`. Đọc `SKILL.md` trước |
+| Coi skill là hàng rào bảo vệ | "A skill is a control, though an advisory one." (S3) Quy tắc cứng thì dùng hook (Module 11.3) hoặc `permissions.deny` |
 
 ---
 
 ## 7. REAL CASE — Câu chuyện thực tế
 
-**Scenario**: Fintech Việt Nam migrate sang Kubernetes. Team có ít K8s experience. Claude helped nhưng output generic, missing production pattern.
+**Bối cảnh**: Một team fintech ở TP.HCM tích hợp cổng thanh toán với ba ngân hàng Việt Nam. Cứ vài
+tháng lại có engineer mới lặp lại đúng nhóm lỗi cũ: số tiền lưu dạng số thực, VND có phần thập
+phân, retry không có idempotency key. Quy tắc nằm trong wiki chẳng ai mở, rồi trong một
+`CLAUDE.md` 500 dòng.
 
-**Skill Solution**:
+**Vấn đề**: `CLAUDE.md` load ở mọi lượt nên context đầy nhanh, độ tuân thủ giảm; review vẫn bắt
+đi bắt lại cùng một lỗi.
 
-Install kubernetes skill cung cấp:
-- Production-ready manifest template
-- Security best practice (RBAC, NetworkPolicy)
-- Debugging workflow
-- Scaling pattern
+**Giải pháp**: Team chuyển quy tắc vào `.claude/skills/vn-payment-rules/` với
+`user-invocable: false` và description nêu rõ từ khóa kích hoạt ("payment", "VNPay", "MoMo",
+"refund"). `SKILL.md` giữ sáu điều bất di bất dịch; `references/bank-specs.md` chứa định dạng
+trường của từng ngân hàng, chỉ load khi Claude chạm vào adapter. `CLAUDE.md` rút xuống dưới 200
+dòng. Đây đúng là cách Anthropic mô tả trong SDLC bảo mật của họ (S4): "those guidelines are
+encoded in CLAUDE.md files and references to org-wide skills so the code follows these best
+practices the minute it's generated", và khi agent phát hiện nhóm lỗi mới, "the relevant file is
+updated to prevent it recurring".
 
-**Team Workflow**:
-1. "Tạo deployment cho payment-service"
-2. Claude dùng skill → production-ready YAML
-3. Team review (learning while doing)
-4. Deploy with confidence
-
-**Kết quả (2 tháng)**:
-- Manifest quality: Generic → Production-ready
-- Security issue: 8 → 1 (skill enforce best practice)
-- Time to deploy: -40% (ít back-and-forth fix)
-- Team learning: Accelerated (skill explain pattern)
-
-**Quote**: "Skill như có Kubernetes expert pair programming. Được production-ready output trong khi learning best practice."
+**Kết quả**: Quy tắc áp dụng lúc sinh code thay vì lúc review; thêm ngân hàng mới chỉ là thêm một
+mục trong `bank-specs.md`. Một hook (Module 11.3) vẫn là chốt chặn tất định cho quy tắc không được
+phép sai: không có `float` dưới `payments/`.
 
 ---
 

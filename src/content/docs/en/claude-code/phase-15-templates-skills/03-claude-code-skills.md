@@ -1,304 +1,374 @@
 ---
 title: 'Claude Code Skills'
-description: 'Find, install, and use Claude Code Skills to extend capabilities with community-built enhancements.'
+description: 'Create a project skill in .claude/skills/<name>/SKILL.md, invoke it with /<name> or let Claude auto-apply it, and inspect skills with /skills.'
+verified: 2026-09-22
+claude_version: 2.1.278
 ---
 
 # Module 15.3: Claude Code Skills
 
-> **Estimated time**: ~30 minutes
+> **Estimated time**: ~35 minutes
 >
 > **Prerequisite**: Module 15.2 (Command & Prompt Templates)
 >
-> **Outcome**: After this module, you will understand Claude Code Skills, know how to find and install them, and be able to use Skills to extend Claude's capabilities.
+> **Outcome**: After this module, you will be able to create a project skill in
+> `.claude/skills/<name>/SKILL.md`, invoke it with `/<name>` or let Claude auto-apply it, and
+> inspect skills with `/skills`.
 
 ---
 
 ## 1. WHY — Why This Matters
 
-You want Claude to work with Kubernetes, Terraform, or a specific framework. Claude has general knowledge, but not the specialized commands, best practices, and workflows for your tool. You end up teaching Claude the same things repeatedly.
+Every time you ask for tests you paste the same five lines: "use `node:test`, one `test()` per
+export, cover the edge case, don't touch the source." Your teammate pastes a different version. You
+moved it into `CLAUDE.md`, and now that file is 400 lines Claude reads on every turn.
 
-Skills package this knowledge. Install a skill, and Claude immediately knows the patterns, best practices, and workflows. No repeated teaching.
+The docs: "Create a skill when you keep pasting the same instructions, checklist, or multi-step
+procedure into chat, or when a section of CLAUDE.md has grown into a procedure rather than a
+fact." A skill is that procedure, in a folder, loaded only when needed.
 
 ---
 
 ## 2. CONCEPT — Core Ideas
 
-### What is a Skill?
+### A skill is a folder with a `SKILL.md`
 
 ```text
-Skill = Knowledge + Tools + Workflows
-
-- Knowledge: Domain-specific information
-- Tools: Commands and integrations
-- Workflows: Step-by-step processes
+.claude/skills/test-file/
+├── SKILL.md          # frontmatter (when to use) + instructions (what to do)
+├── references/       # optional: long docs, loaded only when Claude opens them
+└── scripts/          # optional: helpers Claude runs, never loaded into context
 ```
 
-### Skill Types
+The directory name becomes the command (`/test-file`). The `---` must be the file's first line.
 
-| Type | Source | Examples |
-|------|--------|----------|
-| **Official** | Anthropic | Core development skills |
-| **Community** | Open source | Framework-specific skills |
-| **Custom** | You/team | Company-specific skills |
+### Progressive disclosure: three layers (S8)
 
-### Skill Components
+Anthropic's Agent Skills post explains why skills are cheap: name and description are always in
+context; the body loads on invoke; linked files load on demand.
 
-```text
-⚠️ Structure may vary — verify current implementation
-
-/skill-name/
-├── SKILL.md          # Skill documentation
-├── prompts/          # Prompt templates
-├── tools/            # Tool definitions
-├── workflows/        # Multi-step workflows
-└── examples/         # Usage examples
+```mermaid
+graph LR
+    A["Layer 1: name + description<br/>always in context (~50 tokens)"] -->|relevant?| B["Layer 2: SKILL.md body<br/>loaded on invoke"]
+    B -->|needs detail?| C["Layer 3: references/ · scripts/<br/>read or run on demand"]
 ```
 
-### How Skills Extend Claude
+Once invoked, the body "stays there across later turns": state what to do, not why.
 
-```text
-Without Skill:
-You: "Create a Kubernetes deployment"
-Claude: [Generic YAML, might miss best practices]
+### Where skills live
 
-With Kubernetes Skill:
-You: "Create a Kubernetes deployment"
-Claude: [Production-ready YAML with health checks,
-         resource limits, proper labels]
-```
+| Location | Path | Loads in |
+|---|---|---|
+| Project | `.claude/skills/<name>/SKILL.md` | This repo; commit it for the team |
+| Personal | `~/.claude/skills/<name>/SKILL.md` | All your projects on this machine |
+| Plugin | `<plugin>/skills/<name>/SKILL.md` | Where the plugin is enabled, as `/plugin-name:name` |
 
-### Skill Discovery
+Enterprise skills ship via managed settings; enterprise beats personal beats project.
 
-- Official skill repository
-- Community skill registries
-- GitHub search for Claude Code skills
-- Team internal skill libraries
+### Who invokes it
+
+| Frontmatter | You | Claude | In context |
+|---|---|---|---|
+| (default) | Yes | Yes | Description always; body on invoke |
+| `disable-model-invocation: true` | Yes | No | Nothing until you type `/name` |
+| `user-invocable: false` | No | Yes | Description always; body on invoke |
+
+Side effects get `disable-model-invocation: true`: "You don't want Claude deciding to deploy
+because your code looks ready."
+
+### Dynamic content in the body
+
+| Syntax | What happens |
+|---|---|
+| `$ARGUMENTS` | Everything typed after `/name` |
+| `$0`, `$1` | First, second argument (0-based) |
+| `` !`git diff HEAD` `` | Runs **before** Claude sees the skill; output replaces the line |
+| `@src/math.js` | Attaches that file's content |
+| `${CLAUDE_SKILL_DIR}` | The skill's own directory, for `scripts/` paths |
+
+### Commands vs skills
+
+"Custom commands have been merged into skills." `.claude/commands/deploy.md` and
+`.claude/skills/deploy/SKILL.md` both create `/deploy`; command files keep working. Skills add
+supporting files, invocation control, and auto-loading; on a name clash the skill runs.
 
 ---
 
 ## 3. DEMO — Step by Step
 
-**Scenario**: Using skills to improve Claude's domain knowledge.
+Run this in `~/cc-lab` (git repo, `src/math.js`, `tests/math.test.mjs`, `npm test`).
 
-### Step 1: Explore Available Skills
-
-```bash
-# ⚠️ Commands may vary — verify current implementation
-
-$ claude skill list --available
-
-Official Skills:
-- docker: Docker container management
-- kubernetes: Kubernetes orchestration
-- terraform: Infrastructure as Code
-
-Community Skills:
-- nextjs: Next.js development patterns
-- prisma: Prisma ORM workflows
-```
-
-### Step 2: Install a Skill
+**Step 1: Create the skill**
 
 ```bash
-# ⚠️ Verify current implementation
+# docs: skills
+mkdir -p .claude/skills/test-file
+cat > .claude/skills/test-file/SKILL.md <<'EOF'
+---
+name: test-file
+description: Write a node:test file for a given source file. Use when the user asks to add tests, write tests, or cover a module with tests.
+argument-hint: "<path>"
+allowed-tools: Read, Write
+---
 
-$ claude skill install kubernetes
+Write a `node:test` test file for the source file `$ARGUMENTS`.
 
-Installing kubernetes skill...
-✓ Downloaded skill package
-✓ Registered tools
-✓ Loaded prompts
-
-Kubernetes skill installed.
+1. Read `$ARGUMENTS` and list every exported function.
+2. Write `tests/<basename>.test.mjs` (replace it if it exists) that imports
+   `test` from `node:test` and `assert` from `node:assert/strict`.
+3. Add one `test()` per exported function plus one edge case
+   (for example dividing by zero).
+4. Do not modify the source file. Do not run the tests; tell the user to run `npm test`.
+EOF
 ```
 
-### Step 3: Use Skill in Session
+Description = trigger phrases; body = procedure; `allowed-tools` pre-approves `Read` and `Write`
+for the invoking turn.
+
+**Step 2: Check the frontmatter parses**
+
+```bash
+# docs: skills (Troubleshooting) · requires v2.1.233+
+claude plugin validate .claude/skills
+```
 
 ```text
-You: Create a production-ready deployment for a Node.js app
-with 3 replicas.
+# Output may vary
+Validating components in: /Users/luatnq/cc-lab/.claude/skills
 
-Claude: [Using kubernetes skill]
-
-I'll create a production-ready deployment:
+✔ Validation passed
 ```
 
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: nodejs-app
-  labels:
-    app: nodejs-app
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: nodejs-app
-  template:
-    spec:
-      containers:
-      - name: nodejs-app
-        image: your-registry/nodejs-app:latest
-        resources:
-          requests:
-            memory: "128Mi"
-            cpu: "100m"
-          limits:
-            memory: "256Mi"
-            cpu: "500m"
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 3000
-        readinessProbe:
-          httpGet:
-            path: /ready
-            port: 3000
-```
+**Step 3: Invoke it by name**
 
-**Skill ensured**:
-- Resource limits (prevent runaway containers)
-- Health probes (automatic restart on failure)
-- Proper labels (for service discovery)
-
-### Step 4: Skill-Specific Commands
+Start `claude` and type:
 
 ```text
-You: /k8s-debug my-pod is in CrashLoopBackOff
+/test-file src/math.js
+```
 
-Claude: [Skill-guided debugging]
+```text
+# Output may vary
+❯ /test-file src/math.js
 
-Kubernetes debugging workflow:
-1. Check pod status: kubectl describe pod my-pod
-2. Check logs: kubectl logs my-pod --previous
-3. Common causes:
-   - Application error (check logs)
-   - Missing config/secrets
-   - Resource limits too low
+⏺ Two exports: add and divide. Replacing the existing tests/math.test.mjs.
+  ⎿  $ cat > /Users/luatnq/cc-lab/tests/math.test.mjs <<'EOF'
+     …
+⏺ Wrote tests/math.test.mjs (replaced the existing file). It covers both exports
+  from src/math.js:
+
+  - add — sums two numbers
+  - divide — returns the quotient
+  - edge case — divide(1, 0) is Infinity, divide(0, 0) is NaN
+
+  The source file is untouched. Run npm test to execute them.
+```
+
+`$ARGUMENTS` became `src/math.js`. This machine runs in auto mode, so Claude used a heredoc
+instead of the pre-approved `Write`; in default mode `Write` runs without a prompt, other tools
+still ask.
+
+**Step 4: See it in `/skills`**
+
+Type `/skills`, then `test-file` to filter:
+
+```text
+# Output may vary
+Skills
+  1/196 skills · type to filter · ↓/enter to select · esc to clear
+
+╭──────────────────────────────────────────╮
+│ ⌕ test-file                              │
+╰──────────────────────────────────────────╯
+❯ ✔ on         test-file · project · ~50 tok
+```
+
+`~50 tok` is layer 1, paid every turn. `Space` cycles `on` → `name-only` → `user-only` → `off`;
+`Esc` saves it to `.claude/settings.local.json` as `skillOverrides`.
+
+**Step 5: Let Claude trigger it from a plain request**
+
+Restore the test file (`git checkout -- tests/`), then ask without naming it:
+
+```bash
+# docs: skills, cli-reference
+claude -p "add tests for src/math.js" --permission-mode acceptEdits
+```
+
+```text
+# Output may vary
+Wrote `tests/math.test.mjs` (replacing the previous version, which only tested `add`). It covers:
+
+- `add` — positive, negative-cancelling, and float inputs
+- `divide` — exact, negative, and fractional results
+- **divide by zero** edge case — `Infinity`, `-Infinity`, and `NaN` for `0/0`
+
+`src/math.js` is untouched. Per the skill I didn't run the tests — run `npm test` to verify.
+```
+
+"Per the skill" is a hint, not proof. Find the `Skill` tool call in the event stream:
+
+```bash
+# docs: cli-reference
+claude -p "add tests for src/math.js" --permission-mode acceptEdits \
+  --output-format stream-json --verbose | grep -o '"name":"Skill","input":{[^}]*}'
+```
+
+```text
+# Output may vary
+"name":"Skill","input":{"skill":"test-file","args":"src/math.js"}
+```
+
+**Step 6: Measure what your skills cost**
+
+```bash
+# docs: skills (Find unused skills) · requires v2.1.252+
+claude -p "/skill-doctor"
+```
+
+```text
+# Output may vary
+Skills loaded this session
+
+  skill                 source            context  7d tokens   uses  last used
+  …
+  test-file             projectSettings       ~50          -     1×  today
+  …
+  context = this skill's one-line listing in the system prompt, included every turn
+  (dash = not in the current listing, costs nothing; full SKILL.md loads only when it runs)
+
+8 skills synced from claude.ai loaded but never invoked. Each one adds to the system prompt every turn.
 ```
 
 ---
 
 ## 4. PRACTICE — Try It Yourself
 
-### Exercise 1: Explore Available Skills
+### Exercise 1: A skill Claude must never run on its own
 
-**Goal**: Discover what skills exist.
+**Goal**: Create `/changelog` that writes `CHANGELOG.md` from git history, user-only.
 
 **Instructions**:
-1. List available official skills
-2. Read documentation for 2-3 skills
-3. Identify which would help your current project
+1. Create `.claude/skills/changelog/SKILL.md` with `disable-model-invocation: true`.
+2. Inject the last 20 commits with `` !`git log --oneline -20` ``.
+3. Ask "update the changelog" and observe that Claude does **not** run the skill; then run
+   `/changelog` yourself.
+
+**Expected result**: Only `/changelog` writes the file: "If Claude tries anyway, Claude Code
+blocks the call".
 
 <details>
 <summary>💡 Hint</summary>
-
-Focus on skills matching your tech stack: cloud provider, framework, database.
-
+With `disable-model-invocation: true` the description is not in context, so nothing matches.
 </details>
 
 <details>
 <summary>✅ Solution</summary>
 
-Useful skills by role:
-- **Backend**: kubernetes, docker, database skills
-- **Frontend**: nextjs, react, tailwind skills
-- **DevOps**: terraform, aws/gcp, ci-cd skills
-- **Data**: python, pandas, jupyter skills
+```markdown
+---
+description: Write CHANGELOG.md from recent commits
+disable-model-invocation: true
+allowed-tools: Write
+---
 
-Pick 1-2 most relevant to your daily work.
+**Recent commits**
 
+!`git log --oneline -20`
+
+Group the commits above under Added / Changed / Fixed and write them to CHANGELOG.md
+under a new "Unreleased" heading. Do not edit any other file.
+```
+
+A non-zero exit from the `!` command aborts the invocation; append `|| true` if it may fail.
 </details>
 
-### Exercise 2: Install and Use a Skill
+### Exercise 2: A skill with a reference file
 
-**Goal**: Experience skill-enhanced Claude output.
+**Goal**: Keep a long style guide out of context until needed.
 
 **Instructions**:
-1. Install a skill relevant to your project
-2. Ask Claude a domain-specific question
-3. Compare output quality with/without skill
+1. Create `.claude/skills/api-style/references/style.md` with 30+ lines of API conventions.
+2. Link it from `SKILL.md` and ask Claude to add an endpoint.
+
+**Expected result**: The Skills row in `/context` stays small; Claude reads `style.md` only when
+it writes code. Docs rule: "Keep `SKILL.md` under 500 lines."
+
+<details>
+<summary>✅ Solution</summary>
+
+```markdown
+---
+description: API design conventions for this codebase. Use when adding or changing HTTP endpoints.
+user-invocable: false
+---
+
+When writing endpoints, follow the naming and error-format rules in
+[references/style.md](references/style.md). Read it before writing code.
+```
+
+`user-invocable: false`: background knowledge, not an action.
+</details>
+
+### Exercise 3: Convert a command file into a skill
+
+**Goal**: Migrate `.claude/commands/review-diff.md` to `.claude/skills/review-diff/SKILL.md`.
+
+**Instructions**:
+1. Create the command file and confirm `/review-diff` works (command files still do).
+2. `git mv .claude/commands/review-diff.md .claude/skills/review-diff/SKILL.md`.
+3. Add `context: fork` and `agent: Explore` for a read-only subagent.
+
+**Expected result**: `/review-diff` runs the skill (it beats a same-named command file) in a
+subagent that never sees your conversation.
 
 <details>
 <summary>💡 Hint</summary>
-
-Try the same prompt before and after installing the skill to see the difference.
-
+Don't name it `review`: "the bundled alias `/review` never runs your skill".
 </details>
 
 <details>
 <summary>✅ Solution</summary>
 
-Example comparison:
-- **Without skill**: Generic code, missing best practices
-- **With skill**: Production-ready code, includes error handling, follows conventions
+```markdown
+---
+description: Review the uncommitted diff for bugs and missing tests
+context: fork
+agent: Explore
+allowed-tools: Bash(git diff *)
+---
 
-The skill provides domain expertise Claude wouldn't have otherwise.
+**Diff**
 
-</details>
+!`git diff HEAD`
 
-### Exercise 3: Evaluate Skill Quality
-
-**Goal**: Learn to assess community skills.
-
-**Instructions**:
-1. Find a community skill for your tech stack
-2. Test on 3 different tasks
-3. Evaluate: documentation, accuracy, maintenance
-
-<details>
-<summary>💡 Hint</summary>
-
-Check: last updated, GitHub stars, issues/responses, example quality.
-
-</details>
-
-<details>
-<summary>✅ Solution</summary>
-
-Quality checklist:
-- [ ] Clear documentation with examples
-- [ ] Updated within last 6 months
-- [ ] Responsive maintainer
-- [ ] Accurate output on your tests
-
-Don't install skills that fail multiple checks.
-
+Review the diff above. List bugs, missing error handling, and untested paths,
+with file and line references. Do not edit files.
+```
 </details>
 
 ---
 
 ## 5. CHEAT SHEET
 
-### Skill Commands
+| Frontmatter field | Meaning |
+|---|---|
+| `name` | Display name; the command comes from the directory name |
+| `description` | What it does and when. Claude matches requests against this |
+| `argument-hint` | Autocomplete hint, e.g. `[filename] [format]` |
+| `disable-model-invocation: true` | Only you can run it |
+| `user-invocable: false` | Only Claude can run it |
+| `allowed-tools` | Tools pre-approved for the invoking turn only |
+| `context: fork` + `agent` | Run as a subagent (`Explore`, `Plan`, `general-purpose`, custom) |
 
-```bash
-# ⚠️ Verify current implementation
-
-claude skill list             # List installed
-claude skill list --available # List all available
-claude skill install [name]   # Install skill
-claude skill remove [name]    # Remove skill
-claude skill info [name]      # Skill details
-```
-
-### Popular Skill Categories
-
-| Category | Examples |
-|----------|----------|
-| **Cloud** | AWS, GCP, Azure |
-| **DevOps** | Kubernetes, Docker, Terraform |
-| **Databases** | PostgreSQL, MongoDB, Redis |
-| **Frameworks** | Next.js, Django, FastAPI |
-| **Tools** | Git, CI/CD, Testing |
-
-### Skill Quality Checklist
-
-- [ ] Clear documentation
-- [ ] Real code examples
-- [ ] Active maintenance
-- [ ] Positive community feedback
+| Command / syntax | Purpose |
+|---|---|
+| `/<name> args` | Invoke; `/a /b args` stacks up to six |
+| `/skills` | List, filter, sort (`t`), cycle visibility (`Space`), save (`Esc`) |
+| `/skill-doctor` | Per-skill context cost and usage; text with `-p` |
+| `claude plugin validate .claude/skills` | Find `SKILL.md` files that don't parse |
+| `"skillOverrides": {"deploy": "off"}` | Hide a skill without editing it |
+| `Skill(deploy *)` in `permissions.deny` | Block Claude from invoking it |
 
 ---
 
@@ -306,41 +376,37 @@ claude skill info [name]      # Skill details
 
 | ❌ Mistake | ✅ Correct Approach |
 |---|---|
-| Installing every skill | Only install what you need |
-| Trusting skill blindly | Review skill output critically |
-| Using outdated skills | Check version and maintenance |
-| Ignoring skill conflicts | Be aware of skill interactions |
-| Not reading skill docs | Understand capabilities first |
-| Ignoring skill commands | Learn the shortcuts |
-| Requiring skills | Skills enhance, shouldn't be required |
+| Looking for a `skill install` subcommand | None exists. A skill is a directory: copy it into `.claude/skills/`, commit it, or ship it in a plugin (Module 15.5) |
+| `description: Helper for tests` | Brief it like a new hire (S9): what it does **and** when, with the phrases people type |
+| A deploy skill with no `allowed-tools` | It only works because you click through prompts. Declare exact tools (`Bash(git push *)`) and set `disable-model-invocation: true` |
+| Every workflow in `CLAUDE.md` | (S15) "Aim to keep CLAUDE.md under 200 lines by including only essentials"; move procedures into skills |
+| Trusting `allowed-tools` in a repo you did not write | The grant applies even in an untrusted folder or a `-p` run. Read `SKILL.md` first |
+| Treating a skill as a guardrail | "A skill is a control, though an advisory one." (S3) Enforce hard rules with hooks (Module 11.3) or `permissions.deny` |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: Vietnamese fintech migrating to Kubernetes. Team had limited K8s experience. Claude helped but output was generic, missing production patterns.
+**Scenario**: A Ho Chi Minh City fintech team integrates a payment gateway with three Vietnamese
+banks. Every few months a new engineer reproduces the same bug class: amounts as floating point,
+VND with decimals, no idempotency key on retries. The rules lived in a wiki nobody opened, then in
+a 500-line `CLAUDE.md`.
 
-**Skill Solution**:
+**Problem**: `CLAUDE.md` loaded every turn, so context filled fast and adherence dropped; review
+kept catching the same mistakes after the fact.
 
-Installed kubernetes skill that provided:
-- Production-ready manifest templates
-- Security best practices (RBAC, NetworkPolicies)
-- Debugging workflows
-- Scaling patterns
+**Solution**: The team moved the rules into `.claude/skills/vn-payment-rules/` with
+`user-invocable: false` and a description naming the triggers ("payment", "VNPay", "MoMo",
+"refund"). `SKILL.md` holds six non-negotiables; `references/bank-specs.md` holds each bank's
+field formats and loads only when Claude touches an adapter. `CLAUDE.md` shrank under 200 lines.
+This is the pattern Anthropic describes for its own secure SDLC (S4): "those guidelines are
+encoded in CLAUDE.md files and references to org-wide skills so the code follows these best
+practices the minute it's generated", and when an agent finds a new bug class, "the relevant file
+is updated to prevent it recurring".
 
-**Team Workflow**:
-1. "Create deployment for payment-service"
-2. Claude uses skill → production-ready YAML
-3. Team reviews (learning while doing)
-4. Deploys with confidence
-
-**Results (2 months)**:
-- Manifest quality: Generic → Production-ready
-- Security issues: 8 → 1 (skill enforced best practices)
-- Time to deploy: -40% (less back-and-forth fixing)
-- Team learning: Accelerated (skill explains patterns)
-
-**Quote**: "The skill was like having a Kubernetes expert pair programming with us. We got production-ready output while learning best practices."
+**Result**: Rules apply at generation time, not review time; a new bank is a new section in
+`bank-specs.md`. A hook (Module 11.3) remains the deterministic backstop for the one rule that
+must never slip: no `float` under `payments/`.
 
 ---
 
