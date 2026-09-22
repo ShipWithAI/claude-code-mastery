@@ -1,268 +1,283 @@
 ---
 title: 'Auto Coding Levels'
-description: 'Understand Claude Code automation levels from manual to full auto and configure each for your risk tolerance.'
+description: 'Map the three automation levels onto Claude Code permission modes: Shift+Tab, --permission-mode, defaultMode, and what auto mode does and does not guarantee.'
+verified: 2026-09-22
+claude_version: 2.1.278
 ---
 
 # Module 7.1: Auto Coding Levels
 
 > **Estimated time**: ~30 minutes
 >
-> **Prerequisite**: Phase 6 (Thinking & Planning), Module 2.2 (Permission System)
+> **Prerequisite**: Phase 6 (Thinking & Planning),
+> [Module 2.2 (Permission System)](../../phase-02-security/02-permission-system/)
 >
-> **Outcome**: After this module, you will understand the automation spectrum in Claude Code, know how to configure each level, and make informed decisions about when to increase or decrease automation based on task risk.
+> **Outcome**: After this module, you will be able to pick a **permission mode** per task using
+> the Risk × Familiarity matrix, switch it with `Shift+Tab` / `--permission-mode` /
+> `permissions.defaultMode`, and explain why `auto` mode is not `bypassPermissions`.
 
 ---
 
 ## 1. WHY — Why This Matters
 
-You've been using Claude Code in "approve everything" mode, and one day it deletes your config file while "cleaning up unused files." Or the opposite: you're clicking "approve" 50 times just to add console.log statements to ten functions. Both scenarios waste time and cause frustration.
+One afternoon you press "Yes" 40 times to add logging to ten functions. The next day you switch
+everything off, and Claude "cleans up" a config file you needed. Same mistake both times:
+treating automation as a switch.
 
-The real problem isn't Claude Code — it's treating automation as binary (on/off) instead of a spectrum. Some tasks need tight human oversight. Others benefit from letting Claude run freely within guardrails. Knowing which level to use when is a core skill that separates effective Claude Code users from frustrated ones.
+Claude Code ships that spectrum as **permission modes**. The three "levels" this course uses are
+labels; the modes are the mechanism, and they are enforced by Claude Code, not by the model.
 
 ---
 
 ## 2. CONCEPT — Core Ideas
 
-### The Automation Spectrum
+### The modes the docs list
 
-Claude Code operates on a spectrum from full manual control to complete autonomy. Understanding this spectrum helps you match the right automation level to each task's risk profile.
+The permissions page lists **six modes plus one alias**. This course groups them into three levels:
+
+| Level | Mode | What runs without asking | Best for |
+|---|---|---|---|
+| **1 — Manual** | `default` (alias `manual`) | Reads only | Reviewing every action, sensitive work |
+| 1 | `plan` | Reads; no source edits until you approve a plan | Exploring before changing anything |
+| **2 — Semi-Auto** | `acceptEdits` | Reads, file edits, `mkdir`/`touch`/`mv`/`cp` in the working dir | Iterating on code you'll review in `git diff` |
+| 2 | `auto` | Everything, with a **classifier** reviewing each action | Long tasks, prompt fatigue |
+| 2 (CI) | `dontAsk` | Reads + pre-approved tools; anything that would prompt is **denied** | Locked-down scripts |
+| **3 — Full Auto** | `bypassPermissions` | Everything | Isolated containers/VMs **only** |
 
 ```mermaid
 graph LR
-    A[Manual Mode] -->|"Allow session"| B[Semi-Auto Mode]
-    B -->|"Allow always"| C[Full Auto Mode]
-
-    A1[You approve<br/>every action]
-    B1[You set guardrails<br/>Claude operates within]
-    C1[Claude executes<br/>autonomously]
-
-    A --- A1
-    B --- B1
-    C --- C1
+    L1["Level 1: default / plan<br/>you approve"] -->|Shift+Tab| L2["Level 2: acceptEdits / auto<br/>guardrails + classifier"]
+    L2 -->|sandbox only| L3["Level 3: bypassPermissions<br/>no prompts, no checks"]
 ```
 
-### Level 1: Manual Mode (Default)
+### How to set the mode
 
-This is Claude Code's default behavior. Every file write, command execution, and potentially destructive operation triggers a permission prompt. You review and approve each action individually.
+- **During a session**: `Shift+Tab` cycles `default` → `acceptEdits` → `plan` → (`auto` if
+  available) → back. `bypassPermissions` only joins the cycle if you started with it enabled;
+  `dontAsk` never does.
+- **One session**: `claude --permission-mode plan` (also works with `-p`).
+- **Every session in a project**: `permissions.defaultMode` in `.claude/settings.json`. Terminal
+  sessions honor every value there **except** `auto` and `bypassPermissions` — those two only
+  apply from user or managed settings.
+- **Org-wide off switch**: `permissions.disableBypassPermissionsMode` / `disableAutoMode` =
+  `"disable"` in managed settings.
 
-**Best for:**
-- Unfamiliar codebases where you're still learning the structure
-- High-risk changes (authentication, payments, database schema)
-- Learning how Claude Code behaves on your specific project
+### What auto mode is — and isn't
 
-**Tradeoff:** Maximum safety but slowest execution.
+`auto` is the built-in starting mode on Pro/Max/Team. A second model, the classifier, reviews
+each action and blocks anything that "escalates beyond your request, targets unrecognized
+infrastructure, or appears driven by hostile content Claude read". Anthropic reports **84% fewer
+prompts** in internal use with this two-layer classifier design (S13, "How we built Claude Code
+auto mode", 2026-03-25). The docs are equally blunt: *"Auto mode reduces permission prompts but
+does not guarantee safety."* It is Level 2 with a reviewer, not Level 3. If the classifier blocks
+3 actions in a row (or 20 total), auto mode pauses and you're prompted again.
 
-### Level 2: Semi-Auto Mode
+### Risk × Familiarity matrix (keep this)
 
-The middle ground. When Claude requests permission, choose "Allow for session" instead of "Allow once." This grants blanket approval for similar actions during the current session.
+| Task risk | Codebase familiarity | Mode |
+|---|---|---|
+| Low (formatting, tests) | High | `acceptEdits` or `auto` |
+| Low | Low | `plan` first, then `acceptEdits` |
+| High (DB, auth, payments) | High | `default`, with `permissions.deny` on hot paths |
+| High | Low | **`default` — always** |
 
-**Best for:**
-- Familiar tasks you've done before
-- Repetitive operations (formatting 50 files, adding tests)
-- Daily development work in codebases you know well
+Modes set the baseline. `permissions.allow/deny/ask` rules layer on top, and **deny rules block
+in every mode, including `bypassPermissions`** (Module 2.2). CLAUDE.md and prompts are advisory.
 
-**Tradeoff:** Faster execution with reasonable safety. You set boundaries once, Claude operates within them.
-
-### Level 3: Full Auto Mode
-
-Claude executes your prompt completely autonomously without stopping for approvals. This requires explicit opt-in through command-line flags or configuration.
-
-**Best for:**
-- Well-planned tasks with clear requirements (use Think+Plan from Module 6.3 first)
-- Sandboxed environments or branches you can easily discard
-- CI/CD pipelines where human approval breaks automation
-
-**Tradeoff:** Maximum speed but highest risk. Requires strong planning and trust.
-
-⚠️ **Critical Rule:** Full Auto should ALWAYS be combined with good upfront planning. Never use it for exploratory or ambiguous tasks.
-
-### Risk Assessment Matrix
-
-| Task Risk | Codebase Familiarity | Recommended Level |
-|-----------|---------------------|-------------------|
-| Low (formatting, tests) | High | Semi-Auto or Full Auto |
-| Low (formatting, tests) | Low | Semi-Auto |
-| High (DB, auth, payments) | High | Manual or Semi-Auto |
-| High (DB, auth, payments) | Low | **Always Manual** |
-
-### Connection to Permission System
-
-These automation levels build on the permission system from Module 2.2: permissions define what Claude can access, automation levels define approval frequency.
-
-### Comparing Automation Approaches
-
-How do Claude Code's automation levels compare across different workflows?
-
-| Approach | Control Level | Speed | Context Quality | Best Scenario |
-|----------|--------------|-------|-----------------|---------------|
-| **Manual Mode** | Maximum | Slow | Perfect — you verify each step | Learning, high-risk code, security-critical |
-| **Semi-Auto Mode** | Balanced | Fast | Good — session-scoped trust | Daily development, feature work |
-| **Full Auto Mode** | Minimal | Fastest | Depends on CLAUDE.md quality | CI/CD, sandboxed environments |
-| **Multi-Agent** (Phase 7.3) | Per-agent | Parallel | Fresh per agent | Complex multi-file tasks |
-| **Headless/SDK** (Phase 11) | Programmatic | Automated | Script-defined | Production pipelines, batch ops |
-
-**Key insight**: These are not competing approaches — they **combine**. A typical advanced workflow might use Semi-Auto for interactive development, spawn Full Auto agents for well-defined subtasks, and orchestrate via SDK in CI/CD. The skill is matching the right automation level to each part of your workflow.
+> `(S13)`: `docs/references/anthropic-sources.md`.
 
 ---
 
 ## 3. DEMO — Step by Step
 
-**Task:** Refactor `src/utils/helpers.ts` — extract three functions (`validateEmail`, `formatDate`, `parseConfig`) into separate files.
+Run in `~/cc-lab` (`src/math.js`, `tests/math.test.mjs`, `npm test`). This machine's user
+settings start sessions in `auto`, so each command pins a mode explicitly.
 
-### Demo 1: Manual Mode
-
-**Step 1: Start Claude Code**
-```bash
-$ claude
-```
-
-**Step 2: Give the prompt**
-```text
-Refactor src/utils/helpers.ts:
-- Extract validateEmail, formatDate, parseConfig to separate files
-- Update imports in helpers.ts
-```
-
-**Step 3: First approval prompt**
-```text
-Claude wants to:
-  - Write src/utils/validateEmail.ts
-
-Options:
-  [y] Allow once
-  [a] Allow for session
-  [n] Deny
-
-Your choice:
-```
-
-You press `y`. Claude creates the file. This repeats for each file.
-
-**Total prompts:** 6-8
-**Total time:** ~5 minutes
-**Result:** Complete control, but slow for low-risk task.
-
-### Demo 2: Semi-Auto Mode
-
-Same task, different approach.
-
-**Step 3: First approval prompt**
-When you see the first prompt, press `a` for "Allow for session."
-
-**Step 4: Watch it execute**
-Claude proceeds with remaining file writes without additional prompts.
-
-**Total prompts:** 1-2
-**Total time:** ~2 minutes
-**Result:** Balanced — guardrails set once, Claude works within them.
-
-### Demo 3: Full Auto Mode ⚠️
+**Step 1: Read the mode indicator, then cycle it**
 
 ```bash
-$ claude --dangerously-skip-permissions  # ⚠️ Needs verification
+# docs: permission-modes#switch-permission-modes
+claude --permission-mode default
 ```
 
-Claude executes the entire refactoring without stopping.
+Status bar on start, then after each `Shift+Tab`:
 
-**Total prompts:** 0
-**Total time:** ~1 minute
-**Result:** Fast, but requires trust + planning beforehand.
+```text
+# Output may vary
+  ⏸ manual mode on
+  ⏵⏵ accept edits on (shift+tab to cycle)
+  ⏸ plan mode on (shift+tab to cycle)
+  ⏵⏵ auto mode on (shift+tab to cycle)
+```
+
+Why: the label under the prompt is the only place the mode is shown — read it before risky work.
+
+**Step 2: Level 1 headless — plan mode proposes, never edits**
+
+```bash
+# docs: permission-modes#analyze-before-you-edit-with-plan-mode
+claude --permission-mode plan -p "Propose how to add a subtract function to src/math.js with a test. Do not edit any file."
+git status --short
+```
+
+```text
+# Output may vary
+Here's the proposal (no files touched; the plan is saved at `~/.claude/plans/propose-how-to-add-keen-dahl.md`).
+…
+- `src/math.js:1-2` exports `add` and `divide` as one-liners.
+…
+Run `npm test` — expect 2 passing tests (`add`, `subtract`), 0 failing.
+```
+
+`git status` prints nothing: plan mode read the repo and wrote only the plan file.
+
+**Step 3: Level 1 interactive — the real permission prompt**
+
+```bash
+# docs: permissions#permission-system
+claude --permission-mode default
+```
+
+Prompt: `Create a file hello.txt containing hi`
+
+```text
+# Output may vary
+⏺ Write(hello.txt)
+ Create file
+ hello.txt
+  1 hi
+ Do you want to create hello.txt?
+ ❯ 1. Yes
+   2. Yes, and switch to accept edits (auto-approve file edits and common file commands) for this session
+      (shift+tab)
+   3. No
+ Esc to cancel · Tab to amend
+```
+
+Option 2 *is* the jump to Level 2. A Bash prompt offers a different second option:
+`Yes, and don't ask again for: npm test *` — that one is saved to `.claude/settings.local.json`
+as `Bash(npm test *)`. Press `Esc` and Claude reports `User rejected write to hello.txt`.
+
+**Step 4: Headless has no prompt — so the mode decides**
+
+```bash
+# docs: headless#auto-approve-tools
+claude -p "Create a file hello.txt containing hi" --permission-mode default
+ls hello.txt
+```
+
+```text
+# Output may vary
+The write to `hello.txt` was blocked pending your permission. Please approve the write request and I'll create the file, or let me know if you'd prefer a different approach.
+ls: hello.txt: No such file or directory
+```
+
+`--permission-mode default` forces the stock behavior; on a fresh install you get the same
+result without it unless `settings.json` sets `permissions.defaultMode`. Now Level 2:
+
+```bash
+claude -p "Create a file hello.txt containing hi" --permission-mode acceptEdits
+cat hello.txt
+```
+
+```text
+# Output may vary
+Created `/Users/luatnq/cc-lab/hello.txt` containing `hi`.
+hi
+```
+
+**Step 5: Make Level 2 the project default**
+
+```bash
+# docs: permission-modes#start-in-a-different-mode
+mkdir -p .claude && cat > .claude/settings.json << 'EOF'
+{
+  "permissions": {
+    "defaultMode": "acceptEdits"
+  }
+}
+EOF
+claude
+```
+
+```text
+# Output may vary
+  ⏵⏵ accept edits on (shift+tab to cycle)
+```
+
+Project settings outrank the user file, so the session starts at Level 2 without a flag.
+
+**Step 6: Level 3 — real flag, sandbox only**
+
+```bash
+# docs: cli-reference — equivalent to --permission-mode bypassPermissions
+claude --dangerously-skip-permissions
+```
+
+The flag is real; don't run it on your host. Use it only inside a sandbox or container (Module
+2.3). It refuses to start as root, and deny rules still apply — but every prompt and the
+classifier are gone.
+
+Clean up: `rm hello.txt .claude/settings.json`.
 
 ---
 
 ## 4. PRACTICE — Try It Yourself
 
-### Exercise 1: Level Calibration
+### Exercise 1: Count the prompts
 
-**Goal:** Experience the difference between Manual and Semi-Auto on a low-risk task.
+**Goal**: Feel the difference between Level 1 and Level 2 on a low-risk task.
+**Instructions**:
+1. `claude --permission-mode default`, prompt: "Add a one-line JSDoc comment above each function
+   in src/math.js". Count the prompts.
+2. `git checkout -- src`, then repeat with `--permission-mode acceptEdits`.
+3. Which mode matched the risk?
 
-**Instructions:**
-1. Create a test file with 5 simple functions
-2. **Round 1 - Manual Mode:** Prompt Claude to add console.log to each function. Count approval prompts.
-3. **Round 2 - Semi-Auto Mode:** Revert changes, repeat with "Allow for session" on first prompt.
-4. Compare: which felt appropriate for this low-risk task?
+**Expected result**: one prompt per edit in `default`; zero in `acceptEdits`.
 
 <details>
 <summary>💡 Hint</summary>
-
-The point is noticing how the flow differs. Manual gives maximum visibility; Semi-Auto gives speed with initial oversight.
+Watch the status bar; in `acceptEdits` you review the result with `git diff`, not inline.
 </details>
 
 <details>
 <summary>✅ Solution</summary>
-
-**Manual mode:** ~5 prompts (one per function edit). Safe but tedious.
-
-**Semi-Auto mode:** ~1 prompt. Much faster for low-risk, repetitive tasks.
-
-**Conclusion:** For low-risk tasks like adding logging, Semi-Auto is the right tool.
+`default` prompts once per `Edit`. `acceptEdits` auto-approves edits inside the working
+directory, so the run is silent; `git diff src/math.js` is your review step.
 </details>
 
----
+### Exercise 2: Pick the mode
 
-### Exercise 2: Risk Assessment Practice
-
-**Goal:** Train your intuition for matching tasks to automation levels.
-
-For each task, decide: Manual, Semi-Auto, or Full Auto?
-
-1. Run Prettier on entire codebase (150 files)
-2. Modify database migration file
-3. Add new API endpoint (following existing pattern)
-4. Update authentication logic
-5. Generate unit tests for pure utility functions
-
-<details>
-<summary>💡 Hint</summary>
-
-Consider: Is it reversible? What's the blast radius? How well-defined is the task?
-</details>
+**Goal**: Train the matrix. For each task, pick a mode and one rule.
+1. Prettier on 150 files. 2. Edit a DB migration. 3. New endpoint following an existing pattern.
+4. Change auth logic. 5. Generate tests for pure functions.
 
 <details>
 <summary>✅ Solution</summary>
 
-| Task | Level | Reason |
-|------|-------|--------|
-| Prettier on 150 files | Semi-Auto or Full Auto | Low risk, reversible, high volume |
-| Database migration | **Manual** | High risk, mistakes are costly |
-| Add API endpoint | Semi-Auto | Medium risk, follows pattern |
-| Auth logic | Manual | High risk, security implications |
-| Generate unit tests | Semi-Auto or Full Auto | Low risk, tests don't change production code |
+| Task | Mode | Extra guardrail |
+|---|---|---|
+| Prettier | `acceptEdits` | `git diff --stat` after |
+| Migration | `default` | `"deny": ["Edit(./migrations/**)"]` until reviewed |
+| Endpoint | `acceptEdits` | `plan` first if the pattern is unclear |
+| Auth | `default` | `"deny": ["Read(./.env)"]` |
+| Tests | `auto` | Stop hook running `npm test` (Module 11.3) |
 </details>
 
 ---
 
 ## 5. CHEAT SHEET
 
-### Quick Decision Guide
-
-| Question | If YES → | If NO → |
-|----------|----------|---------|
-| Is this reversible with `git checkout`? | Semi-Auto OK | Manual |
-| Do I understand exactly what Claude will do? | Increase automation | Manual |
-| Is this sandboxed/disposable branch? | Full Auto OK | Be cautious |
-| Am I learning this codebase? | Manual | Semi-Auto OK |
-| Does this touch auth/payments/DB schema? | Manual | — |
-
-### Permission Prompt Shortcuts ⚠️
-
-| Key | Action |
-|-----|--------|
-| `y` | Allow once |
-| `a` | Allow for session |
-| `n` | Deny |
-
-⚠️ *Key bindings need verification in current Claude Code version.*
-
-### Level Selection Quick Reference
-
-| Scenario | Level |
-|----------|-------|
-| First time on this project | Manual |
-| Adding tests to 20 functions | Semi-Auto |
-| Refactoring database layer | Manual |
-| Formatting before commit | Semi-Auto |
-| CI/CD documentation | Full Auto |
+| Command / Feature | Description | Example |
+|---|---|---|
+| `Shift+Tab` | Cycle mode in-session | `default` → `acceptEdits` → `plan` → `auto` |
+| `--permission-mode <mode>` | Start in a mode; works with `-p` | `claude --permission-mode plan` |
+| `permissions.defaultMode` | Default per machine/project/org | `{"permissions": {"defaultMode": "acceptEdits"}}` |
+| `/permissions` | View/edit allow, ask, deny rules | rules evaluate deny → ask → allow |
+| `/plan` | Plan mode for one prompt | `/plan refactor the parser` |
+| `--dangerously-skip-permissions` | = `--permission-mode bypassPermissions` | sandbox/container only |
+| `disableBypassPermissionsMode` | Managed off switch | `"disable"` |
+| Prompt keys | `1`/`Enter` Yes · `2` session/rule · `Esc` cancel · `Tab` add a comment | — |
 
 ---
 
@@ -270,32 +285,31 @@ Consider: Is it reversible? What's the blast radius? How well-defined is the tas
 
 | ❌ Mistake | ✅ Correct Approach |
 |---|---|
-| Full Auto on unfamiliar codebase | Start Manual, graduate to Semi-Auto as you learn |
-| Manual mode for 100-file refactor | Semi-Auto with "Allow for session" — review final diff instead |
-| "Allow always" for everything | Be selective. Safe for reads/tests, not for writes to critical paths |
-| Full Auto without planning first | Use Think+Plan (Module 6.3) first, THEN consider Full Auto |
-| Same automation level for all tasks | Match level to risk. Format code = Semi-Auto. Auth changes = Manual |
-| Full Auto in production environments | Full Auto belongs in sandboxes and CI/CD, not production changes |
+| Teaching or expecting a `[y]/[a]/[n]` prompt | It doesn't exist. Prompts are numbered options; `Esc` cancels, `Tab` adds a note |
+| `bypassPermissions` on your laptop | Only inside a sandbox/container; deny rules still hold, nothing else does |
+| Treating `auto` as "totally safe" | It reduces prompts; it is not a substitute for review on sensitive changes |
+| `defaultMode: "auto"` in `.claude/settings.json` | Ignored there — put it in `~/.claude/settings.json` or managed settings |
+| Boundaries stated only in the prompt | The classifier reads them but compaction can drop them; add a `permissions.deny` rule |
+| Same mode for every task | Use the matrix: familiarity and blast radius, not habit |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
-**Scenario:** Vietnamese team onboarding to microservices codebase (15 services, shared libraries, internal RPC).
+**Scenario**: A Vietnamese team onboarding onto a 15-service backend with shared libraries and
+internal RPC.
 
-**Week 1 - Manual Mode:** Every action required approval. Slow, but caught misunderstandings and built trust.
+**Problem**: Week 1 in `default` was slow but caught misunderstandings. By week 2 the team had
+moved to `acceptEdits` for repetitive work and CI docs ran headless with `--permission-mode
+acceptEdits` in a container. Then a developer ran a schema change in `auto` with a vague prompt:
+"Add user preferences table". Claude guessed the column types; the migration failed in staging.
 
-**Week 2 - Semi-Auto Mode:** "Allow for session" for repetitive tasks. Velocity increased 3x.
+**Solution**: The team rule became the matrix. Unfamiliar + high-risk → `default`, with
+`"deny": ["Edit(./migrations/**)"]` until a human reviews. Familiar + low-risk → `acceptEdits`.
+`bypassPermissions` only in the CI container. The migration was redone in `plan` mode, plan
+approved, then executed with `acceptEdits`.
 
-**Week 3 - Full Auto in CI/CD:** Auto-generate API docs on every merge in sandboxed containers.
-
-**The Mistake:** Developer used Full Auto on database migration with vague prompt: "Add user preferences table." Claude made wrong assumptions about column types. Migration failed in staging.
-
-**The Fix:** Reverted to Manual, wrote detailed plan using Think mode, then re-ran with Semi-Auto. Succeeded.
-
-**Lesson:** Team rule: Manual for unfamiliar + high-risk, Semi-Auto for familiar + medium-risk, Full Auto only for planned + sandboxed.
-
-**Result:** After 2 months, velocity increased 40% with zero production incidents from automation mismatches.
+**Result**: No further staging incidents from automation mismatches in the following two months.
 
 ---
 
