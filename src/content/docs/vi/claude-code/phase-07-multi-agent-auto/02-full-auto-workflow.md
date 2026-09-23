@@ -1,317 +1,328 @@
 ---
-title: 'Quy Trình Full Auto'
-description: 'Thiết lập và vận hành quy trình full auto coding với Claude Code cho các task end-to-end.'
+title: 'Full Auto Workflow'
+description: 'Chạy task tự động dài mà an toàn: dựng ranh giới bằng deny rule, hook, worktree và --max-turns; ngắt bằng Esc; quay lại checkpoint bằng /rewind; verify bằng check Claude tự chạy được.'
+verified: 2026-09-22
+claude_version: 2.1.278
 ---
 
-# Module 7.2: Quy Trình Full Auto
+# Module 7.2: Full Auto Workflow
 
-> **Thời gian học**: ~35 phút
+> **Thời gian ước tính**: ~35 phút
 >
-> **Yêu cầu trước**: Module 7.1 (Các Cấp Độ Auto Coding), Module 6.3 (Think+Plan Combo)
+> **Điều kiện tiên quyết**: Module 7.1 (Các mức Auto Coding), Module 6.3 (Think+Plan Combo)
 >
-> **Kết quả**: Sau module này, bạn sẽ có workflow đầy đủ cho Full Auto mode an toàn — từ pre-flight check đến post-execution verify. Biết chính xác khi nào Full Auto phù hợp và cách set guardrail.
+> **Kết quả**: Sau module này, bạn chạy được một task hands-off qua
+> **PREPARE → EXECUTE → MONITOR → VERIFY** với ranh giới do Claude Code *cưỡng chế*
+> (`permissions.deny`, hook, `--worktree`, `--max-turns`), và khôi phục bằng `Esc` và `/rewind`.
 
 ---
 
-## 1. WHY — Tại Sao Cần Workflow
+## 1. WHY — Tại sao quan trọng
 
-Nghe Full Auto mạnh nhưng nguy hiểm. Phần lớn dev rơi vào 2 cực: hoặc tránh hoàn toàn vì sợ (miss toàn bộ productivity boost), hoặc dùng bừa rồi gây damage (overwrite logic, break dependency). Không có middle ground vì chưa ai dạy WORKFLOW cụ thể.
+Cách cũ để giữ Claude tránh xa `src/legacy/` là một câu trong prompt: "please don't touch X".
+Đó là lời nhờ, không phải ranh giới. Trang permissions nói thẳng: *"Instructions in your prompt
+or `CLAUDE.md` shape what Claude tries to do, but they don't change what Claude Code allows."*
 
-Full Auto không phải cái nút bấm xong ngồi uống cà phê. Nó là một **protocol đầy đủ** — như phi công commercial. Phi công có autopilot nhưng vẫn phải làm pre-flight checklist, monitor instrument, verify landing. Skip một step = crash. Full Auto cũng thế — nếu không có workflow, bạn đang ngồi trên time bomb.
+Full auto là một quy trình, không phải một cờ. Bốn pha bên dưới vẫn như trước; điều thay đổi là
+mỗi ranh giới giờ có cơ chế đứng sau.
 
 ---
 
-## 2. CONCEPT — Bốn Pha Full Auto
-
-Full Auto workflow gồm 4 phase tuần tự. Skip phase nào cũng tăng risk. Đây không phải "best practice" — đây là **minimum viable safety protocol**.
+## 2. CONCEPT — Ý tưởng cốt lõi
 
 ```mermaid
 graph LR
-    A[1. CHUẨN BỊ] --> B[2. THỰC THI]
-    B --> C[3. GIÁM SÁT]
-    C --> D[4. XÁC MINH]
-    D -->|Có vấn đề| A
-    D -->|Thành công| E[Xong]
+    A["1. PREPARE<br/>spec + ranh giới cưỡng chế"] --> B["2. EXECUTE<br/>acceptEdits / auto trong worktree"]
+    B --> C["3. MONITOR<br/>Esc · /rewind"]
+    C --> D["4. VERIFY<br/>check Claude tự chạy được"]
+    D -->|fail| A
+    D -->|pass| E[Merge]
 ```
 
-### Phase 1: CHUẨN BỊ (Critical Phase)
+### PREPARE — spec và hàng rào
 
-Đây là phase quyết định 80% success rate.
+Lời khuyên của Anthropic cho feature lớn: *"have Claude interview you first"* (để Claude phỏng
+vấn bạn trước) bằng tool `AskUserQuestion`, ghi kết quả ra `SPEC.md`, rồi *"start a fresh session
+to execute it"*. *"Time spent making the spec precise pays off more than time spent watching the
+implementation."* — thời gian làm spec chính xác sinh lời hơn thời gian ngồi canh. (S1)
 
-- **Think+Plan trước** (Module 6.3) — KHÔNG BAO GIỜ Full Auto mà không có plan. Plan không cần perfect, nhưng phải rõ: input/output là gì, boundary là gì, success criteria là gì.
-- **Safety net**: `git checkout -b feature/auto-experiment` — LUÔN LUÔN branch mới. Full Auto làm việc trên main branch = Russian roulette.
-- **Define boundary**: file/directory nào được phép touch, cái nào forbidden. Ví dụ: "Only touch `src/services/*.ts`, DO NOT modify `src/config/` or `package.json`".
+Rồi rào lượt chạy bằng những thứ Claude Code cưỡng chế:
 
-### Phase 2: THỰC THI
+| Ranh giới | Cơ chế | Ai cưỡng chế |
+|---|---|---|
+| Đường dẫn Claude không được sửa | `"permissions": {"deny": ["Edit(./src/legacy/**)"]}` | Claude Code, mọi mode kể cả `bypassPermissions` |
+| Lệnh cần logic riêng | `PreToolUse` hook, exit 2 ([Module 11.3](../../phase-11-automation-headless/03-hooks-system/)) | Chạy trước bước kiểm tra permission |
+| Working tree của bạn | `claude --worktree <name>` → `.claude/worktrees/<name>` | Checkout riêng, branch riêng |
+| Loop chạy hoài (headless) | `--max-turns N` — "Exits with an error when the limit is reached" | Chỉ print mode |
+| Chi phí (headless) | `--max-budget-usd` | Chỉ print mode |
 
-- **Prompt rõ ràng reference plan**: "Follow the plan in CLAUDE.md Phase 3. Generate unit tests for all functions in `src/services/`. Stop after 5 files and wait for checkpoint."
-- **Stop condition + checkpoint**: Không để chạy end-to-end 100 file. Chia batch. Sau mỗi batch, verify trước khi tiếp.
+Deny `Bash(git push *)` chặn `git push origin main` nhưng không chặn `git -C . push` — muốn cưỡng
+chế không phụ thuộc chuỗi lệnh thì dùng sandbox (Module 2.3).
 
-### Phase 3: GIÁM SÁT
+### EXECUTE
 
-Full Auto ≠ unattended. Bạn vẫn phải watch output realtime.
+`acceptEdits` cho edit bạn sẽ xem lại bằng `git diff`; `auto` khi lượt chạy dài và việc giảm
+prompt của classifier đáng giá. Không bao giờ `bypassPermissions` ngoài container.
 
-- **Look for**: file access lạ (sao nó đọc `.env`?), error pattern, scope creep (sao nó sửa file ngoài boundary?)
-- **Esc sẵn sàng**: Nếu thấy đi sai hướng, nhấn **Esc** để ngắt ngay — session và context vẫn giữ nguyên. Đừng để chạy hết rồi mới rollback — waste token + time.
+### MONITOR
 
-### Phase 4: XÁC MINH
+- **`Esc`** ngắt lượt hiện tại; session và context vẫn còn. (`Ctrl+C` hai lần là *thoát*.)
+- **`/rewind`**, hoặc `Esc` `Esc` khi ô nhập trống, mở menu checkpoint: khôi phục code, hội
+  thoại, hoặc cả hai, theo từng prompt bạn đã gửi. Claude Code giữ snapshot cho **100 checkpoint
+  gần nhất**; tin nhắn bạn xếp hàng giữa lượt nhập vào lượt đó và không có checkpoint riêng.
+- Giới hạn (S15): *"Checkpointing does not track files modified by Bash commands"* — checkpoint
+  không theo dõi file bị `rm`, `mv`, `cp` qua Bash, và edit do subagent làm cũng không khôi phục
+  được — dùng git cho những trường hợp đó.
 
-Sau khi Full Auto claim "Done", verify TRƯỚC KHI merge:
+### VERIFY
 
-- **`git diff`**: scan toàn bộ change — có file nào lạ không?
-- **Run test**: `npm test` hoặc `cargo test` — CI có pass không?
-- **Verify vs plan**: output có match với plan ban đầu không?
+*"Give Claude a check it can run: tests, a build, a screenshot to compare."* — đưa cho Claude một
+phép kiểm tra nó tự chạy được. (S1) Rồi xác nhận hàng rào còn nguyên:
+`git diff --stat -- <đường cấm>` phải không in gì.
 
-Nếu fail → quay lại Phase 1, adjust plan, retry.
+> `(S1)`, `(S15)`: `docs/references/anthropic-sources.md`.
 
 ---
 
-### Full Auto Eligibility Checklist
+## 3. DEMO — Từng bước
 
-Task có ĐỦ 5 điều kiện này mới nên dùng Full Auto:
+Chạy trong `~/cc-lab`. Task: thêm `subtract` vào `src/math.js` kèm test, không đụng
+`src/legacy/`.
 
-- ✅ **Repetitive**: 10+ item giống nhau (e.g., generate test cho 50 function)
-- ✅ **Well-defined**: input/output rõ ràng, không ambiguous
-- ✅ **Isolated**: không touch critical infrastructure (auth, payment, config)
-- ✅ **Reversible**: có git branch, dễ rollback
-- ✅ **Verifiable**: có cách test objective (unit test, build pass, lint clean)
+**Bước 1: PREPARE — spec trước (tương tác)**
 
-Thiếu 1/5 → xuống Assisted mode (Module 7.1).
-
----
-
-## 3. DEMO — Generate Unit Test Cho Cả Service Layer
-
-**Task**: Generate unit test cho `src/services/` — 15 file TypeScript, ~50 function. Manual estimate: 2-3 tiếng. Target: 15 phút với Full Auto.
-
----
-
-**Step 1: CHUẨN BỊ**
-
-Tạo safety net:
-```bash
-$ git checkout -b feature/auto-generate-tests
-```
-
-Chạy Think+Plan:
-```bash
-$ claude
-You: "I want to generate unit tests for all functions in src/services/.
-Use Jest, 80% coverage minimum, mock external dependencies."
-
-Claude: [Think mode] Analyzing 15 files...
-Plan:
-1. Scan src/services/*.ts
-2. For each function: generate test file in __tests__/
-3. Use jest.mock() for DB/API calls
-4. Run npm test after each batch (5 files/batch)
-```
-
-Compact context để tránh bloat:
-```bash
-/compact
-```
-
-Define boundary trong CLAUDE.md:
-```markdown
-## Full Auto Boundary
-ALLOWED: Create/modify files in src/services/__tests__/
-FORBIDDEN: Modify src/services/*.ts (source files), package.json, jest.config.js
-```
-
----
-
-**Step 2: THỰC THI**
-
-Prompt với reference plan + checkpoint:
-```bash
-You: "Follow the plan above. Generate tests for FIRST 5 FILES in src/services/,
-then STOP and show summary. Do NOT proceed to next batch until I confirm."
-
-Claude: [Full Auto] Starting batch 1/3...
-✓ Created src/services/__tests__/user.service.test.ts (12 tests)
-✓ Created src/services/__tests__/order.service.test.ts (8 tests)
-...
-Summary: 5 files, 47 tests, 0 errors. Ready for checkpoint.
-```
-
----
-
-**Step 3: GIÁM SÁT**
-
-Trong lúc Claude chạy, watch output:
 ```text
-Creating src/services/__tests__/user.service.test.ts  ← OK
-Reading src/config/database.ts                         ← Warning! Out of boundary?
-  (context: need DB schema for mock)                   ← OK, read-only
-Creating src/services/user.service.ts                  ← RED FLAG! Modifying source!
+I want to add a subtract function to src/math.js. Interview me in detail using the
+AskUserQuestion tool. Keep interviewing until we've covered everything, then write a complete
+spec to SPEC.md.
 ```
 
-Nếu thấy dòng cuối → nhấn **Esc** ngay để ngắt turn. Trong case này, Claude chỉ read config (OK), không modify source.
+Trả lời các câu hỏi, đọc lại `SPEC.md`, rồi rời session này — lượt thực thi bắt đầu mới.
 
----
+**Bước 2: PREPARE — hàng rào Claude Code cưỡng chế**
 
-**Step 4: XÁC MINH**
-
-Check git diff:
 ```bash
-$ git diff --stat
-src/services/__tests__/user.service.test.ts    | 89 +++++++++++
-src/services/__tests__/order.service.test.ts   | 67 ++++++++
-...
-5 files changed, 312 insertions(+)
+# docs: permissions#read-and-edit
+mkdir -p src/legacy && printf 'export function old(x) { return x; }\n' > src/legacy/old.js
+mkdir -p .claude && cat > .claude/settings.json << 'EOF'
+{
+  "permissions": {
+    "deny": ["Edit(./src/legacy/**)"]
+  }
+}
+EOF
 ```
 
-Verify: chỉ file trong `__tests__/`, không có file khác → ✅
+Chứng minh nó. Cố tình yêu cầu vi phạm:
 
-Run test:
 ```bash
-$ npm test
-PASS src/services/__tests__/user.service.test.ts
-PASS src/services/__tests__/order.service.test.ts
-...
-Tests: 47 passed, 47 total
-Coverage: 83.2% (target: 80%)
+claude -p "Rename the function in src/legacy/old.js to legacyOld" --permission-mode acceptEdits
+git diff --stat src/legacy
 ```
 
-✅ Pass. Confirm tiếp batch 2.
+```text
+# Output may vary
+I can't make this edit — `src/legacy/` is blocked by your permission settings (the Edit tool was denied on that directory).
+…
+If you want me to apply it, either allow edits to `src/legacy/` in your settings (or `.claude/settings.local.json`), or make the one-line change yourself.
+```
+
+`git diff --stat src/legacy` không in gì. `acceptEdits` tự duyệt edit, nhưng deny rule vẫn
+thắng.
+
+**Bước 3: EXECUTE — trong worktree, ở Level 2**
+
+```bash
+# docs: cli-reference --worktree · common-workflows#run-parallel-sessions-with-worktrees
+claude --worktree auto-demo --permission-mode acceptEdits -p "Add a subtract(a, b) function to src/math.js and a test for it in tests/math.test.mjs, then run npm test and report the result."
+git worktree list
+```
+
+```text
+# Output may vary
+Done. Followed red → green:
+
+- `src/math.js:2` — added `export function subtract(a, b) { return a - b; }`
+- `tests/math.test.mjs:5` — added `test('subtract', () => assert.equal(subtract(5, 3), 2))`
+
+**Result of `npm test`:** 2 tests, 2 pass, 0 fail (`add` and `subtract`). …
+
+Changes are uncommitted in the `auto-demo` worktree.
+/Users/luatnq/cc-lab                              90c242f [main]
+/Users/luatnq/cc-lab/.claude/worktrees/auto-demo  90c242f [worktree-auto-demo] locked
+```
+
+Vì sao: lượt chạy diễn ra trên branch `worktree-auto-demo` trong một checkout riêng. Cây `main`
+của bạn không bị đụng — `git diff --stat src/math.js` trong `~/cc-lab` không in gì.
+
+**Bước 4: MONITOR — ngắt và rewind**
+
+Mở session tương tác, tạo một edit, rồi mở menu checkpoint:
+
+```bash
+# docs: checkpointing#rewind-and-summarize
+claude --permission-mode acceptEdits
+```
+
+```text
+Add a multiply(a, b) function to src/math.js without running any commands
+/rewind
+```
+
+```text
+# Output may vary
+   Rewind
+   Restore the code and/or conversation to the point before…
+   ❯ Add a multiply(a, b) function to src/math.js without running any commands
+     math.js +1
+     (current)
+   Enter to continue · Esc to cancel
+```
+
+Chọn prompt, rồi chọn hành động:
+
+```text
+# Output may vary
+   The conversation will be unchanged.
+   The code will be restored -1 in math.js.
+     1. Restore code and conversation
+     2. Restore conversation
+   ❯ 3. Restore code
+     4. Summarize from here
+   ↓ 5. Summarize up to here
+   ⚠ Rewinding does not affect files edited manually or via bash.
+```
+
+Sau **Restore code**, `git diff src/math.js` trống. Nếu một lượt đang đi sai *ngay lúc* chạy,
+bấm `Esc` trước — Claude trả lời `Interrupted · What should Claude do instead?` và chờ.
+
+**Bước 5: VERIFY — check Claude tự chạy được, cộng hàng rào**
+
+```bash
+# docs: best-practices — "Give Claude a check it can run"
+(cd .claude/worktrees/auto-demo && npm test 2>&1 | grep -E '^# (pass|fail)')
+git -C .claude/worktrees/auto-demo diff --stat
+git -C .claude/worktrees/auto-demo diff --stat -- src/legacy/
+```
+
+```text
+# Output may vary
+# pass 2
+# fail 0
+ src/math.js         | 1 +
+ tests/math.test.mjs | 3 ++-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
+```
+
+Lệnh cuối không in gì — đường cấm sạch. Merge branch, rồi dọn dẹp:
+`git worktree remove .claude/worktrees/auto-demo && git branch -D worktree-auto-demo`,
+`rm -rf src/legacy .claude/settings.json`.
 
 ---
 
-**Result**:
-3 batch x 5 phút = 15 phút total. Coverage 83%, zero manual test viết. So với 2-3 tiếng manual → tiết kiệm 90% time.
+## 4. PRACTICE — Tự thực hành
 
----
+### Bài 1: Rào rồi thử phá
 
-## 4. PRACTICE — Thử Workflow Của Bạn
-
-### Bài 1: Pre-Flight Checklist Của Riêng Bạn
-**Mục tiêu**: Tạo checklist cụ thể cho project/tech stack của bạn
+**Mục tiêu**: Viết một deny rule và một `PreToolUse` hook, xem cả hai giữ vững dưới
+`acceptEdits`.
 **Hướng dẫn**:
-1. Pick một task lặp trong codebase (e.g., add TypeScript type cho 20 function, generate API doc cho 10 endpoint)
-2. Viết plan (Think+Plan hoặc manual)
-3. Define boundary (file nào OK, file nào forbidden)
-4. Execute Full Auto với checkpoint
-5. Post-mortem: ghi lại điều gì work, điều gì không
+1. Deny `Edit(./package.json)` trong `.claude/settings.json`.
+2. Thêm `PreToolUse` hook (matcher `Bash`) exit 2 khi lệnh chứa `git push`.
+3. Chạy `claude -p "Bump the version in package.json and push" --permission-mode acceptEdits`.
 
-**Kết quả mong đợi**: Một checklist 5-7 item bạn sẽ dùng cho mọi Full Auto session sau này.
+**Kết quả mong đợi**: edit bị deny rule từ chối; push bị hook từ chối.
 
 <details>
 <summary>💡 Gợi ý</summary>
-Checklist nên include: git branch check, /compact, boundary trong CLAUDE.md, stop condition trong prompt, verify command (test/build).
+Stdin của hook là JSON; đọc `.tool_input.command` bằng `jq`. Module 11.3 có cấu trúc chính xác.
 </details>
 
 <details>
-<summary>✅ Giải pháp mẫu</summary>
+<summary>✅ Lời giải</summary>
 
-```markdown
-## My Full Auto Checklist
-- [ ] git checkout -b auto/[task-name]
-- [ ] /compact (if context > 50k tokens)
-- [ ] Write boundary in CLAUDE.md
-- [ ] Prompt includes: plan reference + stop condition
-- [ ] Watch output for out-of-boundary access
-- [ ] git diff + npm test before merge
+```json
+{
+  "permissions": { "deny": ["Edit(./package.json)"] },
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Bash",
+        "hooks": [ { "type": "command",
+          "command": "jq -e '.tool_input.command | test(\"git push\") | not' > /dev/null || { echo 'push blocked' >&2; exit 2; }" } ] }
+    ]
+  }
+}
 ```
+
+Claude báo cả hai lần từ chối; `git log origin/main` không có push mới.
 </details>
 
----
+### Bài 2: Lượt headless có giới hạn
 
-### Bài 2: Boundary Testing
-**Mục tiêu**: Verify Claude có respect boundary không
-**Hướng dẫn**:
-1. Tạo fake project với `src/` (allowed) và `config/` (forbidden)
-2. Prompt: "Add logger to all files in src/, DO NOT touch config/"
-3. Sau khi execute, check `git diff` — có file trong `config/` bị modify không?
-
-**Kết quả mong đợi**: Không có file nào trong `config/` thay đổi. Nếu có → cần rõ ràng hơn trong prompt.
+**Mục tiêu**: Dùng `--max-turns` làm hàng rào chống chạy hoài.
+**Hướng dẫn**: chạy `claude -p "Make npm test pass" --permission-mode acceptEdits --max-turns 3`
+với một test cố tình fail. Quan sát lúc chạm giới hạn thì thoát. Module 7.4 sẽ đọc JSON kết quả
+của lượt này.
 
 <details>
-<summary>✅ Giải pháp</summary>
-Nếu Claude vẫn touch `config/`, thử prompt: "HARD RULE: You are FORBIDDEN to write/modify any file in config/. Only READ is allowed. Confirm you understand before starting."
+<summary>✅ Lời giải</summary>
+`--max-turns` chỉ có ở print mode và "Exits with an error when the limit is reached". Nâng giới
+hạn hoặc thu hẹp task; không bao giờ xoá test để cho pass.
 </details>
 
 ---
 
 ## 5. CHEAT SHEET
 
-### Pre-Flight Checklist
-| Step | Command/Action |
-|------|----------------|
-| Safety net | `git checkout -b auto/experiment` |
-| Context prep | `/compact` nếu > 50k token |
-| Define boundary | Ghi rõ trong CLAUDE.md hoặc prompt |
-| Plan | Think+Plan hoặc manual plan |
-
-### Prompt Template
-```text
-Follow this plan: [link/summary]
-Scope: [boundary - file/directory allowed]
-Stop condition: After [N items/files], show summary and WAIT
-FORBIDDEN: [critical files/dirs]
-```
-
-### Emergency Stop
-| Trigger | Action |
-|---------|--------|
-| Out-of-boundary access | Nhấn **Esc** ngay |
-| Unexpected error pattern | Nhấn **Esc**, review plan |
-| Scope creep | Nhấn **Esc**, clarify boundary |
-
-### Post-Execution Checklist
-- [ ] `git diff --stat` — check file list
-- [ ] `git diff` — scan actual change
-- [ ] Run test (`npm test`, `cargo test`, etc.)
-- [ ] Verify output vs plan
-- [ ] If pass → merge; if fail → `git reset --hard`, adjust plan
+| Pha | Lệnh / Tính năng | Mô tả |
+|---|---|---|
+| PREPARE | Interview → `SPEC.md` → session mới | Spec chính xác hơn ngồi canh (S1) |
+| PREPARE | `"deny": ["Edit(./path/**)"]` | Hàng rào cứng, mọi mode |
+| PREPARE | `PreToolUse` hook, exit 2 | Kiểm tra chuỗi lệnh theo ý bạn (11.3) |
+| PREPARE | `claude --worktree <name>` | Checkout cô lập tại `.claude/worktrees/<name>` |
+| PREPARE | `--max-turns N`, `--max-budget-usd X` | Trần cho headless |
+| EXECUTE | `--permission-mode acceptEdits` / `auto` | Level 2; `bypassPermissions` = chỉ container |
+| MONITOR | `Esc` | Ngắt lượt, giữ session |
+| MONITOR | `/rewind` (`Esc` `Esc`) | Khôi phục code / hội thoại / cả hai; tóm tắt |
+| VERIFY | `npm test`, build, screenshot | "a check it can run" |
+| VERIFY | `git diff --stat -- <đường cấm>` | Phải trống |
 
 ---
 
-## 6. PITFALLS — Lỗi Thường Gặp
+## 6. PITFALLS — Lỗi thường gặp
 
-| ❌ Sai lầm | ✅ Đúng cách |
+| ❌ Sai lầm | ✅ Cách đúng |
 |---|---|
-| Full Auto không plan, không boundary | Luôn Think+Plan + define boundary trước |
-| Chạy trên `main` branch trực tiếp | `git checkout -b` — LUÔN LUÔN dùng branch riêng |
-| Để Full Auto chạy 100 item một lúc | Chia batch 5-10 item, checkpoint giữa batch |
-| Không watch output, đi uống cà phê | Full Auto ≠ unattended. Phải monitor realtime |
-| `git diff` sau khi merge rồi | Verify TRƯỚC KHI merge. Rollback sau merge = nightmare |
-| Không test — tin Claude claim "Done" | LUÔN run test/build. AI hallucinate "success" |
-| Dùng Full Auto cho critical infra (auth, payment) | Critical code = Manual hoặc Assisted. Không bao giờ Full Auto |
+| "Do NOT modify src/legacy" trong prompt | `permissions.deny` — prompt chỉ là lời khuyên |
+| Với tay bấm `Ctrl+C` giữa lượt | `Esc` tạm ngừng lượt và giữ session; `Ctrl+C` ×2 là thoát |
+| Tin `/rewind` sau khi `rm`/`mv` trong Bash | Checkpoint chỉ theo dõi edit của file tool; dùng git |
+| Chạy trên checkout chính | `--worktree` — cây của bạn sạch, review branch |
+| Headless `-p` không có cờ permission | Ghi file bị deny; truyền `--permission-mode acceptEdits` hoặc `--allowedTools` |
+| Bỏ đi không có check | Đưa Claude test/build để chạy; verify hàng rào bằng `git diff` |
+| Bỏ qua spec | Interview → `SPEC.md` → session mới |
 
 ---
 
-## 7. REAL CASE — Migration TypeScript Cho Legacy Codebase
+## 7. REAL CASE — Câu chuyện thực tế
 
-**Scenario**: Startup Việt Nam (fintech) cần migrate legacy JavaScript sang TypeScript. 200+ file, không có type, không có test. Deadline: 2 tuần.
+**Bối cảnh**: Một startup Việt Nam phải migrate 200+ file sang TypeScript trong hai tuần.
 
-**Lần thử 1 (Sai lầm)**:
-Dev nghe "Full Auto mạnh" → prompt: "Convert all .js to .ts, add types". Không plan, không boundary, chạy luôn trên `develop` branch.
+**Vấn đề**: Lần 1 là một prompt duy nhất — "Convert the entire codebase to TypeScript" — không
+spec, không rào, chạy trên checkout chính. Vỡ 50+ import và build mobile; bốn giờ sau phải reset
+branch.
 
-**Kết quả**:
-- 4 giờ sau, 150 file converted
-- Build break — 50+ import path sai (`.js` → `.ts`)
-- Type inference sai ở async function → runtime bug
-- Rollback mất 4 giờ untangle từng commit
+**Giải pháp**: Lần 2 theo đúng quy trình.
+- **PREPARE**: Claude phỏng vấn lead và viết `SPEC.md` với sáu batch
+  (utils → services → routes → components → pages → config). `.claude/settings.json` deny
+  `Edit(./src/services/**)` cho batch 1; mỗi batch chạy trong `--worktree` riêng.
+- **EXECUTE**: `--permission-mode acceptEdits`, mỗi session một batch.
+- **MONITOR**: Ở batch 1 Claude định "sửa" một import trong `src/services/`; deny rule từ chối.
+  Lead bấm `Esc`, siết lại spec, rồi tiếp tục.
+- **VERIFY**: `tsc --noEmit`, test, và `git diff --stat -- src/services/` (trống) trước khi merge.
 
-**Lần thử 2 (Đúng workflow)**:
-1. **CHUẨN BỊ**:
-   - Think+Plan: chia 6 batch theo module (user, order, payment, admin, report, util)
-   - Branch: `git checkout -b feature/typescript-migration`
-   - Boundary: mỗi batch chỉ touch 1 module
-2. **THỰC THI**:
-   - Batch 1 (user module, 30 file) → checkpoint
-   - Verify → commit
-   - Batch 2...
-3. **GIÁM SÁT**: Watch import path, type error
-4. **XÁC MINH**: `tsc --noEmit` + `npm test` sau mỗi batch
-
-**Kết quả**:
-- 6 batch x 1 giờ = 6 giờ total
-- Zero rollback
-- 95% type coverage
-- Quote từ lead: "Full Auto tiết kiệm 1 tuần công, nhưng chỉ vì chúng tôi follow đúng workflow. Lần đầu fail vì nghĩ nó là magic button."
+**Kết quả**: Cả sáu batch merge trong một tuần, không rollback, và team giữ bộ deny rule theo
+batch làm template migration chuẩn.
 
 ---
 
-> **Tiếp theo**: [Module 7.3: Kiến Trúc Multi-Agent](../03-multi-agent-architecture/) →
+> **Tiếp theo**: [Module 7.3: Kiến trúc Multi-Agent](../03-multi-agent-architecture/) →
