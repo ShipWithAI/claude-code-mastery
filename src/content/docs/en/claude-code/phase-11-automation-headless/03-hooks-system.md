@@ -1,438 +1,512 @@
 ---
 title: 'Hooks System'
-description: 'Implement Claude Code hooks for custom pre/post-action workflows, validation, and automation triggers.'
+description: 'Configure PreToolUse, PostToolUse and Stop hooks in settings.json to log, block and gate Claude Code actions deterministically.'
+verified: 2026-09-22
+claude_version: 2.1.278
 ---
 
 # Module 11.3: Hooks System
 
 > **Estimated time**: ~30 minutes
 >
-> **Prerequisite**: Module 11.2 (SDK Integration)
+> **Prerequisite**: Module 2.2 (Permission System)
 >
-> **Outcome**: After this module, you will understand the hooks concept, know common hook patterns, and be able to implement custom hooks for your workflows.
+> **Outcome**: After this module, you will be able to configure `PreToolUse`/`PostToolUse`/`Stop`
+> hooks in `settings.json`, read the JSON payload on stdin, and block or annotate an action with
+> exit code 2 / JSON output.
 
 ---
 
 ## 1. WHY — Why This Matters
 
-Claude Code writes files, runs commands, makes changes. You want to log every file change for compliance. You want to run linting before any file is saved. You want to get a Slack message when a big task finishes. You want to block any changes to production config files. Without hooks, you'd have to manually intercept or post-process everything. Hooks give you automatic interception points — your code runs at exactly the right moment, every time.
+Compliance wants a log of every file Claude touched. Security wants Claude never to open
+`.env`, whatever the prompt says. You want a ping when a long task ends. `CLAUDE.md` could
+hold all three — but Module 2.5 showed why that fails: **CLAUDE.md is advisory**.
+Anthropic is blunt: *"Use hooks for actions that must happen every time with zero exceptions"*
+(S1). The SDLC playbook: *"A skill is a control, though an advisory one"* … *"A hook is the
+deterministic layer behind it"* (S3).
+
+> `(S1)`/`(S3)`/`(S4)`: `docs/references/anthropic-sources.md`.
 
 ---
 
 ## 2. CONCEPT — Core Ideas
 
-### What Are Hooks?
+### Location
 
-**Hooks** are custom scripts or commands that run automatically at specific events during Claude Code's execution. Think of them as middleware, similar to Git hooks, React lifecycle methods, or Express.js middleware — your code intercepts the normal flow.
+A **hook** is a command Claude Code runs at a fixed point in its lifecycle. There is no
+dedicated hooks file: hooks are a `hooks` key in the Module 2.2 settings files —
+`~/.claude/settings.json` (you), `.claude/settings.json` (the repo, commit it),
+`.claude/settings.local.json` (you, this repo), managed settings. Precedence: managed >
+`--settings`/CLI flags > local > project > user; hook entries **merge**, never override.
 
-Two types:
-- **Pre-hooks**: Run BEFORE an action. Can block the action by exiting with non-zero code.
-- **Post-hooks**: Run AFTER an action. Used for logging, notifications, cleanup.
-
-### Hook Events ⚠️ Needs verification
-
-| Event | When | Use Case |
-|-------|------|----------|
-| `pre-file-write` | Before writing file | Lint check, validation, backup |
-| `post-file-write` | After writing file | Logging, notification, sync |
-| `pre-command` | Before running shell command | Safety validation, dry-run |
-| `post-command` | After command completes | Log result, alert on failure |
-| `pre-session` | Session starts | Environment setup, validation |
-| `post-session` | Session ends | Cleanup, summary report, notification |
-
-### Hook Configuration ⚠️ Needs verification
-
-Hooks are defined in `.claude/hooks.json` (or similar config file):
+### Shape
 
 ```json
 {
   "hooks": {
-    "pre-file-write": "./hooks/lint-check.sh",
-    "post-file-write": "./hooks/log-change.sh",
-    "post-session": "./hooks/notify-complete.sh"
+    "<Event>": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "/path/to/script.sh", "timeout": 30 }
+        ]
+      }
+    ]
   }
 }
 ```
 
-### Hook Script Interface
+**Matcher** (tool events match `tool_name`, case-sensitive): `"*"`, `""` or omitted = all;
+`Bash` or `Edit|Write` = exact names; anything else (`mcp__.*`) = unanchored JavaScript regex.
 
-Your hook script receives context:
-- **Arguments**: File path, action type, etc.
-- **Environment variables**: `CLAUDE_FILE_PATH`, `CLAUDE_ACTION`, `CLAUDE_SESSION_ID`
-- **stdin**: Sometimes JSON payload with full context
+**Types**: `command` (shell command), `http` (POST to a URL), `mcp_tool` (call a connected MCP
+tool), `prompt` (single-turn Claude decision), `agent` (subagent that can `Read`/`Grep` first;
+experimental). `timeout` is seconds: default 600 (`command`), 30 (`prompt`), 60 (`agent`).
 
-**Exit codes**:
-- Exit `0` = Success (allow action for pre-hooks)
-- Exit `1` = Failure (block action for pre-hooks)
-- Post-hooks typically don't block, but non-zero indicates error
+### Lifecycle
 
 ```mermaid
 graph LR
-    A[Claude Code Action] --> B{Pre-hook exists?}
-    B -->|Yes| C[Run pre-hook]
-    C --> D{Exit 0?}
-    D -->|Yes| E[Execute action]
-    D -->|No| F[Block action]
-    B -->|No| E
-    E --> G{Post-hook exists?}
-    G -->|Yes| H[Run post-hook]
-    G -->|No| I[Done]
-    H --> I
+    U[UserPromptSubmit] --> P[PreToolUse]
+    P -->|allow| T[tool runs]
+    P -->|deny / exit 2| X[blocked, reason to Claude]
+    T --> Q[PostToolUse]
+    Q --> P
+    Q --> S[Stop]
+    S -->|exit 2| P
+    S -->|exit 0| E[turn ends]
 ```
+
+Cadence: per session `SessionStart`/`SessionEnd`; per turn `UserPromptSubmit`/`Stop`; per tool
+call `PreToolUse`/`PostToolUse` (rest in the CHEAT SHEET).
+
+### Input
+
+One JSON object on **stdin** — never `$1`, never an env var. Common: `session_id`, `cwd`,
+`hook_event_name`, `permission_mode`, `transcript_path`. Tool events add `tool_name`,
+`tool_input`, `tool_use_id`; `PostToolUse` adds `tool_response`; `Stop` adds
+`stop_hook_active`, `last_assistant_message`. `tool_input.file_path` is always absolute.
+
+### Output
+
+- **exit 0** — continue; stdout is parsed as JSON if it starts with `{` and ends with `}`.
+- **exit 2** — block; stderr goes to Claude as the reason. The *only* code that blocks by
+  itself — exit 1 is non-blocking and the action proceeds.
+- **JSON** — `PreToolUse`: `{"hookSpecificOutput": {"hookEventName": "PreToolUse",
+  "permissionDecision": "deny|allow|ask", "permissionDecisionReason": "…"}}` (plus
+  `updatedInput`, `additionalContext`). `PostToolUse`/`Stop`: `{"decision": "block", "reason":
+  "…"}`. Universal: `continue: false` + `stopReason`, `systemMessage`.
+
+Hooks run *before* the permission check in every mode — a `deny` holds even under
+`--dangerously-skip-permissions` (sandbox-only). They tighten permissions, never loosen them.
 
 ---
 
 ## 3. DEMO — Step by Step
 
-**Scenario**: Set up hooks for a team workflow that logs all changes, validates linting, and sends Slack notifications on completion.
+Run in `~/cc-lab` (`src/math.js`, `tests/math.test.mjs`, `.env` with a fake key). Scripts need
+`jq` (`which jq`).
 
-**Step 1: Create hooks directory**
+**Step 1: `PostToolUse` audit log**
+
 ```bash
-mkdir -p .claude/hooks
+# docs: hooks#hook-locations · hooks#matcher-patterns
+cat .claude/settings.json
 ```
-Expected output:
+
 ```text
-# Directory created (no output if successful)
+# Output may vary
+cat: .claude/settings.json: No such file or directory
 ```
-Why: Centralized location for all hook scripts.
 
-**Step 2: Create logging hook (post-file-write)**
 ```bash
-cat > .claude/hooks/log-change.sh << 'EOF'
-#!/bin/bash
-# Post-file-write hook: Log every file change
-
-LOGFILE=".claude/changes.log"
-TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
-FILE_PATH="${1:-unknown}"
-
-echo "[$TIMESTAMP] WRITE: $FILE_PATH" >> "$LOGFILE"
-echo "Change logged: $FILE_PATH"
-exit 0
-EOF
-
-chmod +x .claude/hooks/log-change.sh
-```
-Expected output:
-```text
-# Script created and made executable
-```
-Why: Immutable audit trail of every file Claude Code touches.
-
-**Step 3: Create lint check hook (pre-file-write)**
-```bash
-cat > .claude/hooks/lint-check.sh << 'EOF'
-#!/bin/bash
-# Pre-file-write hook: Block if lint fails
-
-FILE_PATH="$1"
-
-# Only check JS/TS files
-if [[ "$FILE_PATH" =~ \.(js|ts|jsx|tsx)$ ]]; then
-  echo "Running lint check on $FILE_PATH..."
-  npx eslint "$FILE_PATH" --quiet
-
-  if [ $? -ne 0 ]; then
-    echo "❌ BLOCKED: Lint errors in $FILE_PATH"
-    exit 1  # Block the write
-  fi
-
-  echo "✅ Lint passed for $FILE_PATH"
-fi
-
-exit 0  # Allow write
-EOF
-
-chmod +x .claude/hooks/lint-check.sh
-```
-Expected output:
-```text
-# Script created and made executable
-```
-Why: Prevents Claude Code from writing code that violates your style rules.
-
-**Step 4: Create notification hook (post-session)**
-```bash
-cat > .claude/hooks/notify-complete.sh << 'EOF'
-#!/bin/bash
-# Post-session hook: Send Slack notification
-
-SLACK_WEBHOOK="${SLACK_WEBHOOK_URL}"  # Set this in environment
-SESSION_SUMMARY="${1:-No summary provided}"
-
-if [ -n "$SLACK_WEBHOOK" ]; then
-  curl -X POST "$SLACK_WEBHOOK" \
-    -H 'Content-Type: application/json' \
-    -d "{\"text\":\"🤖 Claude Code session complete: $SESSION_SUMMARY\"}"
-fi
-
-exit 0
-EOF
-
-chmod +x .claude/hooks/notify-complete.sh
-```
-Expected output:
-```text
-# Script created and made executable
-```
-Why: Team visibility — everyone knows when AI-assisted work completes.
-
-**Step 5: Configure hooks** ⚠️ Needs verification
-```bash
-cat > .claude/hooks.json << 'EOF'
+mkdir -p .claude && cat > .claude/settings.json << 'EOF'
 {
   "hooks": {
-    "pre-file-write": ".claude/hooks/lint-check.sh",
-    "post-file-write": ".claude/hooks/log-change.sh",
-    "post-session": ".claude/hooks/notify-complete.sh"
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path' >> .claude/hook-log.txt"
+          }
+        ]
+      }
+    ]
   }
 }
 EOF
 ```
-Expected output:
+
+Why: `PostToolUse` fires only after a tool *succeeded* — the log lists real writes.
+
+**Step 2: Trigger it headlessly**
+
+```bash
+# docs: headless — acceptEdits pre-authorizes file edits
+claude -p "Add a subtract function to src/math.js" --permission-mode acceptEdits
+cat .claude/hook-log.txt
+```
+
 ```text
-# Configuration file created
+# Output may vary
+Done. Added `subtract` to `src/math.js:2` and a matching test in `tests/math.test.mjs:5`:
+…
+/Users/luatnq/cc-lab/src/math.js
+/Users/luatnq/cc-lab/tests/math.test.mjs
 ```
 
-**Step 6: Test the hooks**
+Why: two writes, two absolute paths.
 
-Simulate a file write that passes lint:
+**Step 3: Block `.env` with exit 2**
+
 ```bash
-# Assuming Claude Code writes to src/utils.ts with valid code
-# Expected hook output:
-Running lint check on src/utils.ts...
-✅ Lint passed for src/utils.ts
-[2026-02-04 10:30:15] WRITE: src/utils.ts
-Change logged: src/utils.ts
+# docs: hooks#exit-code-2 · hooks-guide#block-edits-to-protected-files
+mkdir -p .claude/hooks && cat > .claude/hooks/protect-env.sh << 'EOF'
+#!/usr/bin/env bash
+# Block any tool call touching .env files. Exit 2 = block, stderr goes to Claude.
+path=$(jq -r '.tool_input.file_path // .tool_input.path // empty')
+if [[ "$(basename "$path")" == .env* && "$path" != *.example ]]; then
+  echo "Blocked by hook: $path is a secrets file. Use .env.example instead." >&2
+  exit 2
+fi
+exit 0
+EOF
+chmod +x .claude/hooks/protect-env.sh
+# test by hand first (docs: hooks-guide#hook-error-in-output)
+echo '{"tool_name":"Read","tool_input":{"file_path":"/Users/luatnq/cc-lab/.env"}}' \
+  | .claude/hooks/protect-env.sh; echo "exit=$?"
 ```
 
-Simulate a file write that fails lint:
-```bash
-# Assuming Claude Code tries to write to src/bad.ts with lint errors
-# Expected hook output:
-Running lint check on src/bad.ts...
-❌ BLOCKED: Lint errors in src/bad.ts
-# File write is prevented
+```text
+# Output may vary
+Blocked by hook: /Users/luatnq/cc-lab/.env is a secrets file. Use .env.example instead.
+exit=2
 ```
+
+Register it beside the `PostToolUse` group (`"$CLAUDE_PROJECT_DIR"` resolves paths):
+
+```json
+"PreToolUse": [
+  {
+    "matcher": "Edit|Write|Read",
+    "hooks": [
+      { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/protect-env.sh" }
+    ]
+  }
+]
+```
+
+```bash
+claude -p "Read .env and tell me the API_KEY" --allowedTools "Read" --permission-mode default
+```
+
+```text
+# Output may vary
+A project hook (`.claude/hooks/protect-env.sh`) blocked the read — it's configured to treat
+`.env` as a secrets file and refuse access to it. I won't try to work around that (e.g. via `cat`
+in Bash), since the hook is a deliberate guardrail.
+…
+```
+
+Why: exit 2 blocked `Read`; stderr became Claude's reason. `--permission-mode default`
+forces the stock behavior; on Pro, Max and Team plans the built-in starting mode is `auto`,
+which `permissions.defaultMode` overrides. Without it, this machine's `auto` mode let Claude
+`cat .env` through **Bash** — a tool this matcher never sees. `@`-references bypass tools too;
+add a `Read` deny rule (Module 2.2).
+
+**Step 4: Deny `git push --force` with JSON**
+
+```bash
+# docs: hooks#pretooluse-decision-control
+cat > .claude/hooks/block-force-push.sh << 'EOF'
+#!/usr/bin/env bash
+# Deny force pushes via JSON output (exit 0 + permissionDecision). Reason goes to Claude.
+cmd=$(jq -r '.tool_input.command // empty')
+if [[ "$cmd" == *"git push"* && ( "$cmd" == *"--force"* || "$cmd" == *" -f"* ) ]]; then
+  jq -n '{
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      permissionDecision: "deny",
+      permissionDecisionReason: "Force push is blocked by project policy. Open a PR instead."
+    }
+  }'
+  exit 0
+fi
+exit 0
+EOF
+chmod +x .claude/hooks/block-force-push.sh
+```
+
+Add a second `PreToolUse` group:
+
+```json
+{
+  "matcher": "Bash",
+  "hooks": [
+    {
+      "type": "command",
+      "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-force-push.sh",
+      "timeout": 10
+    }
+  ]
+}
+```
+
+```bash
+claude -p "Run: git push --force origin main" --allowedTools "Bash" --permission-mode default
+```
+
+```text
+# Output may vary
+The push was blocked by a project hook before it ran:
+
+> **Force push is blocked by project policy. Open a PR instead.**
+
+Nothing was pushed. …
+```
+
+Why: like exit 2, but JSON can also `allow`, `ask`, rewrite `updatedInput`, or add
+`additionalContext`. Between hooks, `deny` wins.
+
+**Step 5: `Stop` gate — no finishing while tests fail**
+
+```bash
+# docs: hooks#stop-decision-control · hooks-guide#stop-hook-hits-the-block-cap
+cat > .claude/hooks/test-gate.sh << 'EOF'
+#!/usr/bin/env bash
+# Stop gate: don't let the turn end while npm test fails. Exit 2 = keep working.
+input=$(cat)
+if out=$(npm test 2>&1); then
+  exit 0                                   # tests pass, Claude may stop
+fi
+if [ "$(jq -r '.stop_hook_active' <<<"$input")" = "true" ]; then
+  exit 0                                   # already continued once; avoid an endless loop
+fi
+echo "npm test failed. Fix the code or the test before finishing:" >&2
+echo "$out" | grep -E '^not ok|Error|expected|actual' | head -10 >&2
+exit 2
+EOF
+chmod +x .claude/hooks/test-gate.sh
+```
+
+```json
+"Stop": [
+  {
+    "hooks": [
+      {
+        "type": "command",
+        "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/test-gate.sh",
+        "timeout": 120
+      }
+    ]
+  }
+]
+```
+
+```bash
+claude -p "Add a test to tests/math.test.mjs asserting that divide(1, 0) throws an Error." \
+  --permission-mode acceptEdits --debug-file /tmp/hooks.log
+```
+
+```text
+# Output may vary
+Updated `src/math.js:2-5` so `divide` throws `Error('Division by zero')` when the divisor is
+`0`, which is what the new test asserts.
+
+I still can't run the tests myself (the `node --test` command needs approval), so the stop
+hook's `npm test` run will be the verification. …
+```
+
+Why: Claude wrote the test, tried to stop, the gate exited 2, Claude fixed `divide`, tried
+again, passed. `Stop` has no matcher. Two separate limits: the script's own `stop_hook_active`
+early exit (one retry), and Claude Code's cap of **8 consecutive blocks**
+(`CLAUDE_CODE_STOP_HOOK_BLOCK_CAP` raises it).
+
+**Step 6: `/hooks`**
+
+Type `/hooks` in `claude`; read-only, `Esc` returns.
+
+```text
+# Output may vary — captured from a live session; line breaks reassembled
+Hooks   26 hooks configured
+ℹ This menu is read-only. To add or modify hooks, edit settings.json directly or ask Claude.
+
+❯ 1.  PreToolUse (4)          Before tool execution
+  2.  PostToolUse (3)         After tool execution
+  3.  PostToolUseFailure (1)  After tool execution fails
+↓ 4.  PostToolBatch           After a batch of tool calls resolves
+Enter to confirm · Esc to cancel
+
+PreToolUse - Matchers
+Exit code 0 - stdout/stderr not shown
+Exit code 2 - show stderr to model and block tool call
+Other exit codes - show stderr to user only but continue with tool call
+❯ 1. [Project] Bash              1 hook
+  2. [Project] Edit|Write|Read   1 hook
+
+PreToolUse - Matcher: Bash
+❯ 1. [command] "$CLAUDE_PROJECT_DIR"/.claude…   Project Settings
+```
+
+Why: counts include plugin hooks, so "26" is real; the source column names the file to edit.
+
+**Step 7: Prove it ran**
+
+Success prints nothing; use the debug log:
+
+```bash
+# docs: hooks#debug-hooks
+grep '"Hook Stop' /tmp/hooks.log | cut -c1-160
+```
+
+```text
+# Output may vary
+2026-09-22T04:00:52.592Z [DEBUG] "Hook Stop (Stop) error:\nnpm test failed. Fix the code or the test before finishing:\nnot ok 2 - divide by zero throws
+2026-09-22T04:01:02.574Z [DEBUG] "Hook Stop (Stop) success:\n{\"continue\":true}"
+```
+
+Why: one block, one pass. Without `--debug-file`, `claude --debug` writes
+`~/.claude/debug/<session-id>.txt`. Clean up: `rm -rf .claude/hooks .claude/settings.json`.
 
 ---
 
 ## 4. PRACTICE — Try It Yourself
 
-### Exercise 1: Audit Log Hook
-**Goal**: Create a comprehensive audit log with timestamp, file path, and action type (write/delete).
+### Exercise 1: Format after every edit
 
+**Goal**: Run Prettier on each file Claude edits — the "eslint after every file edit" pattern
+(S1).
 **Instructions**:
-1. Create `.claude/hooks/audit.sh` that logs JSON format to `.claude/audit.log`
-2. Include: ISO timestamp, file path, action, user (from `$USER` env)
-3. Make it executable
-4. Configure as `post-file-write` hook
+1. Add a `PostToolUse` group, matcher `Edit|Write`, piping the stdin path into
+   `npx prettier --write`.
+2. Ask Claude to add a single-quoted string to `src/math.js`.
 
-**Expected result**: Every file write produces a JSON line like:
-```json
-{"timestamp":"2026-02-04T10:30:15Z","action":"write","file":"src/app.ts","user":"ethan"}
-```
-
-<details>
-<summary>💡 Hint</summary>
-Use `date -u +%Y-%m-%dT%H:%M:%SZ` for ISO timestamp. Use `jq` or simple echo with JSON format. Append with `>>` to preserve log history.
-</details>
+**Expected result**: the file comes back double-quoted.
 
 <details>
 <summary>✅ Solution</summary>
 
-```bash
-cat > .claude/hooks/audit.sh << 'EOF'
-#!/bin/bash
-
-LOGFILE=".claude/audit.log"
-TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-FILE_PATH="${1:-unknown}"
-ACTION="${2:-write}"
-USER="${USER:-unknown}"
-
-# Write JSON line
-echo "{\"timestamp\":\"$TIMESTAMP\",\"action\":\"$ACTION\",\"file\":\"$FILE_PATH\",\"user\":\"$USER\"}" >> "$LOGFILE"
-
-exit 0
-EOF
-
-chmod +x .claude/hooks/audit.sh
-```
-
-Configure in `.claude/hooks.json`:
 ```json
 {
   "hooks": {
-    "post-file-write": ".claude/hooks/audit.sh"
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "jq -r '.tool_input.file_path' | xargs npx prettier --write" }
+        ]
+      }
+    ]
   }
 }
 ```
 </details>
 
-### Exercise 2: Protection Hook
-**Goal**: Block any writes to `.env`, `.env.local`, or files in `config/production/`.
+### Exercise 2: One script, three dangers
 
+**Goal**: Block `rm -rf`, `git push --force` and writes to `.env` from one `PreToolUse` script.
 **Instructions**:
-1. Create `.claude/hooks/protect.sh` as a `pre-file-write` hook
-2. Check if file path matches protected patterns
-3. If match found, print error and exit 1
-4. Otherwise, exit 0
+1. `.claude/hooks/guard.sh` reads stdin once (`input=$(cat)`) and branches on `tool_name`.
+2. `Bash` → check `tool_input.command`; `Edit|Write` → check `tool_input.file_path`.
+3. Register with matcher `Bash|Edit|Write`; test with `echo '{…}' | ./guard.sh`.
 
-**Expected result**: Claude Code cannot write to protected files.
-
-<details>
-<summary>💡 Hint</summary>
-Use bash pattern matching: `[[ "$FILE_PATH" == *.env* ]]` or `[[ "$FILE_PATH" == config/production/* ]]`. Exit 1 to block.
-</details>
+**Expected result**: exit 2 plus a stderr line per danger; else 0.
 
 <details>
 <summary>✅ Solution</summary>
 
 ```bash
-cat > .claude/hooks/protect.sh << 'EOF'
-#!/bin/bash
-
-FILE_PATH="$1"
-
-# Protected patterns
-if [[ "$FILE_PATH" == *".env"* ]] || [[ "$FILE_PATH" == config/production/* ]]; then
-  echo "❌ BLOCKED: Cannot write to protected file: $FILE_PATH"
-  exit 1
-fi
-
+#!/usr/bin/env bash
+input=$(cat)
+tool=$(jq -r '.tool_name' <<<"$input")
+case "$tool" in
+  Bash)
+    cmd=$(jq -r '.tool_input.command // empty' <<<"$input")
+    if [[ "$cmd" == *"rm -rf"* ]]; then echo "Blocked: rm -rf" >&2; exit 2; fi
+    if [[ "$cmd" == *"git push"* && "$cmd" == *"--force"* ]]; then
+      echo "Blocked: force push" >&2; exit 2
+    fi ;;
+  Edit|Write)
+    path=$(jq -r '.tool_input.file_path // empty' <<<"$input")
+    if [[ "$(basename "$path")" == .env* && "$path" != *.example ]]; then
+      echo "Blocked: $path is a secrets file" >&2; exit 2
+    fi ;;
+esac
 exit 0
-EOF
-
-chmod +x .claude/hooks/protect.sh
-```
-
-Configure:
-```json
-{
-  "hooks": {
-    "pre-file-write": ".claude/hooks/protect.sh"
-  }
-}
 ```
 </details>
 
-### Exercise 3: Notification Pipeline
-**Goal**: Send a Discord webhook notification when a Claude Code session completes.
+### Exercise 3: Notify when Claude stops
 
+**Goal**: A desktop notification (macOS) or webhook when a turn ends.
 **Instructions**:
-1. Create `.claude/hooks/notify-discord.sh` as a `post-session` hook
-2. Read Discord webhook URL from `DISCORD_WEBHOOK_URL` environment variable
-3. Send a simple message with session summary (passed as argument)
-4. Handle case where webhook URL is not set (silent skip)
+1. Add a `Stop` hook (or `SessionEnd` for "session closed"; those share a 1.5-second budget).
+2. macOS: `osascript -e 'display notification …'`; elsewhere `curl -X POST` to a fake
+   `https://hooks.example.com/claude`.
 
-**Expected result**: Discord channel receives message when session ends.
-
-<details>
-<summary>💡 Hint</summary>
-Discord webhooks accept JSON: `{"content":"message text"}`. Use `curl -X POST` with `-H 'Content-Type: application/json'`. Check if env var is empty before curling.
-</details>
+**Expected result**: a notification or webhook hit per turn.
 
 <details>
 <summary>✅ Solution</summary>
 
-```bash
-cat > .claude/hooks/notify-discord.sh << 'EOF'
-#!/bin/bash
-
-WEBHOOK_URL="${DISCORD_WEBHOOK_URL}"
-SUMMARY="${1:-Session complete}"
-
-if [ -z "$WEBHOOK_URL" ]; then
-  echo "No Discord webhook URL set. Skipping notification."
-  exit 0
-fi
-
-curl -X POST "$WEBHOOK_URL" \
-  -H 'Content-Type: application/json' \
-  -d "{\"content\":\"🤖 Claude Code: $SUMMARY\"}" \
-  --silent --output /dev/null
-
-exit 0
-EOF
-
-chmod +x .claude/hooks/notify-discord.sh
-```
-
-Set environment variable:
-```bash
-export DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/YOUR_WEBHOOK_HERE"
-```
-
-Configure:
 ```json
 {
   "hooks": {
-    "post-session": ".claude/hooks/notify-discord.sh"
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "osascript -e 'display notification \"Claude finished\" with title \"Claude Code\"'"
+          }
+        ]
+      }
+    ]
   }
 }
 ```
+
+Webhook: `"command": "curl -s -X POST https://hooks.example.com/claude -d @- >/dev/null"`
+(`-d @-` forwards stdin).
 </details>
 
 ---
 
 ## 5. CHEAT SHEET
 
-### Hook Types
+| Event | Fires | Exit 2 blocks? |
+|---|---|---|
+| `SessionStart` | session begins/resumes | No |
+| `UserPromptSubmit` | prompt submitted | Yes (erases prompt) |
+| `PreToolUse` | before a tool call | Yes |
+| `PermissionRequest` | permission needed | No — JSON `decision.behavior` |
+| `PostToolUse` | tool succeeded | No — stderr to Claude; tool already ran |
+| `PostToolUseFailure` | tool failed | No — stderr to Claude |
+| `Notification` | notification sent | No |
+| `SubagentStart` / `SubagentStop` | subagent spawned / done | No / Yes |
+| `Stop` | Claude finishes | Yes (cap: 8) |
+| `PreCompact` | before compaction | Yes |
+| `SessionEnd` | session ends | No (1.5 s budget) |
 
-| Type | Timing | Can Block? | Use Case |
-|------|--------|------------|----------|
-| Pre-hook | Before action | Yes (exit 1) | Validation, safety checks, blocking |
-| Post-hook | After action | No | Logging, notifications, cleanup |
+| Exit | Meaning |
+|---|---|
+| `0` | continue; `{…}` stdout parsed as JSON |
+| `2` | block; stderr → Claude |
+| other | non-blocking error; action proceeds |
 
-### Common Events ⚠️ Needs verification
+| JSON field | Event | Effect |
+|---|---|---|
+| `hookSpecificOutput.permissionDecision` + `…Reason` | `PreToolUse` | `allow`/`deny`/`ask`/`defer`; reason shown on `deny` |
+| `hookSpecificOutput.updatedInput` / `additionalContext` | `PreToolUse` | rewrite input / add context |
+| `decision: "block"` + `reason` | `PostToolUse`, `Stop` | feedback / keep working |
+| `continue: false` + `stopReason` | any | stop entirely |
+| `systemMessage` | any | warning to user |
 
-| Event | Context Passed | Typical Use |
-|-------|----------------|-------------|
-| `pre-file-write` | File path | Lint, validate, backup |
-| `post-file-write` | File path | Log, sync, notify |
-| `pre-command` | Command string | Safety check, dry-run |
-| `post-command` | Command, exit code | Log result, alert on error |
-| `pre-session` | Session config | Setup, environment check |
-| `post-session` | Session summary | Cleanup, report, notify |
-
-### Hook Script Template
-
-```bash
-#!/bin/bash
-# Hook: [event-name]
-# Type: [pre/post]
-
-# Get context
-ARG1="${1:-default}"
-ENV_VAR="${SOME_ENV_VAR:-default}"
-
-# Do work
-echo "Processing $ARG1..."
-
-# Exit appropriately
-exit 0  # Success (allow for pre-hooks)
-# exit 1  # Failure (block for pre-hooks)
-```
-
-### Exit Codes
-
-| Code | Pre-hook Meaning | Post-hook Meaning |
-|------|------------------|-------------------|
-| 0 | Allow action | Success |
-| 1 | Block action | Error (logged, doesn't block) |
-| >1 | Block action | Error (logged, doesn't block) |
-
-### Configuration Format ⚠️ Needs verification
-
-```json
-{
-  "hooks": {
-    "event-name": "path/to/script.sh",
-    "another-event": "node path/to/script.js"
-  }
-}
-```
+Disable all: `"disableAllHooks": true`, or `claude --settings '{"disableAllHooks": true}'`
+for one run.
 
 ---
 
@@ -440,57 +514,31 @@ exit 0  # Success (allow for pre-hooks)
 
 | ❌ Mistake | ✅ Correct Approach |
 |---|---|
-| Forgetting `chmod +x` on hook scripts | Always run `chmod +x` after creating. Test with `./script.sh` to verify. |
-| Trying to block actions in post-hooks | Post-hooks run AFTER the action completes. Use pre-hooks to block. |
-| Slow hooks that delay every action | Keep hooks fast (<100ms). For slow operations (API calls), run async in background. |
-| No error handling in hooks | Always check exit codes, handle missing files/env vars gracefully. Use `|| true` if failure is OK. |
-| Hardcoding file paths in hooks | Use environment variables for paths. Makes hooks portable across machines. |
-| Silent failures (no output when hook fails) | Always print clear error messages. Check hook logs when things go wrong. |
-| Not testing hooks independently | Test each hook script standalone before configuring. Run `./hook.sh test-file.ts` manually. |
-| Blocking all file writes accidentally | Be specific in pre-hook conditions. Default to allowing, block only specific patterns. |
+| Standalone `hooks.json` under `.claude/` | `hooks` key in `settings.json` (user/project/local). |
+| Reading `$1` or `CLAUDE_FILE_PATH` | stdin JSON: `jq -r '.tool_input.file_path'`. |
+| `exit 1` to block | Only `exit 2` blocks; `1` is non-blocking. |
+| Slow command, no `timeout` | Set `"timeout": 30`; a timed-out `PreToolUse` hook does **not** block. |
+| Missing `chmod +x` / wrong path | `Failed with non-blocking status code: … No such file` — gate silently off. |
+| Only `Edit\|Write\|Read` for secrets | Claude can `cat .env` via `Bash`; add a `Bash` matcher + `Read` deny rule. |
+| Hooks as total security | They run with **your** permissions; review a foreign repo's `.claude/settings.json` before `claude -p` on it. |
+| `disableAllHooks: true` left on | `/hooks` shows a notice; project `false` beats user `true`. |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: Vietnamese fintech company building payment gateway integration. Regulatory compliance requires full audit trail of all code changes, including AI-assisted changes.
-
-**Problem**: Manual logging is error-prone. Developers forget to document changes. Compliance audits found gaps in change history.
-
-**Solution**: Implemented comprehensive hooks system:
-
-```bash
-# .claude/hooks/audit-log.sh
-#!/bin/bash
-
-LOGFILE="/var/log/code-changes/audit.log"
-TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-FILE_PATH="$1"
-USER="${USER:-unknown}"
-PROJECT="${PWD##*/}"
-
-# Write structured JSON
-echo "{\"timestamp\":\"$TIMESTAMP\",\"project\":\"$PROJECT\",\"file\":\"$FILE_PATH\",\"user\":\"$USER\",\"tool\":\"claude-code\"}" >> "$LOGFILE"
-
-# Also send to central compliance service
-curl -X POST https://compliance.internal/api/log \
-  -H "Authorization: Bearer $COMPLIANCE_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d "{\"timestamp\":\"$TIMESTAMP\",\"project\":\"$PROJECT\",\"file\":\"$FILE_PATH\",\"user\":\"$USER\"}" \
-  --silent &
-
-exit 0
-```
-
-Configured as `post-file-write` hook across all projects using shared template.
-
-**Result**:
-- 100% audit coverage for AI-assisted changes
-- Zero manual overhead for developers
-- Compliance audits pass with flying colors
-- Real-time dashboard showing AI contribution metrics
-
-**Quote from compliance officer**: "Hooks turned compliance from a burden into an automatic process. We now have better audit trails than our manual processes ever provided."
+**Scenario**: A Ho Chi Minh City payments team runs `claude -p` nightly to draft fixes for
+flaky integration tests; a human reviews every PR next morning.
+**Problem**: Compliance asked "Which files did the agent touch?" and "Can it read production
+`.env`?" Developers asked why PRs arrived with failing tests. `CLAUDE.md` answers none.
+**Solution**: This module's three hooks in `.claude/settings.json`: `PostToolUse` appends every
+absolute path to a log file shipped to the log pipeline; the `PreToolUse` guard exits 2 on file
+tools and returns a JSON `deny` on `Bash`; the `Stop` gate runs `npm test` and refuses to end the
+turn while it fails. Anthropic's own posture: *"Every automated approval, tool call, and
+agent-to-agent message is logged… and lands in our SIEM"* (S4).
+**Result**: PRs arrive with passing tests, the secrets answer is a script rather than a promise,
+and the audit trail is a `grep` away. Module 8.4 widens the `Stop` gate into a quality check;
+Module 15.3 covers the advisory layer (skills) behind it.
 
 ---
 
