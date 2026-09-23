@@ -84,7 +84,14 @@ export default defineConfig({
   site: 'https://course.shipwithai.io',
   // Root has no page of its own. Redirect to the default locale so `/` works in
   // dev too (production additionally has the same redirect in vercel.json).
-  redirects: { '/': '/en/' },
+  redirects: {
+    '/': '/en/',
+    // Module 11.2 was renamed in audit wave 1 (Claude Code SDK → Claude Agent SDK).
+    '/en/claude-code/phase-11-automation-headless/02-claude-code-sdk/':
+      '/en/claude-code/phase-11-automation-headless/02-claude-agent-sdk/',
+    '/vi/claude-code/phase-11-automation-headless/02-claude-code-sdk/':
+      '/vi/claude-code/phase-11-automation-headless/02-claude-agent-sdk/',
+  },
   markdown: {
     rehypePlugins: [rehypeMermaidPre],
   },
