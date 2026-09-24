@@ -160,7 +160,7 @@ src/content/docs/
 **EN:** `src/content/docs/en/claude-code/phase-06-thinking-planning/`
 **VI:** `src/content/docs/vi/claude-code/phase-06-thinking-planning/`
 
-- **Module 6.1 — Think Mode (Extended Thinking)** (`01-think-mode.mdx` / VI: `01-think-mode.md`)
+- **Module 6.1 — Think Mode (Extended Thinking)** (`01-think-mode.mdx` / VI: `01-think-mode.mdx`)
   EN: Activate Claude Code extended thinking for deeper reasoning on complex debugging and architecture tasks.
   VI: Kích hoạt Think Mode trong Claude Code để giải quyết bài toán phức tạp với extended thinking.
 
