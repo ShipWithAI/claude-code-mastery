@@ -1,252 +1,272 @@
 ---
 title: 'MCP — Model Context Protocol'
-description: 'Connect Claude Code to MCP servers to extend capabilities with external tools and data sources.'
+description: 'Add MCP servers with claude mcp add, share them through .mcp.json with ${VAR}, and control their tools with mcp__ permission rules.'
+verified: 2026-09-23
+claude_version: 2.1.280
 ---
 
 # Module 11.5: MCP — Model Context Protocol
 
 > **Estimated time**: ~40 minutes
 >
-> **Prerequisite**: Modules 11.1-11.4 (Headless Mode, SDK, Hooks, GitHub Actions)
+> **Prerequisite**: Modules 11.1–11.4, especially [11.2 SDK](../02-claude-agent-sdk/) and
+> [11.3 Hooks](../03-hooks-system/), plus
+> [2.2 Permissions](../../phase-02-security/02-permission-system/)
 >
-> **Outcome**: After this module, you will understand MCP architecture, connect Claude Code to MCP servers, and extend Claude's capabilities with external tools.
+> **Outcome**: add an MCP server at the right scope, share it through `.mcp.json` with no secret
+> in the file, and allow or deny its tools with `mcp__` rules.
 
 ---
 
 ## 1. WHY — Why This Matters
 
-Claude Code is powerful but isolated. It reads files and runs shell commands. But what if you need Claude to query your production database? Search your company wiki? Check Jira tickets? Pull metrics from monitoring? Out of the box, Claude can't do any of this.
+Your Jira board, your read-replica, your metrics service: Claude Code reaches none of them with
+`Read` and `Bash` alone. So you paste — ticket, query result, log line — and half your context
+window is stale copy-paste.
 
-MCP (Model Context Protocol) changes everything. It's a standardized protocol that lets Claude Code connect to ANY external system — databases, APIs, monitoring tools, whatever you need. One protocol, infinite possibilities. This is how Claude becomes a true team member with system access.
+MCP fixes that. It is also the first time an external system can put text into Claude's context
+and pull data back out, so this module covers both halves: wiring up, and leashing.
 
 ---
 
 ## 2. CONCEPT — Core Ideas
 
-### MCP Architecture
+> "MCP (Model Context Protocol) is an open-source standard for connecting AI applications to
+> external systems." — modelcontextprotocol.io
 
-```text
-Claude Code (Client) ←→ MCP Server ←→ External System
+A server exposes **tools** Claude calls, **resources** you reference with
+`@server:protocol://path`, and **prompts** listed as `/servername:promptname (MCP)`.
+
+```mermaid
+graph LR
+    A[Claude Code] -->|stdio or http| B[MCP server]
+    B --> C[Jira / DB / API]
+    A -.->|mcp__server__tool<br/>permission rule| A
 ```
 
-Claude requests data or actions → MCP Server translates and executes → External system responds → Server formats response → Claude uses it.
+**Transports.** `stdio` servers "run as local processes on your machine"; `http` is "the
+recommended option for connecting to remote MCP servers"; `sse` is deprecated.
 
-### Core Concepts
+**Scopes** decide reach and storage:
 
-| Concept | What It Is | Example |
-|---------|-----------|---------|
-| **Server** | Exposes capabilities via MCP | PostgreSQL MCP server |
-| **Client** | Consumes capabilities | Claude Code session |
-| **Tools** | Functions Claude can call | `query_database(sql)` |
-| **Resources** | Data Claude can read | Database schemas, files |
+| Scope | Loads in | Shared with team | Stored in |
+|---|---|---|---|
+| `local` (default) | Current project only | No | `~/.claude.json` |
+| `project` | Current project only | Yes, via version control | `.mcp.json` in project root |
+| `user` | All your projects | No | `~/.claude.json` |
 
-### Official MCP Servers
+`.mcp.json` is the team file, so it must never hold a secret: `${VAR}` and `${VAR:-default}`
+expand inside `command`, `args`, `env`, `url` and `headers`, keeping the token in each
+developer's environment. Claude Code "prompts for approval in interactive sessions before using
+project-scoped servers"; `enabledMcpjsonServers` or `enableAllProjectMcpServers` stores that
+answer.
 
-- `@modelcontextprotocol/server-postgres` — PostgreSQL access
-- `@modelcontextprotocol/server-sqlite` — SQLite databases
-- `@modelcontextprotocol/server-filesystem` — Enhanced file operations
-- `@modelcontextprotocol/server-github` — GitHub API integration
+**Control.** Every tool is `mcp__<server>__<tool>` — the name you put in `permissions.allow`,
+`deny` or `ask`. `mcp__fs` matches the whole server. An allow glob must start with a literal
+`mcp__<server>__`, so `mcp__fs__read_*` works while `"mcp__*"` is skipped with a warning; in a
+*deny* list, `"mcp__*"` blocks every MCP tool.
 
-### Browser & Debugging MCP Servers
-
-Beyond database and API access, MCP unlocks powerful browser-based debugging workflows:
-
-| Server | Purpose | What Claude Gets |
-|--------|---------|-----------------|
-| **Playwright MCP** | Browser automation | Navigate pages, fill forms, click buttons, take screenshots |
-| **Chrome DevTools MCP** | Live browser debugging | Console logs, network requests, DOM inspection |
-
-#### Playwright MCP in Action
-
-With Playwright MCP connected, Claude can control a real browser. Instead of you describing a bug, Claude navigates to the page, fills in the form, clicks submit, and sees the error itself. This is transformative for:
-
-- **E2E test writing**: Claude runs the test while writing it, catching failures immediately
-- **Visual regression**: Claude screenshots before/after changes to verify UI didn't break
-- **Form debugging**: Claude fills complex multi-step forms to reproduce user-reported bugs
-
-#### Chrome DevTools MCP in Action
-
-Chrome DevTools MCP gives Claude direct access to your browser's developer tools. Claude sees console errors, network failures, and DOM structure without you copy-pasting anything. Practical uses:
-
-- **Console error debugging**: Claude reads the error stack trace directly from browser console
-- **Network inspection**: Claude sees failed API calls, their request/response payloads, and status codes
-- **Performance profiling**: Claude analyzes slow page loads by examining network waterfall
-
-### Project-Level MCP Configuration (.mcp.json)
-
-Instead of configuring MCP servers globally, you can commit project-specific MCP configuration:
-
-```json
-{
-  "mcpServers": {
-    "project-db": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-sqlite", "--db-path", "./data/dev.db"]
-    },
-    "project-memory": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-memory"]
-    }
-  }
-}
-```
-
-**Benefits of .mcp.json**:
-- **Team-shared**: Everyone gets the same MCP servers when they clone the repo
-- **Project-specific**: Different projects use different servers without conflicts
-- **Version-controlled**: MCP config evolves with your codebase
-- **No global pollution**: Personal global config stays clean
-
-Place `.mcp.json` at your project root. Claude Code reads it automatically when you start a session in that directory.
-
-### MCP Token Budget Warning
-
-⚠️ **Critical performance consideration**: Every MCP server's tool descriptions consume context tokens. These tokens are loaded into Claude's context window at the start of every session.
-
-**Rule of thumb**: If your MCP servers collectively use more than **20,000 tokens** of context for tool descriptions, you are significantly reducing Claude's working memory for actual coding tasks.
-
-| MCP Servers Connected | Approx. Token Overhead | Impact |
-|----------------------|------------------------|--------|
-| 1-2 servers | ~2,000-5,000 tokens | Negligible |
-| 3-5 servers | ~8,000-15,000 tokens | Noticeable on complex tasks |
-| 6+ servers | ~20,000+ tokens | Severe — Claude forgets context faster |
-
-**Best practice**: Only enable MCP servers you actively need for the current project. Disable the rest. A lean MCP setup means more context for Claude to reason about your code.
-
-### Configuration Format
-
-⚠️ Verify exact path for your platform:
-
-```json
-{
-  "mcpServers": {
-    "server-name": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-name", "--option", "value"]
-    }
-  }
-}
-```
-
-Config location:
-- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- Linux: `~/.config/Claude/claude_desktop_config.json`
-- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
-
-### Security Model
-
-MCP servers run locally on your machine. Credentials stay on your machine. Claude sends requests, the server executes them, responses go back. Claude never sees raw credentials.
+**Cost.** Tool definitions are deferred by default: "Only tool names and server instructions load
+at session start, so adding more MCP servers has minimal impact on your context window." Not
+free, though: `/context` shows the real number, and Anthropic's costs guidance is to "prefer CLI
+tools when available" — `gh`, `aws` and `gcloud` "don't add any per-tool listing" (S15). Build
+few high-value tools, not a wall of thin ones (S9). `MAX_MCP_OUTPUT_TOKENS` caps output (default
+25,000; warning above 10,000); `--strict-mcp-config` loads only what `--mcp-config` passes.
 
 ---
 
 ## 3. DEMO — Step by Step
 
-**Scenario**: Connect Claude Code to a SQLite database to analyze application data.
-
-### Step 1: Install the SQLite MCP server
+**Step 1: Add a local stdio server** (scratch repo `~/cc-lab`)
 
 ```bash
-$ npm install -g @modelcontextprotocol/server-sqlite
+# docs: en/mcp — claude mcp add [options] <name> -- <command> [args...]
+claude mcp add --transport stdio fs -- npx -y @modelcontextprotocol/server-filesystem ~/cc-lab
 ```
 
-Expected output:
 ```text
-added 42 packages in 3s
+# Output may vary
+Added stdio MCP server fs with command: npx -y @modelcontextprotocol/server-filesystem /Users/you/cc-lab to local config
+File modified: /Users/you/.claude.json [project: /Users/you/cc-lab]
 ```
 
-### Step 2: Configure the MCP server
+Everything after `--` reaches the server untouched, so its flags never collide with Claude's.
 
-Edit your Claude config file:
+**Step 2: Check it connected**
 
 ```bash
-$ code ~/Library/Application\ Support/Claude/claude_desktop_config.json
+claude mcp list
 ```
 
-Add this configuration:
+```text
+# Output may vary
+Checking MCP server health…
+
+…
+fs: npx -y @modelcontextprotocol/server-filesystem /Users/you/cc-lab - ✔ Connected
+```
+
+Statuses: `✔ Connected`, `! Needs authentication`, `✘ Failed to connect`.
+
+**Step 3: Inspect one server** — `claude mcp get fs`
+
+```text
+# Output may vary
+fs:
+  Scope: Local config (private to you in this project)
+  Status: ✔ Connected
+  Type: stdio
+  Command: npx
+  Args: -y @modelcontextprotocol/server-filesystem /Users/you/cc-lab
+
+To remove this server, run: claude mcp remove fs -s local
+```
+
+**Step 4: Share a server through `.mcp.json` — without the token.** In the repo root, commit:
 
 ```json
 {
   "mcpServers": {
-    "sqlite": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-sqlite",
-        "--db-path",
-        "/Users/yourname/projects/app/data/app.db"
-      ]
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": { "Authorization": "Bearer ${GITHUB_TOKEN}" }
     }
   }
 }
 ```
 
-### Step 3: Restart Claude Code
+**Step 5: Verify the token never landed in the file**
 
-The MCP server initializes on startup. Close and reopen Claude Code.
-
-### Step 4: Verify MCP connection
-
-```text
-You: What MCP servers are available?
-
-Claude: I have access to the following MCP servers:
-- sqlite: SQLite database at /Users/yourname/projects/app/data/app.db
-  Tools: query, list_tables, describe_table
+```bash
+claude mcp list | grep github
+claude mcp get github
 ```
 
-### Step 5: Explore database schema
-
 ```text
-You: List all tables in the database
-
-Claude: [calls sqlite.list_tables tool]
-
-The database contains 5 tables:
-- users (1,247 rows)
-- orders (8,932 rows)
-- products (156 rows)
-- sessions (3,891 rows)
-- audit_log (45,223 rows)
+# Output may vary
+github: https://api.githubcopilot.com/mcp/ (HTTP) - ⏸ Pending approval (run `claude` to approve)
+ └ [Warning] [github] mcpServers.github: Missing environment variables: GITHUB_TOKEN
+github:
+  Scope: Project config (shared via .mcp.json)
+  Status: ⏸ Pending approval (run `claude` to approve)
+  Headers:
+    Authorization: Bearer ${GITHUB_TOKEN}
 ```
 
-### Step 6: Query and analyze
+The proof: the header prints by name, not by value — for local, project and user scope,
+all three surfaces show `${VAR}` unexpanded. Export the token and the warning goes away.
+
+**Step 6: Approve the project server** — start `claude` in the repo
 
 ```text
-You: What percentage of orders are abandoned?
+# Output may vary
+  New MCP server found in this project: github
 
-Claude: [calls sqlite.query tool]
+  MCP servers may execute code or access system resources. All tool calls
+  require approval. Learn more in the MCP documentation.
 
-Query: SELECT status, COUNT(*) FROM orders GROUP BY status
+    Use this MCP server
+    Use this and all future MCP servers in this project
+  ❯ Continue without using this MCP server
 
-Results:
-- completed: 7,123 (79.7%)
-- abandoned: 1,456 (16.3%)
-- pending: 353 (4.0%)
+  Enter to confirm · Esc to cancel
+```
 
-16.3% abandoned is higher than the 10-12% e-commerce average.
-Consider implementing cart recovery emails.
+Pick option 3 for anything unvetted.
+
+**Step 7: See every server with `/mcp`**
+
+```text
+# Output may vary
+   Manage MCP servers
+   67 servers
+
+     Local MCPs (/Users/you/.claude.json [project: /Users/you/cc-lab])
+   ❯ fs · ✔ connected · 14 tools
+     …
+   https://code.claude.com/docs/en/mcp for help
+```
+
+Your list will be shorter; the panel also handles OAuth sign-in and per-project disable.
+
+**Step 8: Watch a tool ask for permission**
+
+Run `claude --permission-mode default`, then ask:
+`Use the fs MCP server to read src/math.js`
+
+```text
+# Output may vary
+ Tool use
+   fs — Read Text File Tool: (MCP)
+   path: "/Users/you/cc-lab/src/math.js"
+ Do you want to proceed?
+ ❯ 1. Yes
+   2. Yes, and don't ask again for fs — Read Text File commands in ~/…
+   3. No
+ Esc to cancel · Tab to amend
+```
+
+`--permission-mode default` is what makes the prompt appear: on Pro, Max and Team plans the
+built-in starting mode is `auto`, which `permissions.defaultMode` overrides.
+
+**Step 9: Pre-allow one tool, deny another** — headless cannot answer it:
+
+```bash
+claude -p "Use the fs MCP server to read src/math.js and show me line 1." --permission-mode default
+```
+
+```text
+# Output may vary
+I couldn't read the file because permission to use the fs MCP server's `read_text_file` tool
+hasn't been granted.
+```
+
+Add the rule to `.claude/settings.local.json`:
+
+```json
+{
+  "permissions": {
+    "allow": ["mcp__fs__read_text_file"],
+    "deny": ["mcp__fs__write_file"]
+  }
+}
+```
+
+Re-run the same command:
+
+```text
+# Output may vary
+Line 1 of `src/math.js`, read with the fs MCP server:
+export function add(a, b) { return a + b; }
+```
+
+**Step 10: Clean up**
+
+```bash
+claude mcp remove fs
+claude mcp remove github -s project
+```
+
+```text
+# Output may vary
+Removed MCP server "fs" from local config
+Removed MCP server github from project config
 ```
 
 ---
 
 ## 4. PRACTICE — Try It Yourself
 
-### Exercise 1: Database Explorer
+### Exercise 1: Add a remote HTTP server and sign in
 
-**Goal**: Set up SQLite MCP and explore a sample database.
-
-**Instructions**:
-1. Create a sample SQLite database with at least 2 tables
-2. Configure the SQLite MCP server
-3. Ask Claude to list tables and describe schemas
-4. Ask Claude to identify potential optimizations
-
-**Expected result**: Claude queries the database and suggests improvements.
+**Goal**: add Notion at user scope, then sign in. `claude mcp list` should move it from
+`! Needs authentication` to `✔ Connected`.
 
 <details>
 <summary>💡 Hint</summary>
 
-Use `sqlite3 sample.db` to create tables. Make sure the config path is absolute.
+Remote servers take a URL, not `--`. `claude mcp login <name>` runs OAuth from a shell.
 
 </details>
 
@@ -254,45 +274,55 @@ Use `sqlite3 sample.db` to create tables. Make sure the config path is absolute.
 <summary>✅ Solution</summary>
 
 ```bash
-# Create sample database
-$ sqlite3 ~/sample.db << EOF
-CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, email TEXT);
-CREATE TABLE posts (id INTEGER PRIMARY KEY, user_id INTEGER, title TEXT);
-INSERT INTO users VALUES (1, 'Alice', 'alice@example.com');
-INSERT INTO posts VALUES (1, 1, 'Hello World');
-EOF
+claude mcp add --transport http notion https://mcp.notion.com/mcp --scope user
+claude mcp login notion
+claude mcp list | grep notion
 ```
 
-Config:
-```json
-{
-  "mcpServers": {
-    "sqlite": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-sqlite", "--db-path", "/Users/yourname/sample.db"]
-    }
-  }
-}
-```
-
-Ask Claude: "List tables, describe the posts table, show all posts with user names"
+Undo with `claude mcp logout notion`, then `claude mcp remove notion -s user`, which also
+deletes the stored tokens.
 
 </details>
 
-### Exercise 2: GitHub Integration
+### Exercise 2: Ship a team `.mcp.json`
 
-**Goal**: Connect Claude to GitHub MCP server.
-
-**Instructions**:
-1. Install `@modelcontextprotocol/server-github`
-2. Generate a GitHub personal access token
-3. Configure the GitHub MCP server
-4. Ask Claude to list open issues in a repository
+**Goal**: a teammate clones the repo and gets the server with no prompt and no secret. Add a
+project-scoped server whose token comes from `${VAR}`, then pre-approve it by name;
+`claude mcp get <name>` should show `Scope: Project config (shared via .mcp.json)` and the header
+unexpanded.
 
 <details>
 <summary>💡 Hint</summary>
 
-Use `"env": {"GITHUB_TOKEN": "..."}` in the server config for the token.
+`claude mcp add --scope project` writes `.mcp.json`; approval lives in a settings file.
+
+</details>
+
+<details>
+<summary>✅ Solution</summary>
+
+`.claude/settings.json`, committed:
+
+```json
+{ "enabledMcpjsonServers": ["github"] }
+```
+
+`enableAllProjectMcpServers: true` is the blunter version. Both keys are ignored from the shared
+project file until the teammate accepts the workspace trust dialog — a cloned repo cannot approve
+its own servers.
+
+</details>
+
+### Exercise 3: Take away the write tools
+
+**Goal**: let Claude read through the `fs` server but never write. Add a deny rule, restart, then
+ask Claude to create a file through the server; the write must be refused although the server
+still offers the tool.
+
+<details>
+<summary>💡 Hint</summary>
+
+Deny beats allow. Deny rules accept a glob in the tool-name position.
 
 </details>
 
@@ -301,35 +331,15 @@ Use `"env": {"GITHUB_TOKEN": "..."}` in the server config for the token.
 
 ```json
 {
-  "mcpServers": {
-    "github": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
-      "env": {
-        "GITHUB_TOKEN": "ghp_YOUR_TOKEN_HERE"
-      }
-    }
+  "permissions": {
+    "allow": ["mcp__fs__read_text_file"],
+    "deny": ["mcp__fs__write_file", "mcp__fs__edit_file"]
   }
 }
 ```
 
-Ask Claude: "List open issues in myorg/myrepo"
-
-</details>
-
-### Exercise 3: Multi-Server Workflow
-
-**Goal**: Use multiple MCP servers together.
-
-**Instructions**:
-1. Configure both SQLite and GitHub MCP servers
-2. Ask Claude to correlate data across both sources
-3. Observe how Claude uses both servers
-
-<details>
-<summary>💡 Hint</summary>
-
-Frame questions so Claude needs both sources. Example: "What issues relate to products in our database?"
+Verify in `/permissions`. A tool matched by a bare-name glob deny rule is dropped from Claude's
+context entirely.
 
 </details>
 
@@ -337,76 +347,27 @@ Frame questions so Claude needs both sources. Example: "What issues relate to pr
 
 ## 5. CHEAT SHEET
 
-### MCP Architecture
+| Command | Description |
+|---|---|
+| `claude mcp add [-e K=V] --transport stdio <n> -- <cmd>` | Local process |
+| `claude mcp add --transport http <n> <url>` | Remote server |
+| `claude mcp add … --scope project\|user\|local` | Where it is stored |
+| `claude mcp add-json <n> '<json>'` | From JSON |
+| `claude mcp list` / `get <n>` / `remove <n> [-s <scope>]` | Inspect, remove |
+| `claude mcp login <n>` / `logout <n>` | OAuth from shell |
+| `/mcp` | Status, auth, disable |
+| `@server:protocol://path` | Resource |
+| `/mcp__server__prompt arg1 arg2` | Server prompt |
 
-```text
-┌─────────────┐           ┌─────────────┐           ┌──────────────┐
-│ Claude Code │  Request  │ MCP Server  │  Execute  │ External Sys │
-│  (Client)   │ ────────> │  (Adapter)  │ ────────> │ (DB/API/etc) │
-│             │ <──────── │             │ <──────── │              │
-└─────────────┘  Response └─────────────┘  Result   └──────────────┘
-```
-
-### Official MCP Servers
-
-| Server | Purpose |
-|--------|---------|
-| `server-postgres` | PostgreSQL database |
-| `server-sqlite` | SQLite database |
-| `server-filesystem` | Enhanced file ops |
-| `server-github` | GitHub API |
-
-### Config Template
-
-```json
-{
-  "mcpServers": {
-    "my-server": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-name", "--option", "value"],
-      "env": {
-        "SECRET_KEY": "value"
-      }
-    }
-  }
-}
-```
-
-### Security Checklist
-
-- ✅ Use read-only credentials
-- ✅ Point to replicas, not production
-- ✅ Review server code before installing
-- ✅ Use environment variables for secrets
-
-### Browser MCP Servers
-
-| Server | Purpose | Claude Gets |
-|--------|---------|-------------|
-| Playwright MCP | Browser automation | Navigate, click, fill, screenshot |
-| Chrome DevTools MCP | Live debugging | Console logs, network, DOM |
-
-### Project MCP Config (.mcp.json)
-
-```json
-// Place at project root, commit to git
-{
-  "mcpServers": {
-    "server-name": {
-      "command": "npx",
-      "args": ["-y", "package-name", "--option", "value"]
-    }
-  }
-}
-```
-
-### MCP Token Budget
-
-| Servers | Token Cost | Recommendation |
-|---------|-----------|----------------|
-| 1-2 | ~2-5K | ✅ Safe |
-| 3-5 | ~8-15K | ⚠️ Monitor context usage |
-| 6+ | ~20K+ | ❌ Disable unused servers |
+| Key / variable | Effect |
+|---|---|
+| `permissions.allow: ["mcp__fs__read_text_file"]` | Pre-approve a tool |
+| `permissions.deny: ["mcp__*"]` | Block every MCP tool |
+| `enabledMcpjsonServers` / `enableAllProjectMcpServers` | Approve `.mcp.json` servers |
+| `disabledMcpjsonServers` | Reject one, any file |
+| `allowedMcpServers` *(enforce in managed settings)* | Admin allowlist |
+| `MAX_MCP_OUTPUT_TOKENS` | Output cap; default 25,000 |
+| `--strict-mcp-config` | Only `--mcp-config` servers |
 
 ---
 
@@ -414,41 +375,31 @@ Frame questions so Claude needs both sources. Example: "What issues relate to pr
 
 | ❌ Mistake | ✅ Correct Approach |
 |---|---|
-| Exposing production write credentials | Use read-only replicas or read-only users |
-| Installing unknown MCP servers | Only use official servers or audit code first |
-| Hardcoding secrets in config | Use environment variables: `"env": {"KEY": "value"}` |
-| No access logging | Enable query logging on database side |
-| Mixing dev and prod credentials | Maintain separate config files per environment |
-| Not understanding Claude's actions | Review the SQL/API calls before trusting results |
-| Assuming MCP is sandboxed | MCP servers have full access to what you configure |
+| Editing the Claude Desktop app's JSON config and expecting Claude Code to read it | Different product, different file: use `claude mcp add`, or `claude mcp add-from-claude-desktop` (macOS/WSL) |
+| `npm i -g @modelcontextprotocol/server-sqlite` — SQLite, PostgreSQL and GitHub reference servers are archived | Pick a maintained one; the docs' database example is `claude mcp add --transport stdio db -- npx -y @bytebase/dbhub --dsn "…"`, read-only user |
+| `"Authorization": "Bearer ghp_FAKE-DO-NOT-USE-xxxx"` committed in `.mcp.json` | `"Bearer ${GITHUB_TOKEN}"`, verified with `claude mcp get <name>`: it must print the variable name |
+| "Claude never sees raw credentials — the server holds them" | Tool **output** lands in context: a tool returning a row with an API key just put it in your transcript. Deny tools that reach secrets |
+| Adding ten servers and assuming they are free | Definitions are deferred, but names and instructions still load. Check `/context`, disable unused ones in `/mcp`, prefer `gh`/`aws` (S15) |
+| Trusting a server because it is popular | One that fetches external content can inject instructions into your session ([Module 2.1](../../phase-02-security/01-threat-model/)). Read the source, pin the version |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: A Vietnamese fintech company needed faster production debugging. Database was large, logs scattered, debugging required manual SQL + log searches + code reviews.
+**Scenario**: A Ho Chi Minh City fintech team ran every incident the same way — one engineer in
+Jira, one in the read-replica, one in the logs — then pasted fragments into Claude Code.
 
-**Problem**: Average incident resolution: 4 hours. Engineers spent most time gathering data, not analyzing.
+**Problem**: Someone pasted a query result that still held a partner API key. Nothing leaked, but
+the review that followed banned ad-hoc pasting.
 
-**Solution**: Deployed three MCP servers:
-1. **PostgreSQL MCP** (read-only replica): Claude queries production data
-2. **Custom Monitoring MCP**: Tools like `get_error_logs(service, time_range)`
-3. **GitHub MCP**: Code context for recent changes
+**Solution**: Two project-scoped servers in a committed `.mcp.json` — internal Jira and a
+read-only Postgres user — authenticated through `${JIRA_TOKEN}` and `${PG_DSN}` from each
+developer's environment, never the file. The repo's `.claude/settings.json` carries
+`enabledMcpjsonServers`, an allow list naming the read tools, and a `deny` for the write side.
+Rotating a token is an env change, not a commit.
 
-**Workflow**: Developer asks "Why are payments timing out?"
-
-Claude:
-1. Calls `get_error_logs("payment-service", "1h")` → finds timeout pattern
-2. Queries database → finds spike in pending transactions
-3. Searches GitHub → finds recent change to locking logic
-4. Provides: root cause, proof, fix (rollback commit)
-
-**Result**:
-- Resolution time: 4 hours → **1.2 hours** (-70%)
-- Engineers analyze instead of gathering data
-- Full context without write access
-
-**Quote**: "MCP turned Claude from 'smart assistant' into 'team member with system access.'"
+**Result**: Reviewers diff one file to see which tools the agent can call, and "what can Claude
+touch in production?" now has a list for an answer.
 
 ---
 
