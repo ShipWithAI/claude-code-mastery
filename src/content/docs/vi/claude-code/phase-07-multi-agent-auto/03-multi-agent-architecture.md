@@ -1,663 +1,341 @@
 ---
-title: 'Kiến Trúc Multi-Agent'
-description: 'Hiểu kiến trúc multi-agent trong Claude Code: orchestrator, sub-agent và mô hình phân công task.'
+title: 'Kiến trúc Multi-Agent'
+description: 'Ánh xạ ba pattern orchestrator, pipeline, specialist lên subagent native và agent team thử nghiệm.'
+verified: 2026-09-22
+claude_version: 2.1.278
 ---
 
-# Module 7.3: Kiến Trúc Multi-Agent
+# Module 7.3: Kiến trúc Multi-Agent
 
-> **Thời gian học**: ~40 phút
+> **Thời gian ước tính**: ~40 phút
 >
-> **Yêu cầu trước**: Module 7.2 (Quy Trình Full Auto)
+> **Điều kiện tiên quyết**: Module 7.2 (Full Auto Workflow)
 >
-> **Kết quả**: Sau module này, bạn sẽ hiểu các pattern multi-agent, biết khi nào nên dùng từng pattern, và có thể tự implement orchestration cơ bản bằng one-shot mode và bash scripting.
+> **Kết quả**: Sau module này, bạn định nghĩa được một **subagent** trong
+> `.claude/agents/<name>.md`, gọi nó theo tên, chạy nhiều subagent song song, và quyết định khi
+> nào một **agent team** đáng số token nó tiêu.
 
 ---
 
-## 1. WHY — Tại Sao Cần Multi-Agent
+## 1. WHY — Tại sao quan trọng
 
-Bạn đang build một feature lớn trải dài 10 microservices. Sau 3 giờ làm việc liên tục, single Claude Code session bắt đầu bị rối: nhầm tên service này với service kia, reference code đã xóa từ 2 tiếng trước, suggest giải pháp đã thử và failed. Restart session thì mất hết context, giữ session thì context pollution ngày càng nặng.
-
-Giải pháp multi-agent: Thay vì một "senior dev" làm mọi thứ, bạn có một team các Claude instances — architect design, implementer cho mỗi service, tester, documenter. Mỗi agent có fresh context, chỉ làm một việc cụ thể, không bị nhiễu bởi 200 file đã đọc của các agent khác.
-
-Cũng như team thật: task nhỏ một người làm nhanh hơn. Task lớn phức tạp thì team chuyên môn hóa hiệu quả hơn một người làm hết.
+Đến giờ thứ ba của một feature lớn, Claude nhắc lại quyết định bạn đã huỷ và context đầy output
+test không ai đọc lại. Cách chữa không phải cửa sổ to hơn, mà là nhiều cửa sổ: **subagent** chạy
+trong context riêng và trả về bản tóm tắt; **agent team** là các session riêng với task list
+chung và messaging.
 
 ---
 
-## 2. CONCEPT — Ý Tưởng Cốt Lõi
+## 2. CONCEPT — Ý tưởng cốt lõi
 
-### Khi Nào Dùng Multi-Agent
+### Workflow và agent (S5)
 
-**Single Agent** phù hợp khi:
-- Task < 2 giờ làm việc
-- Chỉ động vào một vùng codebase
-- Context coherent (không jump lung tung giữa các domain khác nhau)
+Anthropic tách *workflow* (code quyết định bước tiếp) khỏi *agent* (model quyết định). Năm khối
+xây dựng của họ ánh xạ lên ba pattern ở đây:
 
-**Multi-Agent** phù hợp khi:
-- Task lớn, nhiều phase rõ ràng (design → implement → test → deploy)
-- Các subtask độc lập, có thể làm song song
-- Cần chuyên môn hóa (backend expert + frontend expert + DevOps expert)
-- Nguy cơ context degradation cao (quá nhiều file, quá nhiều quyết định cần nhớ)
-
-**Rule of thumb**: Nếu bạn assign cho team dev thật, bạn sẽ chia việc cho nhiều người → dùng multi-agent.
-
-### Các Thành Phần Claude Code Liên Kết Như Thế Nào
-
-Trước khi đi vào các pattern multi-agent, hãy hiểu cách các thành phần nội bộ của Claude Code liên kết với nhau:
+| Pattern khoá học | Pattern Anthropic | Cơ chế Claude Code |
+|---|---|---|
+| **Orchestrator-Worker** | orchestrator-workers / parallelization | Subagent song song, mỗi cái trả về tóm tắt |
+| **Pipeline** | prompt chaining | Subagent nối chuỗi ("use A, then use B on A's output"); ở quy mô lớn, Dynamic Workflows, sẽ học sau |
+| **Specialist Team** | evaluator-optimizer | Agent team: teammate có tên, nhắn tin và nhận task |
 
 ```mermaid
 graph TD
-    User[User Prompt] --> CC[Claude Code CLI]
-    CC --> Parser[Command Parser]
-    Parser --> Router{Route Decision}
-
-    Router -->|Interactive| Session[Session Manager]
-    Router -->|"One-shot (-p)"| OneShot[One-Shot Executor]
-    Router -->|SDK call| SDK[SDK Interface]
-
-    Session --> Agent[Agent Loop]
-    OneShot --> Agent
-    SDK --> Agent
-
-    Agent --> Tools[Tool System]
-    Tools --> FileOps[File Read/Write]
-    Tools --> Shell[Shell Commands]
-    Tools --> MCPTools[MCP Servers]
-
-    Agent --> Context[Context Window]
-    Context --> CLAUDE_MD[CLAUDE.md Files]
-    Context --> Conv[Conversation History]
-    Context --> LoadedFiles[Loaded File Content]
-
-    style User fill:#e1f5fe
-    style Agent fill:#fff3e0
-    style Tools fill:#e8f5e9
-    style Context fill:#fce4ec
+    M[Session chính] -->|Agent tool| S1["Subagent A<br/>context riêng, tool riêng"]
+    M -->|Agent tool| S2["Subagent B"]
+    S1 -->|tóm tắt ~1-2K token| M
+    S2 -->|tóm tắt| M
+    M -.->|CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1| T["Team lead"]
+    T --> A["@reviewer"]
+    T --> B["@tester"]
+    A <-->|SendMessage| B
+    A --> L[(Task list chung)]
+    B --> L
 ```
 
-**Các mối quan hệ chính**:
-- **Agent Loop** là engine cốt lõi — đọc context, quyết định hành động, gọi tools, và lặp lại cho đến khi hoàn thành
-- **Tools** là cách agent tác động lên thế giới (đọc/ghi file, chạy lệnh shell, kết nối MCP servers)
-- **Context Window** là những gì agent biết (quy tắc CLAUDE.md, lịch sử hội thoại, nội dung file đã load)
-- **Multi-agent** = nhiều Agent Loop độc lập, mỗi cái có context riêng, giao tiếp qua file trên đĩa
+Một subagent nên trả về khoảng **1.000–2.000 token** (S6), không phải cả transcript — đó là cách
+delegation bảo vệ context chính.
 
-Sơ đồ này giải thích **tại sao multi-agent hiệu quả**: mỗi agent có một Agent Loop sạch với context tập trung, tránh tình trạng ô nhiễm context khi một loop phải xử lý quá nhiều vấn đề cùng lúc.
+### Subagent
+
+Subagent là file Markdown có YAML frontmatter; phần thân là system prompt. Nó nằm ở
+`.claude/agents/` (project), `~/.claude/agents/` (mọi project), hoặc `--agents '{…}'` (một
+session). Chỉ `name` và `description` là bắt buộc.
+
+| Field | Mục đích |
+|---|---|
+| `name`, `description` | Danh tính; `description` cho Claude biết khi nào delegate |
+| `tools` | `Read, Grep, Bash` hoặc YAML list; bỏ trống thì kế thừa mọi tool khả dụng cho subagent |
+| `model` | `sonnet`, `opus`, `haiku`, `fable`, ID đầy đủ, hoặc `inherit` |
+| `permissionMode` | Có hiệu lực khi session chính ở `default`, `dontAsk` hoặc `plan`; bị bỏ qua dưới `acceptEdits`/`auto`/`bypass` |
+| `maxTurns` | Dừng subagent; output được đánh dấu partial |
+| `skills`, `memory`, `isolation: worktree` | Nạp sẵn skill; memory (`user`/`project`/`local`); git worktree riêng |
+
+Built-in: **Explore** (tìm kiếm chỉ đọc), **Plan** (nghiên cứu plan mode), **general-purpose**
+(mọi thứ). `/agents` in lời nhắc, không phải wizard. Gọi theo tên (*"Use the test-writer subagent
+to …"*) hoặc ép bằng `@"test-writer (agent)"`. Subagent bắt đầu mới: system prompt, task message,
+CLAUDE.md, git status — không có hội thoại của bạn.
+
+### Agent team
+
+⚠️ **Thử nghiệm, tắt mặc định.** Bật bằng `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` trong môi
+trường hoặc khối `env` của `settings.json`; chỉ session tương tác. Theo docs, team hơn subagent
+ở *research and review*, *new modules or features*, *debugging with competing hypotheses*,
+*cross-layer coordination* — và thua ở *"sequential tasks, same-file edits, or work with many
+dependencies"*, nơi *"a single session or subagents are more effective."*
+
+Chi phí quyết định. Trang costs: *"approximately 7x more tokens than standard sessions when
+teammates run in plan mode"* — ~7× một session thường **khi teammate chạy ở plan mode** (S15);
+research của Anthropic đo multi-agent ~15× một cuộc chat (S10). Mỗi teammate là một session
+riêng: bắt đầu với 3–5, mỗi người một bộ file, xong thì shut down.
+
+> `(S5)`, `(S6)`, `(S10)`, `(S15)`: `docs/references/anthropic-sources.md`.
 
 ---
 
-### Ba Pattern Chính
+## 3. DEMO — Từng bước
 
-#### Pattern 1: Orchestrator-Worker (Song Song)
+Chạy trong `~/cc-lab`; ảnh chụp đã cắt gọn.
 
-```mermaid
-graph TD
-    O[Orchestrator Agent] --> W1[Worker 1<br/>Service A]
-    O --> W2[Worker 2<br/>Service B]
-    O --> W3[Worker 3<br/>Service C]
-    O --> W4[Worker 4<br/>Service D]
-    W1 --> R[Shared Results]
-    W2 --> R
-    W3 --> R
-    W4 --> R
-    R --> O
-```
-
-**Khi nào dùng**: Nhiều task giống nhau, độc lập, có thể làm song song.
-**Ví dụ**: Thêm logging vào 10 microservices, migrate 20 API endpoints sang TypeScript.
-
-**Cách hoạt động**:
-1. Orchestrator phân tích task, chia nhỏ, tạo work plan
-2. Spawn N worker agents, mỗi agent nhận một subtask
-3. Workers chạy song song (hoặc tuần tự nếu cần safety)
-4. Orchestrator thu thập kết quả, verify consistency
-
----
-
-#### Pattern 2: Pipeline (Tuần Tự)
-
-```mermaid
-graph LR
-    A1[Agent 1<br/>Architect] -->|design.md| A2[Agent 2<br/>Implementer]
-    A2 -->|code| A3[Agent 3<br/>Reviewer]
-    A3 -->|feedback.md| A4[Agent 4<br/>Tester]
-    A4 -->|test results| Done[Complete]
-```
-
-**Khi nào dùng**: Các phase tuần tự, output của agent này là input của agent kế.
-**Ví dụ**: Design API → Implement → Code review → Write tests → Update docs.
-
-**Cách hoạt động**:
-1. Agent 1 chạy, output file (design.md, schema.json...)
-2. Agent 2 đọc output của Agent 1, chạy task tiếp, tạo output mới
-3. Agent 3, 4... lần lượt chạy theo chain
-4. Mỗi agent chỉ cần context từ agent trước, không cần biết toàn bộ lịch sử
-
----
-
-#### Pattern 3: Specialist Team (Chuyên Môn Hóa)
-
-```mermaid
-graph TD
-    C[Coordinator Agent] --> BE[Backend Specialist]
-    C --> FE[Frontend Specialist]
-    C --> DB[Database Specialist]
-    C --> QA[Test Specialist]
-    BE --> Code[Shared Codebase]
-    FE --> Code
-    DB --> Code
-    QA --> Code
-    Code --> C
-```
-
-**Khi nào dùng**: Full-stack feature cần expertise từ nhiều domain.
-**Ví dụ**: Build payment flow hoàn chỉnh — backend API, React UI, Postgres migration, integration tests.
-
-**Cách hoạt động**:
-1. Coordinator tạo integration contract (API spec, data models, interfaces)
-2. Mỗi specialist agent làm phần của mình dựa theo contract
-3. Specialists không nói chuyện trực tiếp — giao tiếp qua artifacts (code, docs)
-4. Coordinator verify integration, resolve conflicts
-
----
-
-### Giao Tiếp Giữa Các Agent
-
-**File-Based Handoffs** (khuyên dùng):
-- Agent A viết `plan.md`, `schema.json`, `architecture.md`
-- Agent B đọc file đó, làm việc, tạo output mới
-- **Ưu**: Clear, auditable, dễ debug
-- **Nhược**: I/O overhead (không đáng kể với modern SSD)
-
-**Pipes** (advanced):
-```bash
-claude -p "analyze codebase" | claude -p "implement improvements from stdin"
-```
-- **Ưu**: Elegant, Unix philosophy
-- **Nhược**: Khó debug, không có artifact trung gian
-
-**JSON Output** ⚠️ Cần xác minh:
-```bash
-claude -p "output JSON schema" --output-format json > schema.json
-```
-- **Ưu**: Structured data, dễ parse
-- **Nhược**: Flag `--output-format` chưa verify có tồn tại
-
----
-
-### Spawning Fresh Agents
-
-Mỗi agent là một lần gọi `claude` riêng biệt với fresh context:
+**Bước 1: Định nghĩa subagent cho project**
 
 ```bash
-claude -p "your specialized prompt here"
+# docs: sub-agents#write-subagent-files
+mkdir -p .claude/agents && cat > .claude/agents/test-writer.md << 'EOF'
+---
+name: test-writer
+description: Writes node:test unit tests for a given source file. Use when asked to add or extend tests.
+tools: Read, Write, Bash
+model: sonnet
+---
+You are a test writer. Read the source file you are given, write or extend
+tests in tests/ using node:test and node:assert/strict, run `npm test`, and
+report only the test names and the pass/fail counts.
+EOF
 ```
 
-**Quan trọng**: Agents không share memory. Giao tiếp qua artifacts — files, stdout, env vars.
+Vì sao: `tools` là hàng rào: không `Edit`, không `WebFetch`.
 
----
-
-## 3. DEMO — Từng Bước
-
-**Task**: Thêm API endpoint mới cho user preferences (theme, language, notifications) — complete với tests và docs.
-
----
-
-### Agent 1: Architect (Design Phase)
-
-**Bước 1**: Chạy architect agent để design
+**Bước 2: Gọi theo tên (Orchestrator-Worker, một worker)**
 
 ```bash
-$ claude -p "Design một API endpoint để quản lý user preferences (theme, language, notifications). Output cần có: route structure, request/response schemas, database changes cần thiết. Viết tất cả vào file architecture.md"
+# docs: sub-agents#invoke-subagents-explicitly
+claude --permission-mode acceptEdits
 ```
 
-**Kết quả**: File `architecture.md` được tạo với nội dung:
+Prompt: `Use the test-writer subagent to add three tests for src/math.js`
 
 ```text
-Reading codebase structure...
-Analyzing existing API patterns...
-
-✓ Created architecture.md with:
-  - Route: PUT /api/v1/users/:id/preferences
-  - Request schema: { theme, language, notifications }
-  - Response: updated user object
-  - DB: add preferences JSON column to users table
-  - Security: require auth, validate user owns resource
+# Output may vary
+⏺ test-writer(Add three tests for math.js)
+  ⎿  Backgrounded agent (↓ to manage · ctrl+o to expand)
+⏺ The test-writer subagent is running. It's extending tests/math.test.mjs with three new tests …
+✻ Waiting for 1 background agent to finish
+ Bash command · from the test-writer agent
+   npm test -- tests/math.test.mjs 2>&1 | tail -30
+ Do you want to proceed?
+ ❯ 1. Yes
+   2. Yes, and don’t ask again for: npm test *
+   3. Yes, and switch to auto mode · auto mode handles these prompts for you
+   4. No
+⏺ Agent "Add three tests for math.js" finished · 37s
 ```
 
-Architect agent **không viết code**, chỉ design. Context sạch, focus 100% vào architecture.
-
----
-
-### Agent 2: Implementer (Implementation Phase)
-
-**Bước 2**: Spawn implementer agent với context từ architecture.md
+Dòng `test-writer(…)` chứng minh có delegation; prompt Bash của nó hiện trong session *của bạn*,
+kèm tên. `acceptEdits` bao `Write` của subagent, không bao `npm test`. Sau đó:
 
 ```bash
-$ claude -p "Đọc architecture.md. Implement preferences endpoint trong src/routes/ và src/services/. Follow existing Express patterns. Dùng Prisma cho database access."
+git diff --stat && npm test 2>&1 | grep -E '^# (pass|fail)'
 ```
-
-**Kết quả**:
 
 ```text
-Reading architecture.md...
-Analyzing src/routes/ structure...
-
-✓ Created src/routes/userPreferences.ts
-✓ Created src/services/preferencesService.ts
-✓ Updated src/routes/index.ts to register route
-✓ Created Prisma migration: add_user_preferences
-
-Files changed:
- src/routes/userPreferences.ts     | 45 ++++++
- src/services/preferencesService.ts | 32 +++++
- src/routes/index.ts               |  2 +
- prisma/migrations/...             | 12 ++
+# Output may vary
+ tests/math.test.mjs | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+# pass 4
+# fail 0
 ```
 
-Implementer **không second-guess** design — chỉ implement đúng spec. Không bị distracted bởi design decisions.
+**Bước 3: `/agents` — một lời nhắc, không phải danh sách**
 
----
+```text
+# Output may vary
+❯ /agents
+  ⎿  The /agents wizard has been removed.
+     Ask Claude to create or update subagents for you (e.g. "create a code-reviewer subagent that ..."),
+     or edit the files directly:
+       • .claude/agents/       (this project)
+       • ~/.claude/agents/     (all projects)
+```
 
-### Agent 3: Tester (Testing Phase)
+`/tasks` liệt kê subagent đang chạy và đã xong.
 
-**Bước 3**: Spawn tester agent để viết comprehensive tests
+**Bước 4: Hai subagent song song (Orchestrator-Worker)**
 
 ```bash
-$ claude -p "Đọc architecture.md và src/routes/userPreferences.ts. Viết comprehensive tests covering happy path, validation errors, not found cases, unauthorized access. Dùng Jest và Supertest."
+# docs: sub-agents#run-parallel-research
+claude --permission-mode default
 ```
 
-**Kết quả**:
+Prompt: `Use two subagents in parallel: one lists every exported function in src/, the other
+lists every TODO comment in the repo. Report both lists.`
+
+Session đang ở `default`, nên chuẩn bị trả lời prompt: subagent nền cần Bash sẽ đẩy yêu cầu lên
+session *của bạn*, kèm tên.
 
 ```text
-Reading architecture.md...
-Reading implementation...
-
-✓ Created tests/routes/userPreferences.test.ts with:
-  - Happy path: update all fields
-  - Validation: invalid theme, missing fields
-  - Auth: unauthorized, wrong user
-  - Not found: user doesn't exist
-
-Running tests...
- PASS  tests/routes/userPreferences.test.ts
-  ✓ should update user preferences (45ms)
-  ✓ should reject invalid theme (12ms)
-  ✓ should require auth (8ms)
-  ✓ should prevent updating other users (15ms)
-
-Tests: 4 passed, 4 total
+# Output may vary
+⏺ 2 background agents launched (↓ to manage)
+   ├ List exported functions in src/
+   └ List TODO comments in repo
+✻ Waiting for 2 background agents to finish
+⏺ Agent "List exported functions in src/" finished · 1m 1s
+  The first subagent finished: src/ has two exported functions, both in src/math.js. …
 ```
 
-Tester agent verify implementation against spec — không cần biết chi tiết Prisma query, chỉ verify behavior.
+Cả hai chạy bằng Explore built-in ở background. Cái đầu trả về tóm tắt: hai dòng, không phải cả
+danh sách file. Cái thứ hai không hoàn tất — `grep` của nó cần phê duyệt ở session chính. Duyệt,
+đổi mode, hoặc pre-approve bằng `permissions.allow`.
 
----
+**Bước 5: Một agent team (Specialist Team)**
 
-### Agent 4: Documenter (Documentation Phase)
-
-**Bước 4**: Spawn documenter để update API docs
+Team được bật ở đây bằng `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` trong `~/.claude/settings.json`.
 
 ```bash
-$ claude -p "Đọc architecture.md và src/routes/userPreferences.ts. Update API.md với endpoint documentation bao gồm curl examples và response formats."
+# docs: agent-teams#start-your-first-agent-team
+claude --permission-mode default
 ```
 
-**Kết quả**:
+Prompt: `Spawn two teammates named reviewer and tester. reviewer reads src/math.js and lists 3
+edge cases; tester reads tests/math.test.mjs and lists 3 missing tests. Each reports back in
+bullets, then ask both to shut down and summarize.`
 
 ```text
-Reading architecture.md...
-Reading implementation...
-Reading existing API.md format...
-
-✓ Updated API.md with:
-  - Endpoint description
-  - Authentication requirements
-  - Request/response examples
-  - Error cases with status codes
-  - curl examples for all scenarios
+# Output may vary
+⏺ 2 background agents launched (↓ to manage)
+   ├ @reviewer
+   └ @tester
+› Message from @reviewer (ctrl+o to expand)
+⏺ Teammate @reviewer finished
+› Message from @tester (ctrl+o to expand)
+⏺ Both reports are in. Sending shutdown requests to both.
+⏺ Shutdown requests sent to both teammates. Here's the summary:
+  reviewer — 3 edge cases in src/math.js
+  - divide by zero — divide(1, 0) → Infinity, divide(-1, 0) → -Infinity, divide(0, 0) → NaN; …
+  tester — 3 missing tests in tests/math.test.mjs
+  - divide happy path — divide is exported but never imported or tested at all …
+  Overlap worth acting on: both flagged divide(x, 0) … No files were modified by either teammate.
 ```
 
-Documenter chỉ focus vào docs — không quan tâm implementation details, chỉ verify behavior từ code + spec.
+Teammate được gọi là `@reviewer`/`@tester`, nhắn thẳng cho lead, thoát khi nhận shutdown request.
+Dọn bằng `rm -rf .claude/agents && git checkout -- tests`.
 
 ---
 
-### Tổng Kết Demo
+## 4. PRACTICE — Tự thực hành
 
-**Kết quả**: Hoàn thành feature trong **~15 phút** với 4 agents chuyên môn hóa.
+### Bài 1: Reviewer chỉ đọc
 
-**So sánh với single agent**:
-- Single agent: ~45 phút, context degradation sau design phase, có thể inconsistent giữa code và docs
-- Multi-agent: Fresh context mỗi phase, consistent với architecture.md, dễ verify từng phase
-
-**Files tạo ra**:
-- `architecture.md` — single source of truth
-- Implementation code
-- Tests
-- Documentation
-
-Mỗi artifact có thể review độc lập. Nếu phase nào fail, re-run chỉ agent đó.
-
----
-
-## 4. PRACTICE — Tự Thực Hành
-
-### Bài 1: Build Pipeline Đầu Tiên
-
-**Goal**: Implement 3-phase pipeline cho một feature nhỏ.
-
-**Instructions**:
-1. Chọn một feature nhỏ với các phase rõ ràng (ví dụ: thêm rate limiting — design → implement → test)
-2. Viết prompts cho 3 agents theo pattern DEMO
-3. Tạo bash script `pipeline.sh` chạy 3 agents tuần tự
-4. Execute và quan sát cách mỗi agent đọc output của agent trước
-
-**Kết quả mong đợi**: Ba file riêng biệt (design.md, implementation code, tests). Mỗi agent reference đúng output của agent trước, không có context pollution.
+**Mục tiêu**: Định nghĩa `security-reviewer` chỉ được nhìn, không được sửa.
+**Hướng dẫn**: tạo `.claude/agents/security-reviewer.md` với `tools: Read, Grep, Glob` và
+`model: sonnet`, rồi hỏi `Use the security-reviewer subagent to review src/`.
+**Kết quả mong đợi**: có danh sách phát hiện; `git status` không đổi.
 
 <details>
-<summary>💡 Hint</summary>
+<summary>✅ Lời giải</summary>
 
-Bash script structure:
-```bash
-#!/bin/bash
-set -e  # Stop on error
-
-echo "=== Phase 1: Agent Architect ==="
-claude -p "prompt for architect"
-
-echo "=== Phase 2: Agent Implementer ==="
-claude -p "prompt for implementer, mention reading design file"
-
-echo "=== Phase 3: Agent Tester ==="
-claude -p "prompt for tester, mention reading design + code"
-
-echo "=== Pipeline complete ==="
-git diff --stat
+```markdown
+---
+name: security-reviewer
+description: Read-only security review of source files. Use before merging.
+tools: Read, Grep, Glob
+model: sonnet
+---
+Review the files you are given for injection, secrets and unsafe defaults.
+Report each finding as: severity, file:line, one-sentence fix. Never edit files.
 ```
+
+Không có `Edit`/`Write` trong `tools`, agent không đổi được gì — hàng rào, không phải lời nhờ.
 </details>
 
+### Bài 2: Orchestrator với tóm tắt JSON
+
+**Mục tiêu**: Ba subagent, một báo cáo gộp.
+**Hướng dẫn**: prompt `Use three subagents in parallel — exports, TODOs, test names. Each must
+return a JSON object {"area": …, "items": […]} and nothing else. Merge them into one JSON array.`
+Xác nhận ba object ngắn quay về, không phải transcript.
+
 <details>
-<summary>✅ Solution</summary>
-
-```bash
-#!/bin/bash
-set -e
-
-echo "=== Agent 1: Architect ==="
-claude -p "Design rate limiting cho API của chúng ta. Strategy: token bucket algorithm. Output implementation plan vào file rate-limit-design.md với các sections: algorithm choice, configuration (requests per window, window size), integration points (middleware location), error responses."
-
-echo "=== Agent 2: Implementer ==="
-claude -p "Đọc rate-limit-design.md. Implement rate limiting middleware trong src/middleware/rateLimit.ts. Dùng thư viện express-rate-limit nếu phù hợp, hoặc implement token bucket thuần nếu design yêu cầu custom logic. Follow existing middleware patterns trong src/middleware/."
-
-echo "=== Agent 3: Tester ==="
-claude -p "Đọc rate-limit-design.md và src/middleware/rateLimit.ts. Viết tests verify rate limiting hoạt động đúng: normal requests pass, burst requests blocked, rate resets after window, custom routes có custom limits. Dùng Jest + Supertest."
-
-echo "=== Pipeline complete ==="
-echo "Verifying changes..."
-git diff --stat
-npm test -- rateLimit
-```
-
-**Giải thích kết quả**:
-- **Agent 1** focus hoàn toàn vào design — không bị distracted bởi implementation concerns
-- **Agent 2** implement đúng spec — không second-guess design, không over-engineer
-- **Agent 3** test against spec — verify behavior match design document
-
-Mỗi agent có fresh context. Architect không bị nhiễu bởi test scenarios. Tester không cần nhớ lý do chọn token bucket — chỉ cần verify spec.
-
-**Nếu phase 2 fail** (implementation có bug), bạn chỉ cần re-run agent 2 với fix prompt. Agent 1 và 3 không bị ảnh hưởng.
+<summary>✅ Lời giải</summary>
+*Báo cáo* của subagent đi vào context của bạn; khuôn dạng chặt giữ nó gần mức 1–2K token (S6).
 </details>
 
----
+### Bài 3: Writer / Reviewer ở hai session (S1)
 
-### Bài 2: Orchestrator-Worker Pattern
-
-**Goal**: Dùng orchestrator-worker cho parallel tasks.
-
-**Instructions**:
-1. **Task**: Thêm error logging vào 5 service files khác nhau
-2. Tạo orchestrator agent phân tích files và viết `logging-plan.md`
-3. Tạo workers (dùng loop) — mỗi worker add logging vào một file
-4. Chạy workers tuần tự (hoặc song song với `&` nếu advanced)
-
-**Kết quả mong đợi**: Cả 5 files được update với logging consistent theo plan của orchestrator.
+**Mục tiêu**: Review với context mới, không thiên vị code nó vừa viết.
+**Hướng dẫn**:
+1. Session A: `claude --permission-mode acceptEdits` →
+   `Implement a clamp(x, lo, hi) function in src/math.js`.
+2. Session B: `claude --worktree review --permission-mode default` → `Review the clamp
+   implementation in @src/math.js. Look for edge cases and consistency with existing functions.`
+3. Dán phát hiện của B vào A: `Here's the review feedback: […]. Address these issues.`
 
 <details>
-<summary>💡 Hint</summary>
-
-Orchestrator prompt nên:
-- List tất cả services cần update
-- Define logging format chung (log level, message template, context fields)
-- Specify error scenarios cần log
-
-Worker prompt template:
-- Read logging-plan.md
-- Apply logging cho service cụ thể: `${service}.ts`
-- Follow plan format exactly
-</details>
-
-<details>
-<summary>✅ Solution</summary>
-
-```bash
-#!/bin/bash
-set -e
-
-echo "=== Orchestrator: Analyzing services và creating plan ==="
-claude -p "Phân tích các files trong src/services/{user,order,payment,auth,notification}.ts. Tạo logging-plan.md specify:
-1. Logging format chung (dùng winston logger đã có sẵn)
-2. Log levels cho từng error type (validation errors: warn, DB errors: error, etc)
-3. Context fields cần include (userId, requestId, timestamp, service name)
-4. Specific errors trong mỗi service cần log
-Output format: markdown table với columns [Service, Error Scenario, Log Level, Context Fields]"
-
-echo ""
-echo "Waiting for orchestrator to complete..."
-sleep 2
-
-echo "=== Workers: Applying logging plan ==="
-for service in user order payment auth notification; do
-  echo "  → Worker processing: ${service} service"
-  claude -p "Đọc logging-plan.md. Thêm appropriate error logging vào src/services/${service}.ts following the plan.
-  - Dùng existing winston logger instance
-  - Add logging cho tất cả error scenarios specified in plan
-  - Include all context fields theo spec
-  - Không thay đổi business logic, chỉ add logging"
-
-  echo "    ✓ ${service} service completed"
-  echo ""
-done
-
-echo "=== All workers complete ==="
-echo "Verifying consistency..."
-git diff --stat
-
-echo ""
-echo "Checking if all services use same logging format..."
-grep -n "logger\." src/services/*.ts | head -20
-```
-
-**Giải thích kết quả**:
-
-**Orchestrator benefits**:
-- Analyzed all 5 services cùng lúc → consistent logging strategy
-- Created single source of truth (logging-plan.md)
-- Defined format trước khi workers start → không có inconsistency
-
-**Worker benefits**:
-- Mỗi worker chỉ focus vào 1 file — fresh context, không bị confused
-- Follow plan blindly — không cần suy nghĩ về format, levels, fields
-- Workers có thể chạy song song nếu cần (thêm `&` sau mỗi claude command, thêm `wait` ở cuối)
-
-**Parallel execution** (advanced):
-```bash
-for service in user order payment auth notification; do
-  claude -p "..." &  # Run in background
-done
-wait  # Wait for all background jobs
-```
-
-⚠️ **Warning**: Parallel execution với `&` chỉ safe nếu workers touch file riêng biệt. Nếu có shared files (như `index.ts`), chạy tuần tự để tránh conflicts.
-
-**Verification**:
-```bash
-# Check all services import logger
-grep "import.*logger" src/services/*.ts
-
-# Check consistent log levels usage
-grep "logger\.(error|warn|info)" src/services/*.ts | wc -l
-
-# Verify context fields present
-grep "userId.*requestId" src/services/*.ts
-```
-
-**Nếu một worker fail**:
-```bash
-# Re-run chỉ failed worker
-claude -p "Đọc logging-plan.md. Fix logging trong src/services/payment.ts..."
-```
-
-Không cần re-run orchestrator hay workers khác.
+<summary>✅ Lời giải</summary>
+B chưa từng thấy lập luận của A, nên nó review code, không review ý định. `--worktree` cho B
+chạy test mà không làm xáo cây của A.
 </details>
 
 ---
 
 ## 5. CHEAT SHEET
 
-### Chọn Pattern Phù Hợp
-
-| Tình Huống | Pattern Dùng | Lý Do |
-|------------|--------------|-------|
-| 10 tasks giống nhau, độc lập | **Orchestrator-Worker** | Parallel execution, same template |
-| Design → Code → Test → Deploy | **Pipeline** | Sequential dependencies, clear handoffs |
-| Frontend + Backend + DB + Infra | **Specialist Team** | Domain expertise per layer |
-| Refactor một module < 2 giờ | **Single Agent** | Context coherent, không cần split |
-| Migrate 50 API endpoints | **Orchestrator-Worker** | Same task template, scale to N workers |
-| Debug complex race condition | **Single Agent** | Cần maintain mental model liên tục |
-
----
-
-### Spawning Agent
-
-| Cách Spawn | Cú Pháp | Use Case |
-|------------|---------|----------|
-| One-shot command | `claude -p "prompt"` | Single task, fresh context |
-| Loop sequential | `for x in list; do claude -p "..."; done` | Batch processing, safe |
-| Loop parallel | `for x in list; do claude -p "..." &; done; wait` | Speed, workers touch different files |
-| Pipeline với pipes | `claude -p "analyze" \| claude -p "implement"` | Simple 2-stage chain |
+| Lệnh / Tính năng | Mô tả | Ví dụ |
+|---|---|---|
+| `.claude/agents/<name>.md` · `~/.claude/agents/` | Subagent của project / cá nhân | `name`, `description`, `tools`, `model` |
+| `--agents '{…}'` | Subagent chỉ cho session, dạng JSON | `claude --agents '{"reviewer": {"description": …, "prompt": …}}'` |
+| `Use the <name> subagent to …` | Delegation, Claude tự quyết | — |
+| `@"<name> (agent)"` | Ép đúng subagent đó | `@"test-writer (agent)" cover src/math.js` |
+| `--agent <name>` | Session chạy như subagent đó | `claude --agent security-reviewer` |
+| Explore / Plan / general-purpose | Built-in: chỉ đọc / nghiên cứu plan / mọi thứ | `Agent(Explore)` chặn một cái |
+| `/tasks` | Việc nền, đang chạy và đã xong | — |
+| `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` | Bật team (thử nghiệm) | `env` trong settings.json |
+| `Spawn N teammates …` | Khởi động team; đặt tên để nhắn `@name` | — |
+| `Ask the <name> teammate to shut down` | Teammate thoát êm | — |
+| `--teammate-mode` | `in-process` (mặc định), `auto`, `tmux`, `iterm2` | split pane cần tmux |
 
 ---
 
-### Communication Giữa Agents
+## 6. PITFALLS — Lỗi thường gặp
 
-| Phương Pháp | Ưu Điểm | Nhược Điểm | Khi Nào Dùng |
-|-------------|---------|------------|--------------|
-| **File handoffs** | Clear, auditable, dễ debug | Extra I/O (negligible) | Recommended cho mọi case |
-| **Pipes** | Elegant, Unix philosophy | Khó debug, no intermediate artifact | Simple 2-agent chains |
-| **Env vars** | Fast cho small data | Size limits, type unsafe | Pass config/flags |
-| **JSON files** | Structured, type-safe | Cần parse logic | Complex data structures |
-
----
-
-### Agent Lifecycle
-
-| Phase | Command | Notes |
-|-------|---------|-------|
-| **Spawn** | `claude -p "prompt"` | Fresh context, no memory of previous agents |
-| **Execute** | Agent runs, reads artifacts, does work | Can read files written by previous agents |
-| **Output** | Writes files, stdout | Next agent input |
-| **Terminate** | Agent exits | No persistent state |
+| ❌ Sai lầm | ✅ Cách đúng |
+|---|---|
+| Vòng lặp bash `claude -p` ghi file, không cờ permission | Subagent native, hoặc `-p` với `--permission-mode acceptEdits` / `--allowedTools` |
+| Coi agent là hộp kín chỉ nói chuyện qua file trên đĩa | Subagent trả về tóm tắt; teammate dùng chung task list và nhắn tin cho nhau |
+| Dùng team cho thay đổi tuần tự, cùng file | Một session hoặc subagent nối chuỗi; mỗi teammate tốn bằng một session |
+| Subagent trả về nguyên transcript | Yêu cầu báo cáo ngắn, có cấu trúc (~1–2K token) |
+| `permissionMode: bypassPermissions` trong subagent | Bị bỏ qua trừ khi session chính bypass; dùng `tools` làm hàng rào |
+| Hai teammate sửa cùng một file | Mỗi teammate một bộ file riêng; docs nói thẳng dùng chung sẽ dẫn tới ghi đè |
 
 ---
 
-### Debugging Multi-Agent
+## 7. REAL CASE — Câu chuyện thực tế
 
-| Issue | Cách Debug |
-|-------|------------|
-| Agent ignored previous output | Check file actually created + readable. Print file content in prompt: "Read X.md and summarize it first" |
-| Inconsistent results across workers | Orchestrator plan không đủ chi tiết. Add examples to plan file |
-| Agent context pollution | Đảm bảo mỗi agent là separate `claude` invocation, không reuse session |
-| Parallel workers conflict | Verify file ownership — workers touch different files, or run sequential |
+**Bối cảnh**: Một team fintech Việt Nam xây payment reconciliation qua sáu service và hai API
+bên thứ ba.
 
----
+**Vấn đề**: Một session dài xuống cấp sau ba ngày: contract lệch và test tham chiếu endpoint
+không còn tồn tại.
 
-## 6. PITFALLS — Lỗi Thường Gặp
+**Giải pháp**: Lead viết `integration-contract.md` trong một session plan mode, rồi, với agent
+team đã bật, spawn sáu teammate đặt tên theo service — mỗi cái là một subagent definition giới
+hạn `tools`, lấy contract làm spawn prompt — cộng một `contract-tester` chỉ đọc. Vượt mốc 3–5 có
+chủ đích: mỗi teammate một ranh giới service, không ai chung file. Review diễn ra trong một
+session `--worktree` mới (Writer/Reviewer).
 
-| ❌ Sai Lầm | ✅ Đúng Cách |
-|------------|-------------|
-| **Dùng multi-agent cho task 10 phút** | Single agent đủ cho tasks < 2 giờ. Multi-agent overhead không đáng với task nhỏ. |
-| **Agents overlap trách nhiệm** | Clear boundary — "Agent A design, Agent B implement, Agent C test". Không có "Agent A design và implement một tí". |
-| **Không có shared artifact** | Luôn dùng handoff file (`design.md`, `spec.json`, `plan.md`). Agents không đọc được suy nghĩ của nhau — phải viết ra. |
-| **Parallel agents edit cùng file** | Coordinate file ownership. Worker 1 → `serviceA.ts`, Worker 2 → `serviceB.ts`. Nếu cần edit shared file → chạy sequential hoặc dùng coordinator merge. |
-| **Over-engineer orchestration** | Start với bash script đơn giản. Chỉ build complex orchestrator khi bash không đủ (>10 workers, complex dependencies). |
-| **Quên fresh context là điểm mạnh** | Đừng pass massive context cho mỗi agent. Cho agent input focused (chỉ spec file cần thiết). Trust specialization — architect không cần đọc test code. |
+**Kết quả**: Lớp reconciliation ship trong một ngày, không lệch API. Bảy file agent nằm lại
+trong `.claude/agents/` và chạy như subagent thường khi team không đáng token.
 
 ---
 
-## 7. REAL CASE — Câu Chuyện Thực Tế
-
-**Scenario**: Startup fintech Việt Nam build payment reconciliation system — 6 microservices (transaction-processor, bank-connector, reconciliation-engine, notification-service, audit-logger, reporting-api), 3 databases (Postgres, MongoDB, Redis), 2 third-party APIs (Vietcombank API, VNPay API).
-
-**Problem**: Team lead thử dùng single Claude Code session build toàn bộ integration. Sau 3 ngày:
-- API contracts inconsistent — transaction-processor expect field `amount_vnd`, reconciliation-engine đọc `amount`
-- Tests reference non-existent endpoints
-- Context window degraded — Claude suggest solutions đã thử và failed 2 ngày trước
-- Restart session → mất hết architectural decisions
-
-**Solution**: Switch sang **Specialist Team pattern**:
-
-1. **Coordinator Agent** (Opus): Tạo `integration-contract.md` defining:
-   - Shared data models (Transaction, ReconciliationRecord, BankTransaction)
-   - API contracts giữa 6 services
-   - Database schemas
-   - Third-party API integration specs
-
-2. **6 Service Agents** (Sonnet, parallel): Mỗi agent implement một microservice từ contract:
-   - Input: `integration-contract.md` + existing codebase patterns
-   - Output: Service implementation + unit tests
-   - Không nói chuyện với nhau — follow contract blindly
-
-3. **Integration Agent** (Sonnet): Build orchestration layer:
-   - Docker Compose setup
-   - API gateway routing
-   - Service mesh configuration
-
-4. **Test Agent** (Sonnet): Add end-to-end tests:
-   - Contract compliance tests (verify mỗi service follow contract)
-   - Integration tests (payment flow từ đầu đến cuối)
-   - Mock third-party APIs
-
-**Execution**:
-```bash
-# Day 1 Morning: Coordinator
-claude -p "Design integration contract cho payment reconciliation..."
-# → integration-contract.md created
-
-# Day 1 Afternoon: 6 Service agents parallel
-for service in transaction-processor bank-connector reconciliation-engine \
-               notification-service audit-logger reporting-api; do
-  claude -p "Implement ${service} theo integration-contract.md..." &
-done
-wait
-
-# Day 2 Morning: Integration agent
-claude -p "Build Docker Compose và API gateway theo integration-contract.md..."
-
-# Day 2 Afternoon: Test agent
-claude -p "Write E2E tests verify contract compliance..."
-```
-
-**Result**:
-- **Hoàn thành trong 2 ngày** (vs 3+ ngày với single agent chưa xong)
-- **Zero API contract mismatch** — tất cả services follow `integration-contract.md`
-- **Mỗi agent context sạch** — transaction-processor agent không bị distracted bởi reporting-api complexity
-- **Contract document = single source of truth** — khi có conflict, check contract
-
-**Metrics**:
-- Single agent attempt: 24 giờ làm việc, 60% complete, 15+ integration bugs
-- Multi-agent: 16 giờ làm việc (8 giờ coordinator + integration + test, 8 giờ parallel service work), 100% complete, 2 integration bugs (caught by contract tests)
-
-**Lessons Learned**:
-- Contract-first approach critical với multi-agent — định nghĩa interface trước khi spawn workers
-- Parallel service agents safe vì mỗi service = isolated codebase folder
-- Fresh context = consistent với contract — không có agent nào "creative" deviate khỏi spec
-
----
-
-> **Tiếp theo**: [Module 7.4: Các Mẫu Agentic Loop](../04-agentic-loops/) →
+> **Tiếp theo**: [Module 7.4: Agentic Loop Patterns](../04-agentic-loops/) →

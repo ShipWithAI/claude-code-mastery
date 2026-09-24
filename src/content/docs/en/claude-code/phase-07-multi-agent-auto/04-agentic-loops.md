@@ -1,6 +1,8 @@
 ---
 title: 'Agentic Loop Patterns'
-description: 'Recognize agentic loop patterns in Claude Code, prompt for specific behaviors, and break unproductive loops.'
+description: 'Close the READ-THINK-ACT-VERIFY loop with a check Claude can run, and bound it with --max-turns, a Stop hook and the rewind menu.'
+verified: 2026-09-22
+claude_version: 2.1.278
 ---
 
 # Module 7.4: Agentic Loop Patterns
@@ -9,394 +11,295 @@ description: 'Recognize agentic loop patterns in Claude Code, prompt for specifi
 >
 > **Prerequisite**: Module 7.3 (Multi-Agent Architecture)
 >
-> **Outcome**: After this module, you will recognize fundamental agentic loop patterns in Claude Code, know how to prompt for specific loop behaviors, and be able to detect and break out of unproductive loops.
+> **Outcome**: After this module, you will be able to give a loop a verifier it can run, bound it
+> with `--max-turns`, hold it to green with a `Stop` hook, and read a headless run's JSON.
 
 ---
 
 ## 1. WHY — Why This Matters
 
-Claude runs for 10 minutes, seems busy, but you have no idea if it's making progress. Sometimes it loops endlessly trying the same failing approach. Other times it gives up too early when one more attempt would have worked. You feel out of control — should you stop it? Let it run? You're just guessing.
+Ten minutes in, the terminal is still scrolling and you cannot tell whether Claude is converging or
+circling. Then it stops and says "all done" — and the suite is still red, or the failing test has
+quietly been deleted.
 
-Understanding agentic loops gives you visibility and control. You'll recognize: "Ah, it's in a self-correction loop trying to fix that test — let it run." Or: "Wait, it's repeating the same failed approach for the third time — I need to intervene." You shift from passive observer to active conductor.
+Both share one root cause: the loop had no check it could run. Fix that, bound the turns, and you
+can walk away from it.
 
 ---
 
 ## 2. CONCEPT — Core Ideas
 
-### The Fundamental Loop: RTAV
-
-Every agentic action in Claude Code follows this cycle:
+### RTAV — the cycle under every agentic run
 
 ```mermaid
 graph LR
     A[READ] --> B[THINK]
     B --> C[ACT]
     C --> D[VERIFY]
-    D -->|Not Done| A
-    D -->|Done| E[COMPLETE]
+    D -->|check fails| A
+    D -->|check passes| E[STOP]
 ```
 
-- **READ**: Claude examines code, errors, test outputs, file states
-- **THINK**: Analyzes what to do next (visible when Think Mode is enabled)
-- **ACT**: Makes changes, runs commands, edits files
-- **VERIFY**: Checks if the action worked (tests pass? error gone? goal met?)
+The loop is only as good as its last step: *"Give Claude a check it can run: tests, a build, a
+screenshot to compare. It's the difference between a session you watch and one you walk away
+from."* (S1) The team that built a C compiler with parallel Claudes put it harder: *"the task
+verifier is nearly perfect, otherwise Claude will solve the wrong problem"* (S14).
 
-The loop continues until verification passes OR max iterations reached OR human intervenes.
+"Can run" is literal. `-p` starts with nothing pre-authorized, so a loop told to make tests pass
+can edit the source but cannot execute `npm test` — it burns turns guessing.
 
-### Pattern 1: Self-Correction Loop
+### Healthy vs stuck
 
-**Trigger**: Test fails, linter error, build breaks
-**Cycle**: Analyze error → hypothesize root cause → implement fix → re-run verification
-**Healthy**: Converges in 2-4 iterations, each iteration fixes at least one issue
-**Unhealthy**: Same error repeats 3+ times, no measurable progress
-**Prompt example**: "Run tests. If any fail, analyze and fix. Repeat until all pass or 5 attempts."
+| Healthy | Stuck |
+|---|---|
+| Each pass removes a failure | Same error text three passes running |
+| The diff gets smaller and more specific | The same lines rewritten back and forth |
+| The verifier runs, its output changes | The verifier never runs at all |
+| Claude names what it could not prove | **Early victory declaration** — "done", no green check (S12) |
+| Failing tests get fixed | Failing tests get edited or deleted — *"unacceptable to remove or edit tests"* (S12) |
 
-This is the most common loop pattern. It's how Claude "debugs itself."
+**Premature completion** is the expensive one, because it looks like success. A `Stop` hook answers
+it: it re-runs the real check after Claude decides it is finished, and exit code 2 sends Claude
+back to work with the failure text. Hooks are enforced; a prompt asking Claude to leave the tests
+alone is advice it may drop under pressure.
 
-### Pattern 2: Iterative Refinement Loop
+### Bounding the loop
 
-**Trigger**: "Improve", "optimize", "refine", "make it better"
-**Cycle**: Evaluate current state → identify improvement → implement → measure
-**Healthy**: Each iteration shows measurable improvement (faster, smaller, cleaner)
-**Unhealthy**: Changes without improvement, endless tweaking, over-engineering
-**Prompt example**: "Optimize this function. Benchmark after each change. Stop when improvement < 5%."
+| Control | What it does |
+|---|---|
+| `--max-turns N` | Print mode only. *"Exits with an error when the limit is reached."* |
+| `--max-budget-usd N` | Print mode only; subagent spend counts toward it |
+| `Stop` hook, exit 2 | Blocks the end of the turn, hands stderr to Claude (Module 11.3) |
+| `Esc` · `/rewind` | Interrupt the turn · rewind to a checkpoint (Module 7.2) |
 
-This loop requires clear success metrics. Without them, it can run forever.
-
-### Pattern 3: Exploration Loop
-
-**Trigger**: Uncertainty, multiple possible approaches, "try different ways"
-**Cycle**: Try approach A → evaluate → try approach B → evaluate → compare → choose best
-**Healthy**: Systematic comparison with clear criteria, reaches decision
-**Unhealthy**: Endless exploration, analysis paralysis, no decision
-**Prompt example**: "Try 3 caching strategies. Benchmark each. Recommend best with trade-offs."
-
-This loop needs explicit: (1) how many options to try, (2) evaluation criteria, (3) decision rule.
-
-### Loop Termination Conditions
-
-Every loop must have a way to stop:
-
-| Termination Type | Example |
-|------------------|---------|
-| **Success** | "All tests pass" |
-| **Max iterations** | "Try at most 5 times" |
-| **Threshold** | "Stop when response time < 100ms" |
-| **Timeout** | "Stop after 10 minutes" |
-| **Human intervention** | User types "stop" or presses **Esc** to interrupt the current turn |
-
-Without termination conditions, loops run until token budget exhausted.
-
-### Recognizing Stuck Loops
-
-Watch for these red flags:
-
-- Same error message appearing in 3+ consecutive iterations
-- Same files edited repeatedly with similar changes
-- No measurable progress toward goal
-- Token usage spiking without visible output
-- Claude expressing confusion or uncertainty repeatedly
-
-When you see these, intervene immediately. Don't wait.
+> `(S1)`, `(S12)`, `(S14)`: `docs/references/anthropic-sources.md`.
 
 ---
 
 ## 3. DEMO — Step by Step
 
-**Goal**: Fix a failing test suite using an explicit self-correction loop.
+A small Node project: `src/math.js` exports `add` and `divide`; `npm test` runs `node --test`.
 
-**Setup**: Assume you have a Node.js project with failing tests in `npm test`.
-
-**Step 1: Start interactive session**
+**Step 1: Break the suite on purpose**
 
 ```bash
-$ claude
+cat > tests/math.test.mjs << 'EOF'
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { add, divide } from '../src/math.js';
+test('add', () => assert.equal(add(1, 2), 3));
+test('divide by zero throws', () => assert.throws(() => divide(1, 0)));
+EOF
+npm test 2>&1 | grep -E '^# (pass|fail)'
 ```
-
-Expected output:
-```text
-Claude Code v1.x
-Type /help for commands
->
-```
-
-**Step 2: Invoke self-correction loop with explicit termination**
-
-Prompt:
-```text
-Run npm test.
-
-If any tests fail:
-1. Read the failing test and the code it tests
-2. Analyze why the test is failing
-3. Fix the code (not the test, unless the test itself is wrong)
-4. Run npm test again
-
-Repeat this cycle until all tests pass, or you've tried 5 times without progress.
-
-After each iteration, report:
-- How many tests still failing
-- What you fixed
-- Whether you're making progress
-```
-
-**Step 3: Observe healthy loop progression**
-
-Expected output:
-```text
-Running npm test...
-
-FAIL src/services/userService.test.ts
-  × should fetch user by ID (45ms)
-  × should handle missing user (12ms)
-  × should validate email format (8ms)
-
-3 tests failed.
-
-=== ITERATION 1 ===
-Reading userService.test.ts and userService.ts...
-
-Analysis: Tests expect async function but implementation is synchronous.
-Root cause: Missing async/await in fetchUser() method.
-
-Fixing: Converting fetchUser() to async...
-Running npm test...
-
-FAIL src/services/userService.test.ts
-  ✓ should fetch user by ID (52ms)
-  × should handle missing user (15ms)
-  × should validate email format (9ms)
-
-Progress: 3 failures → 2 failures. Moving forward.
-
-=== ITERATION 2 ===
-Analysis: Missing null check when user not found.
-
-Adding null check before email validation...
-Running npm test...
-
-PASS src/services/userService.test.ts
-  ✓ should fetch user by ID (48ms)
-  ✓ should handle missing user (14ms)
-  ✓ should validate email format (11ms)
-
-All tests passing! ✓
-Loop terminating: success condition met.
-```
-
-**Key observations**:
-- Iteration 1: 3 failures → 2 failures (progress!)
-- Iteration 2: 2 failures → 0 failures (success!)
-- Total: 2 iterations. Healthy convergence.
-- Each iteration fixed at least one issue
-
-**Step 4: Recognize unhealthy loop (simulation)**
-
-If you saw this instead:
 
 ```text
-=== ITERATION 1 ===
-Fixing typo in line 45: "usr" → "user"...
-Running npm test...
-FAIL 3 tests failed
-
-=== ITERATION 2 ===
-Fixing typo in line 45: "usr" → "user"...
-Running npm test...
-FAIL 3 tests failed
-
-=== ITERATION 3 ===
-Fixing typo in line 45: "usr" → "user"...
-Running npm test...
-FAIL 3 tests failed
+# Output may vary
+# pass 1
+# fail 1
 ```
 
-This is stuck. Same fix repeated, no progress. Intervene:
+`divide(1, 0)` returns `Infinity` instead of throwing, so the new test fails.
+
+**Step 2: A loop with no verifier**
+
+```bash
+# docs: headless#json-output · cli-reference#--max-turns
+claude -p "Make npm test pass" --permission-mode acceptEdits --max-turns 5 --output-format json
+```
+
+```json
+{
+  "type": "result",
+  "subtype": "error_max_turns",
+  "is_error": true,
+  "num_turns": 6,
+  "errors": ["Reached maximum number of turns (5)"],
+  "terminal_reason": "max_turns",
+  "permission_denials": [
+    { "tool_name": "Bash", "tool_input": { "command": "npm test 2>&1 | head -60" } }
+  ],
+  "session_id": "b8f303bb-0788-4580-9da3-adcd3e78e8b6",
+  "total_cost_usd": 0.47875850000000003
+}
+```
+
+`# Output may vary` — trimmed; the object also carries `usage`, `modelUsage`, `duration_ms`. Shell
+exit code: `1`. Read `permission_denials` first: `Bash` was refused, because `acceptEdits` covers
+file edits and common filesystem commands, **not** `npm test`. The fix landed (`git diff` shows
+the guard) — but the loop never saw green and died on the limit.
+
+The headless page names `result`, `session_id`, `total_cost_usd`, `structured_output` and
+`permission_denials`. `subtype`, `is_error`, `num_turns`, `errors` and `terminal_reason` are typed
+on the Agent SDK reference as `SDKResultMessage`, which enumerates both the `subtype` and the
+`terminal_reason` values. In a shell script the exit code is still the simplest signal.
+
+**Step 3: Give the loop its check**
+
+```bash
+# docs: headless#allowed-tools · permissions#bash-rules
+git checkout -- src/math.js
+claude -p "Make npm test pass. Fix the source, not the test." \
+  --permission-mode acceptEdits --allowedTools "Bash(npm test *)" \
+  --max-turns 10 --output-format json
+```
+
+```json
+{
+  "type": "result",
+  "subtype": "success",
+  "is_error": false,
+  "num_turns": 7,
+  "result": "`npm test` passes: 2 tests, 0 failures.\n\nThe failure was in the source, not the test — `divide(1, 0)` returned `Infinity` instead of throwing. `src/math.js:2` now guards the zero divisor… The test file was left untouched.",
+  "total_cost_usd": 0.453361
+}
+```
+
+`# Output may vary` — `result` trimmed. Exit code `0`; one flag turned `error_max_turns` into
+`success`.
+
+**Step 4: A `Stop` gate against early victory**
+
+Break **two** things (`add` returns `a - b`, `divide` still does not throw), then add the gate:
+
+```bash
+# docs: hooks#stop
+mkdir -p .claude/hooks && cat > .claude/hooks/test-gate.sh << 'EOF'
+#!/usr/bin/env bash
+# Stop gate: refuse to end the turn while npm test fails. Exit 2 = keep working.
+input=$(cat)
+if out=$(npm test 2>&1); then
+  exit 0                                    # green: Claude may stop
+fi
+if [ "$(jq -r '.stop_hook_active' <<<"$input")" = "true" ]; then
+  exit 0                                    # already sent back once; don't loop forever
+fi
+echo "npm test still fails. Fix it before finishing:" >&2
+echo "$out" | grep -E '^not ok|AssertionError|# fail' | head -5 >&2
+exit 2
+EOF
+chmod +x .claude/hooks/test-gate.sh
+```
+
+`.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/test-gate.sh",
+            "timeout": 120 }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Now ask for **only** the first bug:
+
+```bash
+claude -p "Fix the failing add test in tests/math.test.mjs." --permission-mode acceptEdits
+```
 
 ```text
-Stop. You're repeating the same fix three times.
+# Output may vary
+Suite is green — `# pass 2`, `# fail 0`, exit 0.
 
-Let's analyze:
-1. Is the fix actually being applied? Show me the file after your changes.
-2. Is there a different root cause you haven't considered?
+Two changes, both in `src/math.js`:
+
+1. **`add`** (`src/math.js:1`) — restored `a + b`. … This was the actual bug you asked about.
+2. **`divide`** (`src/math.js:2`) — added a zero-divisor guard that throws `RangeError`. This
+   was the decision I'd put to you; the gate answered it, so I picked the option that keeps the
+   test's intent intact rather than relaxing the assertion to `Infinity`. …
+
+If you actually wanted `divide` to keep JS's `Infinity` semantics, the fix belongs in the test
+instead and I'll swap it over — but that means the "divide by zero throws" test goes away …
 ```
 
-**Step 5: Check token usage**
+Claude fixed `add`, tried to stop, the gate exited 2 with the remaining failure, and carried on —
+*"the gate answered it"*. Note the second point: it weighed moving the fix into the test and
+rejected it. That is a decision you should not leave to a prompt.
 
-```text
-/cost
-```
-
-Expected output:
-```text
-Session cost: $0.15
-Tokens used: 45,000 input / 12,000 output
-```
-
-If cost is rising fast without progress, that confirms stuck loop.
+Clean up with `rm -rf .claude && git checkout -- .`
 
 ---
 
 ## 4. PRACTICE — Try It Yourself
 
-### Exercise 1: Invoke and Observe RTAV
+### Exercise 1: Turn `error_max_turns` into `success`
 
-**Goal**: Recognize the RTAV cycle in a real Claude Code session.
+**Goal**: Feel the difference a runnable check makes.
 
-**Instructions**:
-1. Pick a task with clear verification: fix a bug, pass a test, or resolve a linter error
-2. Prompt Claude with explicit loop instructions including max iterations
-3. Watch the output carefully — identify READ, THINK, ACT, VERIFY phases
-4. Note: How many iterations did it take? Did it converge successfully?
+**Instructions**: break one test in your own project; run the Step 2 command (no `--allowedTools`)
+and record `subtype` and the exit code; re-run with `--allowedTools "Bash(<test command> *)"`.
 
-**Expected result**: You can identify each RTAV phase and predict when the loop will terminate.
+**Expected result**: `error_max_turns` + exit 1, then `success` + exit 0.
 
 <details>
 <summary>💡 Hint</summary>
 
-Good prompt structure:
-```text
-[TASK]: Fix the failing test in userService.test.ts
-
-[LOOP]:
-1. Read test and implementation
-2. Analyze cause of failure
-3. Fix implementation
-4. Run npm test
-
-Repeat until passing or 5 attempts.
-
-[REPORTING]:
-After each iteration, tell me what you tried and whether it's working.
-```
-
-This makes the loop explicit and observable.
+`Bash(npm test *)` matches `npm test` and `npm test -- tests/x.mjs`, but not `npm run test`. Rules
+read the command text, so match the string your project actually uses.
 </details>
 
 <details>
 <summary>✅ Solution</summary>
 
-Full prompt:
-```text
-Read userService.test.ts and identify the failing assertion.
-Fix the implementation in userService.ts to make it pass.
-Run npm test.
-
-If still failing, analyze the new error and fix again.
-Maximum 5 attempts.
-
-Report after each iteration:
-- What you changed
-- Test result
-- Progress assessment
+```bash
+claude -p "Make the suite pass. Fix the source, not the tests." \
+  --permission-mode acceptEdits --allowedTools "Bash(npm test *)" \
+  --max-turns 10 --output-format json | jq '{subtype, is_error, result}'
 ```
 
-Observing RTAV:
-- **READ**: You'll see Claude reading test file and implementation file
-- **THINK**: "Analysis: The test expects..." (especially clear with Think Mode)
-- **ACT**: "Editing userService.ts..." followed by code changes
-- **VERIFY**: "Running npm test..." followed by output
-
-Healthy loop: 1-3 iterations to pass.
-Stuck loop: Same error 3+ times → intervene.
+Treat the exit code as the verdict, `result` as the summary. `--max-turns` is a circuit breaker,
+not a plan: if a task needs 30 turns, raise it.
 </details>
 
-### Exercise 2: Break a Stuck Loop
+### Exercise 2: Catch a premature "done"
 
-**Goal**: Practice recognizing and intervening when a loop gets stuck.
+**Goal**: Make the `Stop` gate fire.
 
-**Instructions**:
-1. Give Claude a challenging problem (flaky test, complex refactoring)
-2. Watch for stuck loop signs: same fix repeated, no progress, same error 3+ times
-3. When you spot it, intervene with: "Stop and explain what you've tried so far"
-4. Guide Claude to a different approach based on the explanation
+**Instructions**: install the Step 4 gate, break two things, ask Claude to fix one. Then remove
+the hook and repeat the prompt.
 
-**Expected result**: You recognize stuck loops within 3 iterations and intervene effectively.
+**Expected result**: with the gate, Claude keeps going and lands green; without it, it stops after
+the fix you named.
 
 <details>
 <summary>💡 Hint</summary>
 
-Stuck loop signs:
-- Same error message 3+ times
-- Same files edited repeatedly
-- Token count rising without output progress
-- Claude says "trying again" without changing approach
-
-Intervene early. Waiting doesn't help.
+If the gate never fires, the first fix was enough. Break something the prompt does not mention.
 </details>
 
 <details>
 <summary>✅ Solution</summary>
 
-Intervention phrases that work:
-
-**When stuck on same error:**
-```text
-Stop. You've tried this approach 3 times with the same result.
-
-Explain:
-1. What have you tried?
-2. What stayed the same each time?
-3. What might you be missing?
-```
-
-**When changing without progress:**
-```text
-Stop. Let's step back.
-
-What is the actual root cause here? Not just the symptom.
-Explain your theory before fixing anything.
-```
-
-**When algorithm is wrong:**
-```text
-You're stuck because the approach is wrong, not the implementation.
-
-Try a completely different algorithm. What are 2-3 alternative ways to solve this?
-```
-
-After intervention, give either:
-- More context Claude was missing
-- Clearer success criteria
-- Permission to try radically different approach
+The gate's stderr is what Claude reads, so make it useful: failing test names, nothing else. Dumping
+500 lines into a blocked turn costs context and makes the next pass worse. Keep the
+`stop_hook_active` escape — without it, a check that can never go green burns eight turns before
+Claude Code overrides the hook and ends the turn anyway.
 </details>
 
 ---
 
 ## 5. CHEAT SHEET
 
-### Loop Patterns
-
-| Pattern | Trigger Words | Healthy Signs | Stuck Signs |
-|---------|---------------|---------------|-------------|
-| Self-Correction | "fix", "debug", "until passes" | Fewer errors each iteration | Same error repeating 3+ times |
-| Iterative Refinement | "improve", "optimize", "refine" | Measurable improvement each round | Changes without gains |
-| Exploration | "try approaches", "compare options" | Systematic evaluation, reaches decision | Endless trying, no decision |
-
-### Prompts to Invoke Loops
-
-| Loop Type | Prompt Template |
-|-----------|-----------------|
-| Self-Correction | "Fix [problem]. Test after each fix. Repeat until passing or 5 attempts." |
-| Iterative Refinement | "Optimize [metric]. Measure after each change. Stop when improvement < X%." |
-| Exploration | "Try [N] approaches for [goal]. Evaluate each on [criteria]. Recommend best." |
-
-### Intervention Phrases
-
-| Situation | What to Say |
-|-----------|-------------|
-| Stuck loop | "Stop. Explain what you've tried so far." |
-| Wrong direction | "Let's try a completely different approach." |
-| Sufficient progress | "That's good enough. Move on to next task." |
-| Emergency stop | Press **Esc** to interrupt immediately |
-
-### Context Management in Loops
-
-| Trigger | Action |
-|---------|--------|
-| Loop > 10 iterations | `/compact` to compress context |
-| Token budget concern | `/cost` to check usage |
-| Context feels degraded | `/clear` and restart with summary |
+| Command / Feature | Description | Example |
+|---|---|---|
+| `--max-turns N` | Turn limit, print mode only | `claude -p "…" --max-turns 5` |
+| `--max-budget-usd N` | Spend limit, print mode only | `claude -p "…" --max-budget-usd 2` |
+| `--output-format json` | `result`, `session_id`, `total_cost_usd` | `\| jq` |
+| `--allowedTools "…"` | Pre-authorize the verifier | `--allowedTools "Bash(npm test *)"` |
+| `permission_denials` | What the run was refused | read when a loop stalls |
+| `Stop` hook, exit 2 | Blocks the end of a turn | Module 11.3 |
+| `stop_hook_active` | Hook input: already blocked | exit 0 to release |
+| `Esc` · `/rewind` | Interrupt the turn · rewind | Module 7.2 |
+| `/loop [interval] [prompt]` | Re-run a prompt while the session stays open | `/loop 5m /check-ci` |
+| `/context` · `/cost` | Occupancy · spend | watch both in long loops |
 
 ---
 
@@ -404,45 +307,35 @@ After intervention, give either:
 
 | ❌ Mistake | ✅ Correct Approach |
 |---|---|
-| No termination condition — loop runs until token exhaustion | Always specify: max iterations, success criteria, or timeout. "Until done" is too vague. |
-| Letting stuck loops run, hoping Claude self-corrects | If no progress after 3 iterations, intervene immediately. Waiting wastes tokens and time. |
-| Over-optimizing with endless refinement | Define "good enough" upfront: "Stop when tests pass" not "make it perfect." |
-| Ignoring `/compact` — letting context degrade over 20+ iterations | Use `/compact` every 5-10 iterations in long loops to maintain coherence. |
-| Blaming Claude when loops fail — "the AI is broken" | Often the loop design is wrong: unclear goal, missing termination, or insufficient context. |
-| Micromanaging every iteration — approving each step | Let Claude loop autonomously. Intervene only when stuck, unsafe, or done. Trust the cycle. |
+| "Repeat until tests pass" with nothing pre-authorized in `-p` | `--allowedTools "Bash(npm test *)"`; read `permission_denials` when a loop stalls |
+| Trusting the prose summary that the suite is green | Trust the exit code and your `npm test` |
+| Asking in the prompt that tests not be edited | A `Stop` hook re-runs the suite: prompts advise, hooks enforce |
+| No turn or budget bound on an unattended run | `--max-turns` plus `--max-budget-usd`, both print-mode only |
+| Reading `error_max_turns` as "Claude failed" | Usually the verifier was denied — check `permission_denials` |
+| A `Stop` hook with no `stop_hook_active` escape | A check that can never pass burns eight turns before Claude Code overrides the hook |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: A Vietnamese fintech company was migrating 50 REST API endpoints to GraphQL. Each endpoint needed: GraphQL schema definition, resolver implementation, existing test update, and verification that the test passed.
+**Scenario**: A Vietnamese fintech team migrated 50 REST endpoints to GraphQL — each needing a
+schema, a resolver over the service layer, an updated test, and a green run.
 
-**Initial approach (before understanding loops)**: Developers prompted Claude for each endpoint individually. 50 separate Claude sessions. Each required explaining context again. Approaches varied between endpoints. Total time: 3 days across 2 developers.
+**Problem**: The first attempt was one prompt per endpoint, by hand. Context was re-explained every
+time, conventions drifted, two developers spent three days on it. Worse, a few endpoints were
+marked done on a summary alone — nobody ran the test.
 
-**After learning agentic loops**:
+**Solution**: One headless run per endpoint from a shell loop, cycle spelled out: schema, resolver,
+update the test, run the test, move on only when it passes — at most three fix attempts, then
+report for review. The test command was pre-authorized with `--allowedTools`, turns capped with
+`--max-turns`, and a `Stop` hook re-ran the suite so "done" had to mean green.
 
-The team wrote one prompt with an explicit loop structure:
+**Result**: Most endpoints converged unattended, in an afternoon. The handful that did not were
+reported, not silently declared finished.
 
-```text
-Read endpoints.json which lists all 50 REST endpoints.
-
-For each endpoint:
-1. Create GraphQL schema based on REST contract
-2. Implement resolver using existing service layer
-3. Update test file to call GraphQL instead of REST
-4. Run test — if fails, analyze and fix, then re-run
-5. Move to next endpoint ONLY when current endpoint's test passes
-
-Report progress every 10 endpoints completed.
-Maximum 3 fix attempts per endpoint — if still failing after 3, report it for human review.
-```
-
-**Result**: Claude ran a self-correction loop for each endpoint autonomously. 47 out of 50 succeeded without human intervention. 3 needed manual help (complex auth edge cases). Total time: 4 hours (mostly Claude running unattended).
-
-**Key insight from the team lead**: "We didn't make Claude smarter. We didn't switch models. We just made the loop explicit — defined the cycle, the verification, and the termination condition. That clarity turned a 3-day task into a 4-hour task. The loop structure was the entire difference."
-
-**Token cost**: $12 for the full migration vs. estimated $40-50 if done endpoint-by-endpoint. Loop efficiency matters for cost too.
+**Takeaway**: the model did not change and the prompt barely did. The loop got a check it could
+run and a bound it could hit.
 
 ---
 
-> **Next**: [Module 7.5: Multi-Agent Orchestration Tools](../05-orchestration-tools/) →
+> **Next**: [Module 7.5: Orchestration Tools](../05-orchestration-tools/) →
