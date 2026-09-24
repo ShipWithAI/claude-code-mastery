@@ -1,6 +1,8 @@
 ---
 title: 'Orchestration Tools'
-description: 'Explore Claude Code orchestration tools, write multi-agent coordination scripts, and scale automation.'
+description: 'Climb the orchestration ladder: headless fan-out, subagents, agent teams, background agents and the Agent SDK — and pick the lowest rung that works.'
+verified: 2026-09-22
+claude_version: 2.1.278
 ---
 
 # Module 7.5: Orchestration Tools
@@ -9,622 +11,304 @@ description: 'Explore Claude Code orchestration tools, write multi-agent coordin
 >
 > **Prerequisite**: Module 7.4 (Agentic Loop Patterns)
 >
-> **Outcome**: After this module, you will understand the orchestration tool landscape, be able to write basic bash scripts for multi-agent coordination, and know when to graduate to more advanced tools.
+> **Outcome**: After this module, you will be able to fan a task out over many files with
+> `claude -p`, manage **background agents** (`--bg`, `claude agents`), and name the rung of the
+> ladder a job belongs on.
 
 ---
 
 ## 1. WHY — Why This Matters
 
-You've learned multi-agent patterns and agentic loops, but you're still doing everything manually — opening multiple terminals, copy-pasting between them, manually coordinating handoffs. For a 3-agent pipeline, you're spending 10 minutes just orchestrating the conversation flow. There must be a way to automate this.
+Fifty files need the same mechanical change. You could paste fifty prompts into one session and
+watch the context rot, or write one line of bash. Later the job grows teeth — an hour of work, on
+three repos, while you do something else — and bash is no longer the answer.
 
-Orchestration tools let you script the coordination. From simple bash scripts to full SDK integration, there's a spectrum of tools for different automation needs. The right tool can turn a 10-minute manual process into a 10-second automated one.
+There is a ladder here, and most people never look past the rung they learned first. Knowing all
+six means picking the cheapest that fits.
 
 ---
 
 ## 2. CONCEPT — Core Ideas
 
-### The Orchestration Spectrum
-
-From simple to complex, here's the tool landscape:
+### The ladder
 
 ```mermaid
 graph LR
-    A[Bash Scripts] --> B[Claude Code SDK]
-    B --> C[Hooks System]
-    C --> D[External Orchestrators]
-
-    A1[This Module<br/>Phase 7] -.-> A
-    B1[Phase 11] -.-> B
-    C1[Phase 11] -.-> C
-    D1[Phase 12<br/>n8n] -.-> D
-
-    style A fill:#90EE90
-    style A1 fill:#E8F5E9
+    A["1. -p fan-out<br/>(bash)"] --> B["2. Subagents"]
+    B --> C["3. Agent teams"]
+    C --> D["4. Background agents"]
+    D --> E["5. Dynamic Workflows"]
+    E --> F["6. Agent SDK"]
 ```
 
-### Level 1: Bash Scripts (This Module's Focus)
+1. **Headless fan-out** — `claude -p` in a shell loop: one cold session per item, no shared state,
+   testable exit codes. For independent, mechanical items.
+2. **Subagents** — delegation inside one session; each returns a summary (Module 7.3).
+3. **Agent teams** — named teammates, shared task list, messaging (Module 7.3). ⚠️ Experimental,
+   disabled by default. For research, review, separate modules.
+4. **Background agents** — sessions detached from your terminal, managed with `claude agents`.
+   For long work you check later.
+5. **Dynamic Workflows** — a JavaScript script orchestrating many subagents at once, run by a
+   runtime, when a job needs more agents than one conversation can coordinate. Covered later.
+6. **[Agent SDK](../../phase-11-automation-headless/02-claude-agent-sdk/)** — your own program
+   drives the loop, when the orchestration *is* the product.
 
-`claude -p` is the foundation of scripted orchestration:
-- **One-shot execution**: run, get result, exit
-- **File-based communication**: output to files, read from files
-- **Combine with bash**: loops, variables, conditionals, functions
+### Choosing a rung (S15)
 
-**Good for**: Simple pipelines, CI/CD integration, quick automation
+| | Subagents | Agent teams | Workflows |
+|---|---|---|---|
+| Who decides what runs next | *"Claude, turn by turn"* | *"The lead agent, turn by turn"* | *"The script"* |
+| Where intermediate results live | *"Claude's context window"* | *"A shared task list"* | *"Script variables"* |
+| Scale | *"A few delegated tasks per turn"* | *"A handful of long-running peers"* | *"Dozens to hundreds of agents per run"* |
 
-### Level 2: Claude Code SDK (Preview — Phase 11)
+Headless fan-out sits below all three: the shell decides, the filesystem holds results, scale is
+however many times your loop runs. Nothing here is free — every `claude -p` pays for a cold
+context, and a teammate is a whole extra session, which the costs page puts at *"approximately 7x
+more tokens than standard sessions when teammates run in plan mode"* (S15). Climb when the job
+needs it, not because a rung is newer.
 
-Programmatic control from Node.js/Python:
-- Structured responses
-- Error handling
-- State management
+### Fan-out is denied by default
 
-**Good for**: Complex applications, custom tools
-⚠️ SDK details verified in Phase 11
+`claude -p` starts with nothing pre-authorized, so the loop body must say what it may do:
+`--allowedTools "Edit,Bash(git commit *)"` or `--permission-mode acceptEdits`. Without that, each
+run edits nothing and the loop reports success over fifty no-ops.
 
-### Level 3: Hooks System (Preview — Phase 11)
-
-Event-driven automation:
-- Pre/post hooks for file writes, commands
-- Trigger scripts on Claude actions
-- Validation, logging, integration
-
-**Good for**: Reactive workflows, guardrails
-⚠️ Hooks details verified in Phase 11
-
-### Level 4: External Orchestrators (Preview — Phase 12)
-
-Visual workflow engines (n8n, etc.):
-- Multi-system integration
-- Visual workflow design
-- Enterprise-grade features
-
-**Good for**: Complex multi-system workflows
-Details in Phase 12
-
-### Choosing the Right Level
-
-| Need | Tool | Why |
-|------|------|-----|
-| Quick automation | Bash script | Simple, no dependencies |
-| CI/CD pipeline | Bash + `claude -p` | Integrates anywhere |
-| Complex application | SDK (Phase 11) | Programmatic control |
-| Event-driven workflow | Hooks (Phase 11) | React to actions |
-| Enterprise orchestration | n8n (Phase 12) | Visual, maintainable |
-
-**Key principle**: Start simple. Graduate to complexity only when you need the features. Most teams never need beyond bash scripts.
-
-### Data Flow in Orchestration
-
-Understanding how data moves between the three layers of an orchestrated workflow:
-
-```mermaid
-graph TD
-    subgraph "Orchestration Layer"
-        Script[Bash Script / SDK / n8n]
-    end
-
-    subgraph "Agent Layer"
-        A1["claude -p 'design the API'"]
-        A2["claude -p 'implement from design.md'"]
-        A3["claude -p 'write tests from src/'"]
-    end
-
-    subgraph "Artifact Layer"
-        D1[design.md]
-        D2[src/api.ts]
-        D3[tests/api.test.ts]
-    end
-
-    Script -->|spawns| A1
-    Script -->|spawns after A1| A2
-    Script -->|spawns after A2| A3
-
-    A1 -->|writes| D1
-    D1 -->|read by| A2
-    A2 -->|writes| D2
-    D2 -->|read by| A3
-    A3 -->|writes| D3
-
-    style Script fill:#e8eaf6
-    style D1 fill:#fff9c4
-    style D2 fill:#fff9c4
-    style D3 fill:#fff9c4
-```
-
-**Three layers at play**:
-
-1. **Orchestration Layer**: Controls sequencing, parallelism, and error handling. This is your bash script, SDK code, or n8n workflow. It never touches code directly — it only spawns agents and checks results.
-
-2. **Agent Layer**: Each `claude -p` invocation runs with fresh context. Agents don't know about each other. They receive instructions from the orchestrator and produce artifacts.
-
-3. **Artifact Layer**: Files on disk that carry data between agents. Agent 1 writes `design.md`, Agent 2 reads it as input. This is the communication channel — agents talk through files, not through shared memory.
-
-**Why this separation matters**: The orchestration layer is debuggable (it's just bash/code). The agent layer is replaceable (swap models, change prompts). The artifact layer is inspectable (check intermediate files). When something goes wrong, you can pinpoint exactly which layer failed.
+> `(S1)`, `(S15)`: `docs/references/anthropic-sources.md`.
 
 ---
 
 ## 3. DEMO — Step by Step
 
-**Task**: Build a code review pipeline with 3 specialized agents that runs automatically.
-
-**Step 1: Create the orchestration script**
+**Step 1: Three files needing the same change**
 
 ```bash
-#!/bin/bash
-# code-review-pipeline.sh
-
-FILE_TO_REVIEW=$1
-
-if [ -z "$FILE_TO_REVIEW" ]; then
-  echo "Usage: ./code-review-pipeline.sh <file>"
-  exit 1
-fi
-
-echo "=== Code Review Pipeline ==="
-echo "Target: $FILE_TO_REVIEW"
-
-# Agent 1: Security Review
-echo ""
-echo "[1/3] Security review..."
-claude -p "Review $FILE_TO_REVIEW for security issues.
-Focus on: SQL injection, XSS, auth bypass, secrets exposure.
-List issues with line numbers." > security-review.md
-
-# Agent 2: Performance Review
-echo "[2/3] Performance review..."
-claude -p "Review $FILE_TO_REVIEW for performance issues.
-Focus on: N+1 queries, memory leaks, blocking calls, inefficient loops.
-List issues with line numbers." > performance-review.md
-
-# Agent 3: Style Review
-echo "[3/3] Style review..."
-claude -p "Review $FILE_TO_REVIEW for code style issues.
-Focus on: naming conventions, function length, documentation gaps.
-List issues with line numbers." > style-review.md
-
-# Aggregator: Combine results
-echo ""
-echo "Aggregating results..."
-claude -p "Read security-review.md, performance-review.md, style-review.md.
-Create unified REVIEW.md with sections:
-- Critical (security)
-- Important (performance)
-- Minor (style)
-Prioritize by severity." > /dev/null
-
-echo "✓ Review complete! See REVIEW.md"
+cat > src/strings.js << 'EOF'
+export function slugify(s) { return s.toLowerCase().trim().replace(/\s+/g, '-'); }
+EOF
+# …and src/arrays.js (chunk), src/dates.js (isoDay)
+git add src/*.js && git commit -q -m "add three helper modules"
 ```
 
-**Why this works**: Each `claude -p` call is independent. Output goes to files. Next agent reads from files. Simple coordination through the filesystem.
-
-**Step 2: Run the pipeline**
+**Step 2: Fan out with `-p` (S1)**
 
 ```bash
-$ chmod +x code-review-pipeline.sh
-$ ./code-review-pipeline.sh src/services/userService.ts
+# docs: headless#allowed-tools · best-practices#parallel-sessions
+for f in src/strings.js src/arrays.js src/dates.js; do
+  echo "=== $f ==="
+  claude -p "Add a one-line JSDoc comment above the exported function in $f, then commit just
+that file with the message 'docs: jsdoc for $f'. Reply with OK or FAIL and nothing else." \
+    --permission-mode default --allowedTools "Edit,Bash(git commit *)"
+done
 ```
 
-Expected output:
 ```text
-=== Code Review Pipeline ===
-Target: src/services/userService.ts
+# Output may vary
+=== src/strings.js ===
+OK
 
-[1/3] Security review...
-[2/3] Performance review...
-[3/3] Style review...
+=== src/arrays.js ===
+OK
 
-Aggregating results...
-✓ Review complete! See REVIEW.md
+=== src/dates.js ===
+OK
 ```
-
-**Why this matters**: No manual intervention. Pass the file path, get structured review. CI/CD ready.
-
-**Step 3: Examine the output**
 
 ```bash
-$ cat REVIEW.md
+git log --oneline -4
 ```
 
-Expected output:
-```markdown
-# Code Review: src/services/userService.ts
-
-## Critical (Security)
-- **Line 45**: SQL query uses string concatenation — potential injection
-- **Line 78**: API key hardcoded in source
-
-## Important (Performance)
-- **Line 23**: N+1 query in getUserOrders() loop
-- **Line 56**: Blocking file read in async function
-
-## Minor (Style)
-- **Line 12**: Function fetchUser lacks JSDoc
-- **Line 34**: Magic number 86400 should be constant
+```text
+# Output may vary
+27c7597 docs: jsdoc for src/dates.js
+f56e1ec docs: jsdoc for src/arrays.js
+ec31a8e docs: jsdoc for src/strings.js
+5c47bb5 add three helper modules
 ```
 
-**Key observations**:
-- 4 agents total (3 reviewers + 1 aggregator)
-- File-based communication between agents
-- Sequential execution but could be parallelized
-- CI/CD ready — no interactive prompts
+Three cold sessions, three commits, no shared context. Two details make it work: the prompt ends in
+a one-word contract (`OK`/`FAIL`), and `--allowedTools` names exactly what a run may do: edit that
+file, commit. `--permission-mode default` forces the stock behaviour; on Pro, Max and Team plans
+the built-in starting mode is `auto`, which `permissions.defaultMode` overrides.
+
+**Step 3: Dispatch a background agent**
+
+```bash
+# docs: cli-reference#bg · agent-view
+claude --bg --name exports-audit --permission-mode default \
+  "List every exported function in src/ as a Markdown table with columns file and function."
+```
+
+```text
+# Output may vary
+Starting background service…
+backgrounded · 5db069a6 · exports-audit
+  claude agents             list sessions
+  claude attach 5db069a6    open in this terminal
+  claude logs 5db069a6      show recent output
+  claude stop 5db069a6      stop this session
+```
+
+Note the shape: `--bg` takes its prompt **positionally**, refuses `-p`, returns at once, and prints
+the four commands you will need.
+
+**Step 4: Watch it, then stop it**
+
+```bash
+claude agents --json
+```
+
+```json
+[
+  {
+    "pid": 9102,
+    "id": "5db069a6",
+    "cwd": "/Users/luatnq/cc-lab",
+    "kind": "background",
+    "startedAt": 1790084514332,
+    "sessionId": "5db069a6-905f-44ab-98a5-e17e7dcb6e19",
+    "name": "exports-audit",
+    "status": "idle",
+    "state": "done"
+  }
+]
+```
+
+`# Output may vary` — one entry shown; the array covers every session on the machine, so filter by
+`cwd`. Poll `state`: `working`, `blocked`, `done`, `failed`, `stopped`. Bare `claude agents` opens
+the interactive agent view and needs a real terminal; `claude logs <id>` prints recent output,
+`claude attach <id>` opens the session here.
+
+```bash
+claude stop 5db069a6
+```
+
+```text
+# Output may vary
+stopped 5db069a6
+```
+
+Always stop what you start — background agents outlive their shell.
+
+**Step 5: Rungs 2 and 3 you already have**
+
+Rule of thumb: stay in one session (subagents, teams — Module 7.3) while the work shares context,
+fan out with `-p` when items are independent, detach with `--bg` when the work outlives your
+attention. For CI, see Module 11.4.
 
 ---
 
 ## 4. PRACTICE — Try It Yourself
 
-### Exercise 1: Parallel Execution
+### Exercise 1: Refine on three, then run the set
 
-**Goal**: Make the code review pipeline faster with parallel agents.
+**Goal**: Make a fan-out prompt safe before it touches fifty files.
 
-**Instructions**:
-1. Modify `code-review-pipeline.sh` to run 3 review agents in parallel
-2. Use `&` to background each agent
-3. Use `wait` to wait for all to complete
-4. Measure time difference vs sequential
+**Instructions**: pick a mechanical change across many files. Run the loop over **three**, read the
+diffs, fix the prompt, then run the rest. Each run answers `OK` or `FAIL`.
 
-**Expected result**: ~3x faster for 3 parallel agents.
+**Expected result**: three clean diffs — and a prompt you trust on the rest.
 
 <details>
 <summary>💡 Hint</summary>
 
-```bash
-# Run in parallel
-claude -p "security review..." > security.md &
-claude -p "performance review..." > perf.md &
-claude -p "style review..." > style.md &
-wait  # Wait for all background jobs
-```
+Anthropic on this pattern: *"Refine your prompt based on what goes wrong with the first 2-3 files,
+then run on the full set."* (S1)
 </details>
 
 <details>
 <summary>✅ Solution</summary>
 
 ```bash
-#!/bin/bash
-# code-review-pipeline-parallel.sh
-
-FILE=$1
-
-if [ -z "$FILE" ]; then
-  echo "Usage: ./code-review-pipeline-parallel.sh <file>"
-  exit 1
-fi
-
-echo "=== Parallel Code Review Pipeline ==="
-echo "Target: $FILE"
-echo ""
-echo "Running 3 agents in parallel..."
-
-START=$(date +%s)
-
-# Parallel execution
-claude -p "Review $FILE for security issues.
-Focus on: SQL injection, XSS, auth bypass, secrets.
-List issues with line numbers." > security-review.md &
-
-claude -p "Review $FILE for performance issues.
-Focus on: N+1 queries, memory leaks, blocking calls.
-List issues with line numbers." > performance-review.md &
-
-claude -p "Review $FILE for style issues.
-Focus on: naming, function length, documentation.
-List issues with line numbers." > style-review.md &
-
-# Wait for all background jobs to complete
-wait
-
-echo "All agents done in $(($(date +%s) - START)) seconds"
-echo ""
-echo "Aggregating results..."
-
-claude -p "Read security-review.md, performance-review.md, style-review.md.
-Create unified REVIEW.md with sections:
-- Critical (security)
-- Important (performance)
-- Minor (style)
-Prioritize by severity." > /dev/null
-
-echo "✓ Review complete! See REVIEW.md"
+for f in $(cat files.txt); do
+  claude -p "Migrate $f … Return OK or FAIL." --allowedTools "Edit,Bash(git commit *)" \
+    || echo "$f" >> failed.txt
+done
 ```
 
-**Timing comparison**:
-- Sequential: ~45 seconds (15s × 3)
-- Parallel: ~18 seconds (concurrent execution)
-- **Speedup**: 2.5x faster
-
-**Why parallel works here**: Three agents analyze the same file independently. No dependencies between them.
+Committing per file makes the loop restartable: a failed file is one `git revert` away and
+`failed.txt` is your retry list.
 </details>
 
-### Exercise 2: Error Handling
+### Exercise 2: Dispatch, poll, stop
 
-**Goal**: Make the pipeline robust with error handling.
+**Goal**: Run a long job detached and manage it from the CLI.
 
-**Instructions**:
-1. Check exit codes after each `claude -p` call
-2. If an agent fails, retry once
-3. Log all errors to `error.log`
-4. Exit with failure if any agent fails after retry
+**Instructions**: dispatch a read-only audit with `claude --bg --name <name>`, poll
+`claude agents --json` until `state` is `done`, read it with `claude logs <id>`, then
+`claude stop <id>`.
 
-**Expected result**: Robust pipeline that handles transient failures.
+**Expected result**: `state` moves `working` → `done`; the entry disappears after the stop.
 
 <details>
 <summary>💡 Hint</summary>
 
-```bash
-claude -p "task" > output.md
-if [ $? -ne 0 ]; then
-  echo "Failed! Retrying..."
-  claude -p "task" > output.md
-  if [ $? -ne 0 ]; then
-    echo "Retry failed" >> error.log
-    exit 1
-  fi
-fi
-```
+Filter the array — it lists every Claude Code session on the machine:
+`claude agents --json | jq '[.[] | select(.cwd == "'"$PWD"'")]'`
 </details>
 
 <details>
 <summary>✅ Solution</summary>
 
-```bash
-#!/bin/bash
-# code-review-pipeline-robust.sh
-
-FILE=$1
-
-if [ -z "$FILE" ]; then
-  echo "Usage: ./code-review-pipeline-robust.sh <file>"
-  exit 1
-fi
-
-# Error handling function
-run_agent() {
-  local name=$1
-  local prompt=$2
-  local output=$3
-
-  echo "[$name] Running..."
-  claude -p "$prompt" > "$output"
-
-  if [ $? -ne 0 ]; then
-    echo "[$name] Failed! Retrying..." >&2
-    sleep 2
-    claude -p "$prompt" > "$output"
-
-    if [ $? -ne 0 ]; then
-      echo "$(date): $name failed after retry" >> error.log
-      echo "[$name] Failed after retry" >&2
-      return 1
-    fi
-  fi
-
-  echo "[$name] Done"
-  return 0
-}
-
-echo "=== Robust Code Review Pipeline ==="
-echo "Target: $FILE"
-echo ""
-
-# Run each agent with error handling
-run_agent "Security" \
-  "Review $FILE for security issues. Focus on: SQL injection, XSS, auth bypass." \
-  "security-review.md" || exit 1
-
-run_agent "Performance" \
-  "Review $FILE for performance issues. Focus on: N+1 queries, memory leaks." \
-  "performance-review.md" || exit 1
-
-run_agent "Style" \
-  "Review $FILE for style issues. Focus on: naming, documentation." \
-  "style-review.md" || exit 1
-
-echo ""
-echo "All agents succeeded. Aggregating..."
-
-run_agent "Aggregator" \
-  "Read security-review.md, performance-review.md, style-review.md.
-Create unified REVIEW.md with prioritized sections." \
-  "/dev/null" || exit 1
-
-echo "✓ Review complete! See REVIEW.md"
-```
-
-**What this handles**:
-- Network failures (retry mechanism)
-- Logging (error.log tracks failures)
-- Clean exits (return codes propagate)
-- User feedback (clear status messages)
+A background agent that needs a permission it lacks goes to `state: "blocked"` and waits instead of
+failing. So `--bg` jobs should be read-only or carry an explicit `--permission-mode` /
+`--allowedTools`: nobody is there to answer the prompt.
 </details>
 
 ---
 
 ## 5. CHEAT SHEET
 
-### Bash + Claude One-Liners
-
-```bash
-# Basic one-shot
-claude -p "task" > output.md
-
-# With file content
-claude -p "Review: $(cat file.ts)"
-
-# Sequential pipeline
-claude -p "design API" > design.md && \
-claude -p "Implement based on design.md"
-
-# Parallel agents
-claude -p "task1" > out1.md &
-claude -p "task2" > out2.md &
-wait
-
-# Loop over files
-for f in src/*.ts; do
-  claude -p "Review $f" > "reviews/$(basename $f .ts).md"
-done
-
-# Conditional execution
-claude -p "check code" > result.md
-if grep -q "ERROR" result.md; then
-  claude -p "fix errors in result.md"
-fi
-```
-
-### Error Handling Pattern
-
-```bash
-claude -p "task" > output.md
-if [ $? -ne 0 ]; then
-  echo "Failed!" >> error.log
-  exit 1
-fi
-```
-
-### Retry Pattern
-
-```bash
-run_with_retry() {
-  local cmd=$1
-  $cmd || { sleep 2; $cmd; }
-}
-
-run_with_retry "claude -p 'task' > output.md"
-```
-
-### Tool Selection Guide
-
-| Need | Tool | Reason |
-|------|------|--------|
-| Quick automation | Bash | Simple, no dependencies, works everywhere |
-| CI/CD pipeline | Bash + `claude -p` | Integrates with GitHub Actions, GitLab CI, etc. |
-| Complex application | SDK (Phase 11) | Programmatic control, structured data |
-| Event-driven workflow | Hooks (Phase 11) | React to Claude actions automatically |
-| Enterprise orchestration | n8n (Phase 12) | Visual design, multi-system integration |
+| Command / Feature | Description | Example |
+|---|---|---|
+| `for f in …; do claude -p … done` | Fan-out, one session per item | `--allowedTools "Edit,Bash(git commit *)"` |
+| `--allowedTools` · `--permission-mode` | Pre-authorize the loop body | required when `-p` writes |
+| `--output-format json` | Machine-readable result | `\| jq` |
+| `claude --bg "<prompt>"` | Dispatch a background session | `--name` labels it; refuses `-p` |
+| `claude agents` | Agent view (interactive) | `--json`, `--json --all`, `--cwd` |
+| `claude attach <id>` · `claude logs <id>` | Open it here · print recent output | — |
+| `claude stop <id>` | Stop it (alias `claude kill`) | always clean up |
+| `state` | `working`, `blocked`, `done`, `failed`, `stopped` | poll this |
+| Subagents · agent teams · Agent SDK | Rungs 2, 3 and 6 | Modules 7.3, 11.2 |
 
 ---
 
 ## 6. PITFALLS — Common Mistakes
 
 | ❌ Mistake | ✅ Correct Approach |
-|-----------|-------------------|
-| Jumping to SDK for simple automation | Start with bash. Graduate to SDK when you need programmatic control. 90% of teams never need beyond bash. |
-| No error handling in scripts | Always check `$?`. Add retries for transient failures. Log errors to file. Exit with non-zero on failure. |
-| Sequential when parallel is possible | Use `&` and `wait` for independent agents. 3x faster for 3 parallel agents. Parallelize everything that can run concurrently. |
-| Unstructured output between agents | Request structured output (JSON or markdown sections) for reliable parsing. "List issues with line numbers" is better than "tell me about problems". |
-| Hardcoding file paths and prompts | Use variables and arguments: `$1`, `$FILE`, `$TASK`. Make scripts reusable. One script for all files, not one script per file. |
-| Ignoring token costs in loops | Add cost checks. Estimate before running: files × tokens/file × price. One team ran a loop on 10,000 files by accident — $2,000 bill. |
-| Over-engineering orchestration | This module = foundation. Advanced patterns in Phase 11-12. Master bash first. You don't need SDK unless bash is painful. |
+|---|---|
+| "Bash is enough for everything" | Enough for independent mechanical items; shared context wants subagents, long detached work wants `--bg` |
+| `claude -p "fix $f"` with no permission flag | Nothing is pre-authorized in `-p`: the run edits nothing and still bills |
+| An agent team for a same-file refactor | Teams cost far more (S15) and overwrite each other; use one session |
+| Free-form output parsed with `grep` | End the prompt with a contract: `OK`/`FAIL`, or `--output-format json` |
+| Running the loop on all 50 files first | Refine on 2-3, read the diffs, then run the set (S1) |
+| `claude --bg -p "…"` | `--bg` takes the prompt positionally and refuses `-p` |
+| Leaving background agents running | `claude agents --json`, then `claude stop <id>` |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: Vietnamese fintech team needed nightly code quality checks on 200-file microservices codebase. Manual reviews took 2+ hours daily. Senior dev spent first hour of each day just reviewing changes from offshore team.
+**Scenario**: A Vietnamese fintech team ran a nightly quality pass over a microservices repo. The
+offshore team pushed at 18:00 local time; a senior dev spent the first hour of every morning
+reading those diffs by hand, so fixes landed a day late.
 
-**Problem**: Manual process didn't scale. Offshore team (different timezone) pushed code at 6 PM Vietnam time. Morning reviews delayed critical bug fixes by 12+ hours.
+**Problem**: The first automation was one `claude -p` per service writing a report file — and the
+reports came out empty. Nothing was pre-authorized, so every run was denied before it wrote a line,
+while the loop reported success because `claude` exited cleanly.
 
-**Solution**: Bash orchestration running in CI.
+**Solution**: Two changes. The loop body got `--allowedTools` naming exactly the tools a reviewer
+needs, and each run used `--output-format json` so the wrapper could test the result instead of
+trusting the exit path. Per-service runs fan out with `&` and `wait`; aggregation stays one session
+reading the reports, because that part is not independent. It runs from CI (Module 11.4).
 
-```bash
-#!/bin/bash
-# nightly-review.sh
+**Result**: Feedback now waits for the offshore team when they start their day. The pipeline is
+still a shell script — the ladder was at the right rung, the permissions were wrong.
 
-echo "Starting nightly review at $(date)"
-
-# Create reports directory
-mkdir -p reports
-
-# Review each service in parallel
-for dir in src/services/*/; do
-  service=$(basename "$dir")
-  echo "Reviewing $service..."
-
-  claude -p "Review $dir for issues. Focus on:
-  - Security vulnerabilities (SQL injection, XSS, auth bypass)
-  - Performance problems (N+1 queries, memory leaks)
-  - Code style violations
-
-  Format as markdown with sections:
-  - CRITICAL (security issues - must fix immediately)
-  - WARNINGS (performance issues - should fix this sprint)
-  - NOTES (style issues - nice to fix)
-
-  Include file:line references for each issue." \
-    > "reports/${service}.md" &
-done
-
-# Wait for all reviews to complete
-wait
-
-echo "All reviews complete. Aggregating..."
-
-# Aggregate all reports
-claude -p "Read all files in reports/.
-Create summary.md with:
-1. Executive Summary (count of critical/warning/note issues)
-2. Critical Issues (must fix today)
-3. Warnings (should fix this week)
-4. Notes (backlog)
-
-For each issue: service name, file, line, description, recommendation." \
-  > summary.md
-
-# Alert on critical issues
-if grep -q "CRITICAL" summary.md; then
-  # Extract critical count
-  CRITICAL_COUNT=$(grep -c "CRITICAL" summary.md)
-
-  # Send to Slack
-  curl -X POST "$SLACK_WEBHOOK" \
-    -H 'Content-Type: application/json' \
-    -d "{\"text\":\"⚠️ Nightly review found $CRITICAL_COUNT critical issues. See summary.md\"}"
-fi
-
-echo "Review complete at $(date). See summary.md"
-```
-
-**CI Integration** (GitHub Actions):
-
-```yaml
-# .github/workflows/nightly-review.yml
-name: Nightly Code Review
-
-on:
-  schedule:
-    - cron: '0 14 * * *'  # 9 PM Vietnam time (UTC+7)
-
-jobs:
-  review:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Run review pipeline
-        env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-        run: ./scripts/nightly-review.sh
-      - name: Upload reports
-        uses: actions/upload-artifact@v3
-        with:
-          name: review-reports
-          path: |
-            reports/
-            summary.md
-```
-
-**Results**:
-- **Time**: 2 hours manual → 15 minutes automated
-- **Coverage**: 100% of changed files reviewed daily
-- **Response**: Critical issues trigger Slack alert, team sees notification in morning
-- **Cost**: ~$3/night (200 files × ~2000 tokens/file × $0.003/1K tokens)
-- **ROI**: Senior dev time saved = 10 hours/week = $500/week value
-
-**Key insight from team lead**: "We evaluated n8n and custom SDK solutions, but bash + `claude -p` was enough. The key wasn't the tool — it was making it automatic. Now the offshore team gets feedback in their morning (our evening), and we see results in our morning. 24-hour feedback loop became 12 hours. Can't imagine going back to manual reviews."
-
-**Evolution**: After 3 months, they added performance benchmarking and dependency vulnerability scanning to the same pipeline. Still bash. Still works.
+**Takeaway**: when a fan-out "works" but produces nothing, suspect permissions, not prompts.
 
 ---
 
-> **Phase 7 Complete!** You now understand multi-agent architecture, agentic loops, and orchestration basics. You can build automated pipelines with bash scripts and know when to graduate to more advanced tools.
+> **Phase 7 complete.** You can pick a permission level, run a bounded auto workflow, delegate to
+> subagents and teams, close a loop with a verifier, and orchestrate across sessions.
 >
-> **Next Phase**: [Phase 8: Meta-Debugging](../../phase-08-meta-debugging/01-hallucination-detection/) — Learn to debug Claude itself when things go wrong.
+> **Next**: [Phase 8: Meta-Debugging](../../phase-08-meta-debugging/01-hallucination-detection/) →

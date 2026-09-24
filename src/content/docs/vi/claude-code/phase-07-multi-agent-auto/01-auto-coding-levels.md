@@ -1,440 +1,316 @@
 ---
-title: 'Các Cấp Độ Auto Coding'
-description: 'Tìm hiểu các cấp độ tự động hóa coding trong Claude Code: từ suggest đến full auto mode.'
+title: 'Các mức Auto Coding'
+description: 'Ánh xạ ba mức tự động hoá lên permission mode của Claude Code: Shift+Tab, --permission-mode, defaultMode, và auto mode đảm bảo gì — không đảm bảo gì.'
+verified: 2026-09-22
+claude_version: 2.1.278
 ---
 
-# Module 7.1: Các Cấp Độ Auto Coding
+# Module 7.1: Các mức Auto Coding
 
-> **Thời gian học**: ~30 phút
+> **Thời gian ước tính**: ~30 phút
 >
-> **Yêu cầu trước**: Phase 6 (Thinking & Planning), Module 2.2 (Permission System)
+> **Điều kiện tiên quyết**: Phase 6 (Thinking & Planning),
+> [Module 2.2 (Permission System)](../../phase-02-security/02-permission-system/)
 >
-> **Kết quả**: Sau module này, bạn sẽ hiểu automation spectrum trong Claude Code, biết configure từng level, và quyết định khi nào tăng/giảm automation dựa trên task risk.
+> **Kết quả**: Sau module này, bạn chọn được **permission mode** cho từng task theo ma trận
+> Risk × Familiarity, đổi mode bằng `Shift+Tab` / `--permission-mode` /
+> `permissions.defaultMode`, và giải thích được vì sao `auto` không phải `bypassPermissions`.
 
 ---
 
-## 1. WHY — Tại Sao Phải Hiểu Các Cấp Độ
+## 1. WHY — Tại sao quan trọng
 
-Bạn đang refactor một API controller. Click "approve" cho tất cả thay đổi vì tin Claude Code. Sáng hôm sau, server không start được — hoá ra Claude "dọn dẹp" config file cho gọn, nghĩ là file test cũ.
+Bạn bấm "Yes" 40 lần chỉ để thêm log vào mười hàm. Hôm sau tắt hết prompt, và Claude "dọn dẹp"
+luôn file config bạn đang cần. Hai lần cùng một lỗi: coi tự động hoá là công tắc bật/tắt.
 
-Hoặc ngược lại: bạn đang rename một variable xuất hiện 47 chỗ. Claude Code hỏi approve từng chỗ. Bạn click "y", Enter, "y", Enter... 47 lần. Mất 10 phút cho task 30 giây.
-
-Vấn đề: chúng ta coi automation như công tắc on/off. Thực tế, nó là một spectrum — giống lái xe vậy. Manual Mode là lái tay, Semi-Auto là cruise control, Full Auto là xe tự lái. Đường quen thì cruise control okay, đường hoàn toàn rõ ràng thì để xe tự lái, đường lạ trời mưa thì lái tay an toàn hơn. Claude Code cũng vậy — **automation level phải match với risk level**.
+Claude Code cung cấp cả dải đó dưới tên **permission mode**. Ba "level" ở đây chỉ là nhãn; mode
+mới là cơ chế, do Claude Code cưỡng chế, không phải do model.
 
 ---
 
-## 2. CONCEPT — Ba Cấp Độ Automation
+## 2. CONCEPT — Ý tưởng cốt lõi
 
-### Automation Spectrum
+### Các mode trang docs liệt kê
+
+Trang permissions liệt kê **sáu mode cộng một alias**. Khoá học gom thành ba level:
+
+| Level | Mode | Chạy không cần hỏi | Hợp với |
+|---|---|---|---|
+| **1 — Manual** | `default` (alias `manual`) | Chỉ đọc | Duyệt từng thao tác, việc nhạy cảm |
+| 1 | `plan` | Đọc, cộng lệnh được classifier duyệt khi auto mode khả dụng; không sửa source cho tới khi bạn duyệt plan | Khảo sát trước khi đổi gì |
+| **2 — Semi-Auto** | `acceptEdits` | Đọc, sửa file, và `mkdir`/`touch`/`rm`/`rmdir`/`mv`/`cp`/`sed` trong working dir | Sửa code bạn sẽ xem lại bằng `git diff` |
+| 2 | `auto` | Mọi thứ, có **classifier** duyệt từng hành động | Task dài, mỏi tay bấm prompt |
+| 2 (CI) | `dontAsk` | Đọc + tool đã pre-approve; thứ gì lẽ ra phải hỏi thì **bị deny** | Script khoá chặt |
+| **3 — Full Auto** | `bypassPermissions` | Mọi thứ | **Chỉ** container/VM cô lập |
+
+Đọc kỹ dòng `acceptEdits`: `rm` và `rmdir` nằm trong bộ đó. Việc tự duyệt chỉ áp dụng cho đường
+dẫn trong working directory và `additionalDirectories` — nhưng trong phạm vi đó, một lệnh xoá
+chạy mà không hỏi.
 
 ```mermaid
 graph LR
-    A[Manual Mode] -->|"Allow session"| B[Semi-Auto Mode]
-    B -->|"Allow always"| C[Full Auto Mode]
-
-    A1["👤 Bạn approve<br/>từng action"]
-    B1["⚙️ Set guardrails<br/>Claude chạy trong đó"]
-    C1["🤖 Claude chạy<br/>tự động hoàn toàn"]
-
-    A --- A1
-    B --- B1
-    C --- C1
+    L1["Level 1: default / plan<br/>bạn duyệt"] -->|Shift+Tab| L2["Level 2: acceptEdits / auto<br/>guardrail + classifier"]
+    L2 -->|chỉ trong sandbox| L3["Level 3: bypassPermissions<br/>không prompt, không check"]
 ```
 
-### Level 1: Manual Mode (Default)
+### Cách đặt mode
 
-**Đặc điểm**: Claude hỏi approve cho TỪNG action — đọc file, edit, chạy command.
+- **Trong session**: `Shift+Tab` xoay vòng `default` → `acceptEdits` → `plan` → (`auto` nếu
+  khả dụng) → quay lại. `bypassPermissions` chỉ vào vòng xoay khi bạn khởi động với nó;
+  `dontAsk` không bao giờ.
+- **Một session**: `claude --permission-mode plan` (dùng được cả với `-p`).
+- **Mọi session trong project**: `permissions.defaultMode` trong `.claude/settings.json`. Session
+  terminal nhận mọi giá trị ở đó **trừ** `auto` và `bypassPermissions`, hai giá trị chỉ có hiệu
+  lực từ user settings hoặc managed settings.
+- **Khoá toàn tổ chức**: `permissions.disableBypassPermissionsMode` / `disableAutoMode` =
+  `"disable"` trong managed settings.
 
-**Khi nào dùng**:
-- Codebase mới, chưa quen
-- Task high-risk: database migration, authentication, payment processing
-- Production environment (không sandbox)
-- Đang học cách Claude Code hoạt động
+### Auto mode là gì — và không là gì
 
-**Ưu điểm**: Kiểm soát tối đa, bắt lỗi sớm
-**Nhược điểm**: Chậm, phải focus liên tục
+`auto` là mode khởi động mặc định trên Pro/Max/Team. Một model thứ hai, classifier, duyệt từng
+hành động và chặn thứ gì "vượt quá yêu cầu của bạn, nhắm vào hạ tầng lạ, hoặc có vẻ bị nội
+dung độc hại Claude vừa đọc điều khiển". Anthropic báo cáo **84% ít prompt hơn** khi dùng nội
+bộ với thiết kế classifier hai lớp này (S13, "How we built Claude Code auto mode", 2026-03-25).
+Docs nói thẳng: *"Auto mode reduces permission prompts but does not guarantee safety."* Level 2
+có người duyệt, không phải Level 3. Nếu classifier chặn 3 lần liên tiếp (hoặc 20 lần tổng), auto
+mode tạm dừng và bạn được hỏi lại.
 
-### Level 2: Semi-Auto Mode
+### Ma trận Risk × Familiarity (giữ nguyên)
 
-**Đặc điểm**: Bạn set guardrails một lần ("allow for session"), Claude execute tự động trong guardrails đó.
+| Rủi ro task | Độ quen | Mode |
+|---|---|---|
+| Thấp (format, test) | Cao | `acceptEdits` hoặc `auto` |
+| Thấp | Thấp | `plan` trước, rồi `acceptEdits` |
+| Cao (DB, auth, payment) | Cao | `default` + `permissions.deny` cho đường nóng |
+| Cao | Thấp | **`default` — luôn luôn** |
 
-**Khi nào dùng**:
-- Task quen thuộc với codebase đã hiểu
-- Task low-to-medium risk: refactoring, test generation, formatting
-- Có plan rõ ràng, scope xác định
-- Muốn tăng velocity nhưng vẫn giữ safety net
+Mode là nền. Rule `permissions.allow/deny/ask` xếp lên trên, và **deny rule chặn ở mọi mode, kể
+cả `bypassPermissions`** (Module 2.2). CLAUDE.md chỉ là lời khuyên.
 
-**Ưu điểm**: Balance giữa tốc độ và control
-**Nhược điểm**: Vẫn phải monitor, có thể miss edge cases
-
-### Level 3: Full Auto Mode
-
-**Đặc điểm**: Claude execute hoàn toàn tự động, không hỏi approve. Cần opt-in explicit.
-
-**Khi nào dùng**:
-- Task rất quen, đã làm nhiều lần (như CI/CD automation)
-- Sandbox environment với rollback dễ dàng
-- Đã có plan chi tiết + Think Mode validation
-- Codebase có test suite tốt để verify
-
-**Ưu điểm**: Tốc độ tối đa, focus vào strategy thay vì tactics
-**Nhược điểm**: Rủi ro cao nếu plan sai, khó debug khi có lỗi
-
-### Risk Assessment Matrix
-
-| Task Risk | Độ quen codebase | Level khuyến nghị |
-|-----------|------------------|-------------------|
-| Thấp (format, tests) | Cao | Semi-Auto hoặc Full Auto |
-| Thấp | Thấp | Semi-Auto |
-| Cao (DB, auth, payments) | Cao | Manual hoặc Semi-Auto |
-| Cao | Thấp | **Luôn Manual** |
-
-**Lưu ý**: Level này liên kết với **Permission System** (Module 2.2). Semi-Auto và Full Auto vẫn tuân theo permission boundaries — không có permission thì vẫn bị chặn.
-
-### So Sánh Các Phương Pháp Tự Động Hóa
-
-Các mức tự động hóa của Claude Code so sánh như thế nào trong các workflow khác nhau?
-
-| Phương pháp | Mức kiểm soát | Tốc độ | Chất lượng Context | Kịch bản phù hợp |
-|-------------|--------------|--------|-------------------|-------------------|
-| **Manual Mode** | Tối đa | Chậm | Hoàn hảo — bạn xác nhận từng bước | Học tập, code rủi ro cao, security-critical |
-| **Semi-Auto Mode** | Cân bằng | Nhanh | Tốt — trust trong phạm vi session | Phát triển hàng ngày, feature work |
-| **Full Auto Mode** | Tối thiểu | Nhanh nhất | Phụ thuộc chất lượng CLAUDE.md | CI/CD, môi trường sandbox |
-| **Multi-Agent** (Phase 7.3) | Theo từng agent | Song song | Mới cho mỗi agent | Tác vụ phức tạp nhiều file |
-| **Headless/SDK** (Phase 11) | Lập trình | Tự động | Định nghĩa bởi script | Production pipelines, batch ops |
-
-**Điểm mấu chốt**: Đây không phải các phương pháp cạnh tranh — chúng **kết hợp** với nhau. Một workflow nâng cao điển hình có thể dùng Semi-Auto cho phát triển tương tác, spawn Full Auto agents cho các subtask rõ ràng, và orchestrate qua SDK trong CI/CD. Kỹ năng là khớp đúng mức tự động hóa cho từng phần của workflow.
+> `(S13)`: `docs/references/anthropic-sources.md`.
 
 ---
 
-## 3. DEMO — Cùng Task, Ba Cách Thực Hiện
+## 3. DEMO — Từng bước
 
-**Task**: Refactor `src/utils/helpers.ts` — extract 3 functions (formatDate, validateEmail, truncateText) ra file riêng `src/utils/string.ts` và `src/utils/validation.ts`.
+Chạy trong `~/cc-lab` (`src/math.js`, `tests/math.test.mjs`, `npm test`). Máy này có user
+settings khởi động ở `auto`, nên mỗi lệnh đều ghim mode.
 
-### Demo 1: Manual Mode
+**Bước 1: Đọc mode indicator, rồi xoay vòng**
 
 ```bash
-$ claude
+# docs: permission-modes#switch-permission-modes
+claude --permission-mode default
 ```
 
-**Prompt 1**:
+Status bar lúc khởi động, rồi sau mỗi lần `Shift+Tab`:
+
 ```text
-Read src/utils/helpers.ts and show me the 3 functions to extract
+# Output may vary
+  ⏸ manual mode on
+  ⏵⏵ accept edits on (shift+tab to cycle)
+  ⏸ plan mode on (shift+tab to cycle)
+  ⏵⏵ auto mode on (shift+tab to cycle)
 ```
 
-Claude: "I'll read the file..."
-→ **Approve?** `y` (bạn phải confirm)
+Vì sao: dòng đó là nơi duy nhất hiện mode — đọc trước khi làm việc rủi ro.
 
-Output:
-```typescript
-// Found:
-export function formatDate(date: Date): string { ... }
-export function validateEmail(email: string): boolean { ... }
-export function truncateText(text: string, max: number): string { ... }
-```
-
-**Prompt 2**:
-```text
-Extract formatDate and truncateText to src/utils/string.ts
-```
-
-Claude: "I'll create src/utils/string.ts..."
-→ **Approve?** `y`
-
-Claude: "I'll edit src/utils/helpers.ts to remove those functions..."
-→ **Approve?** `y`
-
-Claude: "I'll add export statement..."
-→ **Approve?** `y`
-
-**Prompt 3**:
-```text
-Extract validateEmail to src/utils/validation.ts
-```
-
-Claude: "I'll create src/utils/validation.ts..."
-→ **Approve?** `y`
-
-Claude: "I'll update helpers.ts..."
-→ **Approve?** `y`
-
-**Prompt 4**:
-```text
-Update all imports across the codebase
-```
-
-Claude: "I'll search for imports of helpers.ts..."
-→ **Approve?** `y`
-
-Claude: "I'll edit src/components/UserForm.tsx..."
-→ **Approve?** `y`
-
-Claude: "I'll edit src/pages/Dashboard.tsx..."
-→ **Approve?** `y`
-
-**Tổng cộng**: 6-8 prompts, ~5 phút, 8 lần approve. Full control nhưng chậm.
-
----
-
-### Demo 2: Semi-Auto Mode
+**Bước 2: Level 1 headless — plan mode đề xuất, không sửa**
 
 ```bash
-$ claude
+# docs: permission-modes#analyze-before-you-edit-with-plan-mode
+claude --permission-mode plan -p "Propose how to add a subtract function to src/math.js with a test. Do not edit any file."
+git status --short
 ```
 
-**Prompt 1**:
 ```text
-Refactor src/utils/helpers.ts: extract formatDate + truncateText to src/utils/string.ts, validateEmail to src/utils/validation.ts, update all imports
+# Output may vary
+Here's the proposal (no files touched; the plan is saved at `~/.claude/plans/propose-how-to-add-keen-dahl.md`).
+…
+- `src/math.js:1-2` exports `add` and `divide` as one-liners.
+…
+Run `npm test` — expect 2 passing tests (`add`, `subtract`), 0 failing.
 ```
 
-Claude: "I'll need to:
-1. Read helpers.ts
-2. Create string.ts and validation.ts
-3. Update helpers.ts
-4. Update imports in 3 files
+`git status` không in gì: plan mode chỉ đọc repo và ghi mỗi plan.
 
-May I proceed?"
-
-→ **Approve?** `a` (allow for session)
-
-Claude executes tất cả actions tự động. Bạn thấy:
-```text
-✓ Read src/utils/helpers.ts
-✓ Created src/utils/string.ts
-✓ Created src/utils/validation.ts
-✓ Updated src/utils/helpers.ts
-✓ Updated src/components/UserForm.tsx
-✓ Updated src/pages/Dashboard.tsx
-Done!
-```
-
-**Tổng cộng**: 1 prompt, ~2 phút, 1 lần approve. Balanced.
-
----
-
-### Demo 3: Full Auto Mode ⚠️
+**Bước 3: Level 1 tương tác — permission prompt thật**
 
 ```bash
-$ claude --dangerously-skip-permissions  # ⚠️ Cần xác minh
+# docs: permissions#permission-system
+claude --permission-mode default
 ```
 
-Claude thực thi toàn bộ việc refactor mà không dừng lại.
+Prompt: `Create a file hello.txt containing hi`
 
-**Tổng cộng**: 0 prompt interactive, ~1 phút, 0 lần approve. Fast nhưng cần trust + planning trước.
+```text
+# Output may vary
+⏺ Write(hello.txt)
+ Create file
+ hello.txt
+  1 hi
+ Do you want to create hello.txt?
+ ❯ 1. Yes
+   2. Yes, and switch to accept edits (auto-approve file edits and common file commands) for this session
+      (shift+tab)
+   3. No
+ Esc to cancel · Tab to amend
+```
+
+Lựa chọn 2 *chính là* cú nhảy lên Level 2. Prompt cho Bash có lựa chọn thứ hai khác,
+`Yes, and don't ask again for: npm test *`, được lưu vào `.claude/settings.local.json` dưới dạng
+`Bash(npm test *)`. Bấm `Esc`, Claude báo `User rejected write to hello.txt`.
+
+**Bước 4: Headless không có prompt — nên mode quyết định**
+
+```bash
+# docs: headless#auto-approve-tools
+claude -p "Create a file hello.txt containing hi" --permission-mode default
+ls hello.txt
+```
+
+```text
+# Output may vary
+The write to `hello.txt` was blocked pending your permission. Please approve the write request and I'll create the file, or let me know if you'd prefer a different approach.
+ls: hello.txt: No such file or directory
+```
+
+`--permission-mode default` ép hành vi gốc; trên gói Pro, Max và Team, starting mode built-in
+là `auto`, và `permissions.defaultMode` ghi đè nó. Level 2:
+
+```bash
+claude -p "Create a file hello.txt containing hi" --permission-mode acceptEdits
+cat hello.txt
+```
+
+```text
+# Output may vary
+Created `/Users/luatnq/cc-lab/hello.txt` containing `hi`.
+hi
+```
+
+**Bước 5: Đặt Level 2 làm mặc định cho project**
+
+```bash
+# docs: permission-modes#start-in-a-different-mode
+mkdir -p .claude && cat > .claude/settings.json << 'EOF'
+{
+  "permissions": {
+    "defaultMode": "acceptEdits"
+  }
+}
+EOF
+claude
+```
+
+```text
+# Output may vary
+  ⏵⏵ accept edits on (shift+tab to cycle)
+```
+
+Project settings thắng file user, nên session vào thẳng Level 2, không cần cờ.
+
+**Bước 6: Level 3 — cờ thật, chỉ trong sandbox**
+
+```bash
+# docs: cli-reference — tương đương --permission-mode bypassPermissions
+claude --dangerously-skip-permissions
+```
+
+Cờ này có thật; đừng chạy trên máy host. Chỉ dùng trong sandbox hoặc container (Module 2.3).
+Nó từ chối chạy dưới root và deny rule vẫn áp dụng — nhưng mọi prompt và classifier đều biến mất.
+
+Dọn dẹp: `rm hello.txt .claude/settings.json`.
 
 ---
 
-## 4. PRACTICE — Tự Thử Nghiệm
+## 4. PRACTICE — Tự thực hành
 
-### Bài 1: Level Calibration
+### Bài 1: Đếm số prompt
 
-**Goal**: Làm quen với cảm giác của từng level
+**Mục tiêu**: Cảm nhận khác biệt Level 1 và Level 2 trên task rủi ro thấp.
+**Hướng dẫn**:
+1. `claude --permission-mode default`, prompt: "Add a one-line JSDoc comment above each function
+   in src/math.js". Đếm số prompt.
+2. `git checkout -- src`, lặp lại với `--permission-mode acceptEdits`. Mode nào khớp rủi ro?
 
-**Instructions**:
-1. Tạo folder `practice-auto/` với 5 files:
-   ```bash
-   mkdir practice-auto && cd practice-auto
-   touch utils.ts api.ts helpers.ts validators.ts formatters.ts
-   ```
-
-2. Mỗi file có 1 function đơn giản:
-   ```typescript
-   export function processData(data: any) {
-     return data;
-   }
-   ```
-
-3. Task: Thêm `console.log('Processing:', data)` vào đầu TỪNG function
-
-4. Làm task này 2 lần với 2 levels:
-   - **Lần 1 (Manual)**: Đếm số lần approve
-   - **Lần 2 (Semi-Auto)**: Đo thời gian
-
-**Expected result**:
-- Manual: ~8-10 approvals, ~3-4 phút
-- Semi-Auto: 1 approval, ~1 phút
+**Kết quả mong đợi**: mỗi edit một prompt ở `default`; không prompt nào ở `acceptEdits`.
 
 <details>
-<summary>💡 Hint</summary>
-
-Cho Semi-Auto, prompt: "Add console.log to all functions in practice-auto/*.ts"
+<summary>💡 Gợi ý</summary>
+Nhìn status bar; ở `acceptEdits` bạn xem lại kết quả bằng `git diff`, không phải inline.
 </details>
 
 <details>
-<summary>✅ Solution</summary>
-
-**Manual Mode**:
-```bash
-$ claude
-
-> Read utils.ts
-[approve: y]
-
-> Add console.log('Processing:', data) to processData function
-[approve: y]
-
-> Repeat for api.ts...
-[approve: y]
-...
-```
-
-**Semi-Auto Mode**:
-```bash
-$ claude
-
-> Add console.log('Processing:', data) to the start of processData function in all .ts files in practice-auto/
-[approve: a]  # Allow for session
-# Claude executes all edits automatically
-```
+<summary>✅ Lời giải</summary>
+`default` hỏi một lần cho mỗi `Edit`. `acceptEdits` tự duyệt edit trong working directory nên
+lượt chạy im lặng; `git diff src/math.js` là bước review.
 </details>
 
----
+### Bài 2: Chọn mode
 
-### Bài 2: Risk Assessment
-
-**Goal**: Luyện khả năng đánh giá risk để chọn level
-
-**Instructions**: Với mỗi task dưới đây, xác định:
-- Risk level (Low / Medium / High)
-- Độ quen codebase (Cao / Thấp)
-- Level khuyến nghị (Manual / Semi-Auto / Full Auto)
-- Lý do
-
-**5 Tasks**:
-1. Format tất cả files với Prettier
-2. Add TypeScript types cho API mới bạn chưa từng thấy
-3. Refactor authentication logic trong app banking
-4. Generate unit tests cho utils functions đã có
-5. Update dependencies trong package.json (major version bumps)
+**Mục tiêu**: Luyện ma trận. Với mỗi task, chọn một mode và một rule.
+1. Prettier trên 150 file. 2. Sửa DB migration. 3. Endpoint mới theo pattern có sẵn.
+4. Đổi logic auth. 5. Sinh test cho pure function.
 
 <details>
-<summary>💡 Hint</summary>
+<summary>✅ Lời giải</summary>
 
-Dùng Risk Matrix ở phần CONCEPT. Cân nhắc:
-- Task tự động hoá được không? (format — yes, auth logic — no)
-- Hậu quả nếu sai? (tests — dễ fix, banking auth — disaster)
-- Rollback dễ không? (prettier — git reset, deps — có thể break build)
-</details>
-
-<details>
-<summary>✅ Solution</summary>
-
-1. **Format với Prettier**
-   - Risk: Low (idempotent, dễ rollback)
-   - Độ quen: Không quan trọng (tool-based)
-   - Level: **Full Auto** (hoặc Semi-Auto)
-   - Lý do: Pure formatting, không đụng logic
-
-2. **Add types cho API mới**
-   - Risk: Medium (có thể type sai, break compile)
-   - Độ quen: Thấp (chưa hiểu API)
-   - Level: **Manual**
-   - Lý do: Cần hiểu API behavior, types ảnh hưởng correctness
-
-3. **Refactor banking auth**
-   - Risk: High (security-critical)
-   - Độ quen: Giả sử Cao
-   - Level: **Manual** (hoặc Semi-Auto với review kỹ)
-   - Lý do: Auth bugs = security breach, luôn cẩn thận
-
-4. **Generate unit tests**
-   - Risk: Low (tests không break production)
-   - Độ quen: Cao (utils đã có)
-   - Level: **Semi-Auto** (hoặc Full Auto nếu có plan)
-   - Lý do: Test generation an toàn, nhưng nên review test quality
-
-5. **Update dependencies (major)**
-   - Risk: High (breaking changes có thể phá app)
-   - Độ quen: Không quan trọng
-   - Level: **Manual** (đọc changelog từng package)
-   - Lý do: Major updates cần đọc migration guide, test kỹ
+| Task | Mode | Guardrail thêm |
+|---|---|---|
+| Prettier | `acceptEdits` | `git diff --stat` sau khi chạy |
+| Migration | `default` | `"deny": ["Edit(./migrations/**)"]` tới khi review xong |
+| Endpoint | `acceptEdits` | `plan` trước nếu pattern chưa rõ |
+| Auth | `default` | `"deny": ["Read(./.env)"]` |
+| Test | `auto` | Stop hook chạy `npm test` (Module 11.3) |
 </details>
 
 ---
 
 ## 5. CHEAT SHEET
 
-### Quick Decision Guide
-
-```text
-┌─────────────────────────────────────────────────────────┐
-│  Task Type              →  Level khuyến nghị            │
-├─────────────────────────────────────────────────────────┤
-│  Format / Lint          →  Semi-Auto / Full Auto        │
-│  Generate tests         →  Semi-Auto                    │
-│  Refactor (quen code)   →  Semi-Auto                    │
-│  Refactor (lạ code)     →  Manual                       │
-│  Add features (quen)    →  Semi-Auto                    │
-│  Add features (lạ)      →  Manual                       │
-│  Security / Auth        →  Manual                       │
-│  Database migration     →  Manual                       │
-│  Config changes         →  Manual (review kỹ)           │
-│  CI/CD automation       →  Full Auto (trong sandbox)    │
-└─────────────────────────────────────────────────────────┘
-```
-
-### Permission Shortcuts
-
-| Key | Meaning | Level Impact |
-|-----|---------|--------------|
-| `y` | Yes, approve this action | Stays in Manual Mode |
-| `n` | No, reject this action | Stays in Manual Mode |
-| `a` | Allow for session | Switches to Semi-Auto |
-| `always` | Allow always (persistent) | Switches to Full Auto ⚠️ |
-
-### Level Selection Reference
-
-| Factor | Manual | Semi-Auto | Full Auto |
-|--------|--------|-----------|-----------|
-| **Task familiarity** | Low | Medium-High | Very High |
-| **Code familiarity** | Low | Medium-High | High |
-| **Risk level** | Any | Low-Medium | Low only |
-| **Approval frequency** | Every action | Once per session | None |
-| **Speed** | Slow | Fast | Fastest |
-| **Control** | Maximum | Balanced | Minimum |
-| **Best for** | Learning, high-risk | Daily work | Automation, CI/CD |
+| Lệnh / Tính năng | Mô tả | Ví dụ |
+|---|---|---|
+| `Shift+Tab` | Xoay mode trong session | `default` → `acceptEdits` → `plan` → `auto` |
+| `--permission-mode <mode>` | Khởi động ở một mode; dùng được với `-p` | `claude --permission-mode plan` |
+| `permissions.defaultMode` | Mặc định theo máy/project/tổ chức | `{"permissions": {"defaultMode": "acceptEdits"}}` |
+| `/permissions` | Xem/sửa rule allow, ask, deny | rule xét theo thứ tự deny → ask → allow |
+| `/plan` | Plan mode cho một prompt | `/plan refactor the parser` |
+| `--dangerously-skip-permissions` | = `--permission-mode bypassPermissions` | chỉ sandbox/container |
+| `disableBypassPermissionsMode` | Công tắc khoá managed | `"disable"` |
+| Phím ở prompt | `1`/`Enter` Yes · `2` session/rule · `Esc` huỷ · `Tab` thêm ghi chú | — |
 
 ---
 
-## 6. PITFALLS — Những Sai Lầm Thường Gặp
+## 6. PITFALLS — Lỗi thường gặp
 
 | ❌ Sai lầm | ✅ Cách đúng |
-|-----------|-------------|
-| Dùng Full Auto cho mọi task vì "nhanh hơn" | Full Auto chỉ cho task low-risk + đã plan kỹ. High-risk tasks luôn dùng Manual hoặc Semi-Auto. |
-| Click "allow always" lần đầu tiên dùng Claude Code | Bắt đầu với Manual Mode. Chỉ escalate lên Semi/Full khi đã hiểu behavior của Claude. |
-| Dùng Manual Mode cho task formatting 200 files | Task repetitive, low-risk → Semi-Auto hoặc Full Auto với plan. Manual Mode lãng phí thời gian. |
-| Không có plan khi dùng Full Auto | Full Auto cần plan rõ ràng. Không plan = Claude tự improvise → unpredictable results. |
-| Quên rollback strategy khi dùng Full Auto | Luôn có `git status` clean hoặc backup trước Full Auto. Nếu không rollback được → đừng dùng Full Auto. |
-| Dùng Semi-Auto cho codebase production lạ | Codebase lạ + production = Manual Mode. Học codebase trước, automation sau. |
+|---|---|
+| Dạy hoặc chờ prompt `[y]/[a]/[n]` | Không tồn tại. Prompt là các lựa chọn đánh số; `Esc` huỷ, `Tab` thêm ghi chú |
+| `bypassPermissions` trên laptop | Chỉ trong sandbox/container; deny rule vẫn giữ, mọi thứ khác thì không |
+| Coi `auto` là "an toàn tuyệt đối" | Nó giảm prompt; không thay thế review cho thay đổi nhạy cảm |
+| `defaultMode: "auto"` trong `.claude/settings.json` | Bị bỏ qua ở đó — đặt vào `~/.claude/settings.json` hoặc managed settings |
+| Ranh giới chỉ nêu trong prompt | Classifier có đọc nhưng compaction có thể làm mất; thêm rule `permissions.deny` |
+| Một mode cho mọi task | Dùng ma trận: độ quen và bán kính thiệt hại, không phải thói quen |
 
 ---
 
-## 7. REAL CASE — Onboarding Team Microservices
+## 7. REAL CASE — Câu chuyện thực tế
 
-**Scenario**: Team Việt Nam (5 devs) onboard vào hệ thống microservices của khách hàng Mỹ. 30+ services, tech stack lạ (Go, gRPC, Kubernetes).
+**Bối cảnh**: Một team Việt Nam onboarding vào backend 15 service với shared library.
 
-**Tuần 1 — Manual Mode Only**:
-- Quy định: Tất cả devs PHẢI dùng Manual Mode
-- Mục tiêu: Học cách services giao tiếp, hiểu deployment flow
-- Dev A click approve ~200 lần/ngày nhưng **bắt lỗi sớm**: Claude Code định sửa config file critical, dev thấy ngay và reject
-- Kết quả: Không có incident nào, team hiểu 70% architecture sau 1 tuần
+**Vấn đề**: Tuần 1 ở `default` chậm nhưng bắt được nhiều hiểu nhầm. Sang tuần 2 việc lặp lại
+chạy ở `acceptEdits`, còn CI sinh docs chạy headless với `--permission-mode acceptEdits` trong
+container. Rồi một dev đổi schema ở `auto` với prompt mơ hồ: "Add user preferences table".
+Claude đoán kiểu cột; migration fail ở staging.
 
-**Tuần 2 — Cho phép Semi-Auto**:
-- Điều kiện: Chỉ cho services đã quen, task low-risk (add logging, update tests)
-- Dev B refactor một service Go: dùng Semi-Auto, velocity tăng 3x so với tuần trước
-- Dev C vẫn dùng Manual cho service lạ (payment gateway) → đúng quyết định
+**Giải pháp**: Quy tắc team trở thành ma trận. Chưa quen + rủi ro cao → `default`, kèm
+`"deny": ["Edit(./migrations/**)"]` tới khi có người review. Quen + rủi ro thấp →
+`acceptEdits`. `bypassPermissions` chỉ trong container CI. Migration làm lại ở `plan` mode, rồi
+chạy với `acceptEdits`.
 
-**Tuần 3 — Full Auto Cho CI/CD**:
-- Setup sandbox Kubernetes cluster riêng
-- Dùng Full Auto để test deployment scripts, rollback strategies
-- Plan file chi tiết cho từng scenario
-- Kết quả: Tìm được 2 bugs trong deployment flow mà manual testing bỏ qua
-
-**Mistake**: Dev D dùng Full Auto để migrate database schema của một service — không có plan rõ ràng. Claude Code thực hiện migration nhưng quên update indices. Service chậm đi 10x. Phải rollback, làm lại với Manual Mode + Think+Plan.
-
-**Lesson Learned**:
-> "Full Auto phải kiếm được, không phải mặc định. Nó là phần thưởng khi bạn đã hiểu task + code + risk đủ rõ để trust autonomous execution. Tuần 1 chúng tôi chậm, nhưng tuần 3 chúng tôi nhanh gấp 5 lần — vì đã hiểu khi nào nên thả tay."
+**Kết quả**: Hai tháng sau không còn sự cố staging nào do chọn sai mức tự động hoá.
 
 ---
 
-> **Tiếp theo**: [Module 7.2: Quy Trình Full Auto](../02-full-auto-workflow/) →
+> **Tiếp theo**: [Module 7.2: Full Auto Workflow](../02-full-auto-workflow/) →

@@ -1,6 +1,8 @@
 ---
 title: 'Multi-Agent Architecture'
-description: 'Learn multi-agent patterns for Claude Code orchestration using one-shot mode and bash scripting.'
+description: 'Map the orchestrator, pipeline and specialist patterns onto native subagents and experimental agent teams.'
+verified: 2026-09-22
+claude_version: 2.1.278
 ---
 
 # Module 7.3: Multi-Agent Architecture
@@ -9,331 +11,299 @@ description: 'Learn multi-agent patterns for Claude Code orchestration using one
 >
 > **Prerequisite**: Module 7.2 (Full Auto Workflow)
 >
-> **Outcome**: After this module, you will understand multi-agent patterns, know when to use them, and be able to implement basic orchestration using Claude Code's one-shot mode and bash scripting.
+> **Outcome**: After this module, you will be able to define a **subagent** in
+> `.claude/agents/<name>.md`, invoke it by name, run several in parallel, and decide when an
+> **agent team** earns its token cost.
 
 ---
 
 ## 1. WHY — Why This Matters
 
-You're building a massive feature across 10 services. Hour 1: great progress. Hour 2: solid implementation. Hour 3: Claude mixes up service names, references old decisions, suggests tests for unwritten code. Context is polluted.
-
-Multi-agent architecture solves this: orchestrate focused Claude instances — architect, implementers per service, tester, documenter. Each has fresh context and clear handoffs. Like a real dev team, automated.
+By hour three of a big feature, Claude is quoting decisions you reverted and the context is full
+of test output nobody will read again. The fix isn't a bigger window, it's more windows:
+**subagents** run in their own context and hand back a summary; **agent teams** are separate
+sessions with a shared task list and messaging.
 
 ---
 
 ## 2. CONCEPT — Core Ideas
 
-### When to Use Multi-Agent
+### Workflows vs agents (S5)
 
-**Single Agent**: Tasks under 2 hours, single codebase area, coherent context.
+Anthropic separates *workflows* (code decides what runs next) from *agents* (the model does). Its
+five building blocks map onto our three patterns:
 
-**Multi-Agent**: Complex multi-phase tasks, independent subtasks, specialization benefits (design/implementation/testing), context degradation risk.
-
-**Rule of thumb**: If you'd split work among multiple developers, use multi-agent.
-
-### How Claude Code Components Fit Together
-
-Before diving into multi-agent patterns, understand how Claude Code's internal components relate:
-
-```mermaid
-graph TD
-    User[User Prompt] --> CC[Claude Code CLI]
-    CC --> Parser[Command Parser]
-    Parser --> Router{Route Decision}
-
-    Router -->|Interactive| Session[Session Manager]
-    Router -->|"One-shot (-p)"| OneShot[One-Shot Executor]
-    Router -->|SDK call| SDK[SDK Interface]
-
-    Session --> Agent[Agent Loop]
-    OneShot --> Agent
-    SDK --> Agent
-
-    Agent --> Tools[Tool System]
-    Tools --> FileOps[File Read/Write]
-    Tools --> Shell[Shell Commands]
-    Tools --> MCPTools[MCP Servers]
-
-    Agent --> Context[Context Window]
-    Context --> CLAUDE_MD[CLAUDE.md Files]
-    Context --> Conv[Conversation History]
-    Context --> LoadedFiles[Loaded File Content]
-
-    style User fill:#e1f5fe
-    style Agent fill:#fff3e0
-    style Tools fill:#e8f5e9
-    style Context fill:#fce4ec
-```
-
-**Key relationships**:
-- **Agent Loop** is the core engine — it reads context, decides actions, calls tools, and iterates until the task is done
-- **Tools** are how the agent acts on the world (reading/writing files, running shell commands, connecting to MCP servers)
-- **Context Window** is what the agent knows (CLAUDE.md rules, conversation history, loaded file contents)
-- **Multi-agent** = multiple independent Agent Loops, each with its own fresh context, communicating through files on disk
-
-This diagram explains **why multi-agent works**: each agent gets a clean Agent Loop with focused context, avoiding the context pollution that happens when one loop handles too many concerns simultaneously.
-
-### Three Core Patterns
-
-#### Pattern 1: Orchestrator-Worker
+| Course pattern | Anthropic pattern | Claude Code mechanism |
+|---|---|---|
+| **Orchestrator-Worker** | orchestrator-workers / parallelization | Parallel subagents, each returning a summary |
+| **Pipeline** | prompt chaining | Chained subagents ("use A, then use B on A's output"); at scale, Dynamic Workflows, covered later |
+| **Specialist Team** | evaluator-optimizer | Agent team: named teammates messaging each other, claiming tasks |
 
 ```mermaid
 graph TD
-    O[Orchestrator Agent] --> W1[Worker 1: Service A]
-    O --> W2[Worker 2: Service B]
-    O --> W3[Worker 3: Service C]
-    W1 --> R[Shared Results]
-    W2 --> R
-    W3 --> R
-    R --> O
+    M[Main session] -->|Agent tool| S1["Subagent A<br/>own context, own tools"]
+    M -->|Agent tool| S2["Subagent B"]
+    S1 -->|summary ~1-2K tokens| M
+    S2 -->|summary| M
+    M -.->|CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1| T["Team lead"]
+    T --> A["@reviewer"]
+    T --> B["@tester"]
+    A <-->|SendMessage| B
+    A --> L[(Shared task list)]
+    B --> L
 ```
 
-**Best for**: Parallel independent subtasks. Orchestrator plans, workers execute, integrates results.
+A subagent should return roughly **1,000–2,000 tokens** (S6), not its transcript — that is how
+delegation protects the main context.
 
-**Example**: Add logging to 10 microservices — orchestrator creates spec, workers implement.
+### Subagents
 
-#### Pattern 2: Pipeline (Sequential)
+A subagent is a Markdown file with YAML frontmatter; the body is its system prompt. It lives in
+`.claude/agents/` (project), `~/.claude/agents/` (all projects), or `--agents '{…}'` (one
+session). Only `name` and `description` are required.
 
-```mermaid
-graph LR
-    A[Agent 1: Architect] --> B[Agent 2: Implementer]
-    B --> C[Agent 3: Reviewer]
-    C --> D[Agent 4: Tester]
-```
+| Field | Purpose |
+|---|---|
+| `name`, `description` | Identity; `description` tells Claude when to delegate |
+| `tools` | `Read, Grep, Bash` or a YAML list; omitted, it inherits every tool available to subagents |
+| `model` | `sonnet`, `opus`, `haiku`, `fable`, a full ID, or `inherit` |
+| `permissionMode` | Applies when the main session is `default`, `dontAsk` or `plan`; ignored under `acceptEdits`/`auto`/`bypass` |
+| `maxTurns` | Stops the subagent; its output is marked partial |
+| `skills`, `memory`, `isolation: worktree` | Preloaded skills; memory (`user`/`project`/`local`); own git worktree |
 
-**Best for**: Sequential phases where each agent builds on previous output.
+Built-ins: **Explore** (read-only search), **Plan** (plan-mode research), **general-purpose**
+(everything). `/agents` prints a reminder, not a wizard. Invoke by name (*"Use the test-writer
+subagent to …"*) or force it with `@"test-writer (agent)"`. A subagent starts fresh: system
+prompt, task message, CLAUDE.md, git status — not your conversation.
 
-**Example**: API development — architect designs → implementer codes → reviewer checks → tester validates.
+### Agent teams
 
-#### Pattern 3: Specialist Team
+⚠️ **Experimental, disabled by default.** Enable with `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`
+in your environment or the `env` block of `settings.json`; interactive sessions only. Per the
+docs, a team beats subagents for *research and review*, *new modules or features*, *debugging
+with competing hypotheses*, *cross-layer coordination* — and doesn't for *"sequential tasks,
+same-file edits, or work with many dependencies"*, where *"a single session or subagents are more
+effective."*
 
-```mermaid
-graph TD
-    C[Coordinator] --> BE[Backend Agent]
-    C --> FE[Frontend Agent]
-    C --> T[Test Agent]
-    BE --> CB[Shared Codebase]
-    FE --> CB
-    T --> CB
-    CB --> C
-```
+Cost decides. The costs page puts a team at *"approximately 7x more tokens than standard
+sessions when teammates run in plan mode"* (S15); Anthropic's research system measured
+multi-agent runs at ~15× a chat (S10). A teammate is a whole extra session: start with 3–5, one
+file set each, shut them down when done.
 
-**Best for**: Full-stack features requiring domain expertise.
-
-**Example**: User dashboard — coordinator defines requirements → backend/frontend/test agents work in parallel.
-
-### Agent Communication Methods
-
-**File-Based Handoffs** (recommended): Agent A writes `architecture.md`, Agent B reads it. Clear, auditable, version-controllable.
-
-**Pipes** (advanced): `claude -p "analyze" | claude -p "implement from stdin"`
-
-**JSON Output** ⚠️ Needs verification: `claude -p "output JSON" --output-format json | jq`
-
-### Spawning Fresh Agents
-
-Each agent is a separate Claude Code invocation with fresh context:
-```bash
-claude -p "your specialized prompt here"
-```
-
-No shared memory — communicate via artifacts (files, stdout, environment variables).
+> `(S5)`, `(S6)`, `(S10)`, `(S15)`: `docs/references/anthropic-sources.md`.
 
 ---
 
 ## 3. DEMO — Step by Step
 
-**Task**: Add a new API endpoint for user preferences, complete with tests and documentation.
+Run in `~/cc-lab`; captures are trimmed.
 
-### Agent 1: Architect
+**Step 1: Define a project subagent**
 
-**Step 1: Design Phase**
 ```bash
-$ claude -p "Design an API endpoint for managing user preferences (theme, language, notifications). Output: route structure, request/response schemas, database changes needed. Write everything to architecture.md"
+# docs: sub-agents#write-subagent-files
+mkdir -p .claude/agents && cat > .claude/agents/test-writer.md << 'EOF'
+---
+name: test-writer
+description: Writes node:test unit tests for a given source file. Use when asked to add or extend tests.
+tools: Read, Write, Bash
+model: sonnet
+---
+You are a test writer. Read the source file you are given, write or extend
+tests in tests/ using node:test and node:assert/strict, run `npm test`, and
+report only the test names and the pass/fail counts.
+EOF
 ```
 
-Expected output:
+Why: `tools` is the fence: no `Edit`, no `WebFetch`.
+
+**Step 2: Invoke it by name (Orchestrator-Worker, one worker)**
+
+```bash
+# docs: sub-agents#invoke-subagents-explicitly
+claude --permission-mode acceptEdits
+```
+
+Prompt: `Use the test-writer subagent to add three tests for src/math.js`
+
 ```text
-Created architecture.md with:
-- POST /api/v1/users/:id/preferences
-- Schema: { theme: string, language: string, notifications: boolean }
-- DB: Add preferences column to users table (JSONB)
+# Output may vary
+⏺ test-writer(Add three tests for math.js)
+  ⎿  Backgrounded agent (↓ to manage · ctrl+o to expand)
+⏺ The test-writer subagent is running. It's extending tests/math.test.mjs with three new tests …
+✻ Waiting for 1 background agent to finish
+ Bash command · from the test-writer agent
+   npm test -- tests/math.test.mjs 2>&1 | tail -30
+ Do you want to proceed?
+ ❯ 1. Yes
+   2. Yes, and don’t ask again for: npm test *
+   3. Yes, and switch to auto mode · auto mode handles these prompts for you
+   4. No
+⏺ Agent "Add three tests for math.js" finished · 37s
 ```
 
-### Agent 2: Implementer
+The row `test-writer(…)` proves delegation; its Bash prompt surfaces in *your* session, named.
+`acceptEdits` covers the subagent's `Write`, not its `npm test`. Afterwards:
 
-**Step 2: Implementation Phase**
 ```bash
-$ claude -p "Read architecture.md. Implement the preferences endpoint in src/routes/ and src/services/. Follow existing Express patterns. Use Prisma for DB access."
+git diff --stat && npm test 2>&1 | grep -E '^# (pass|fail)'
 ```
 
-Expected output:
+```text
+# Output may vary
+ tests/math.test.mjs | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+# pass 4
+# fail 0
+```
+
+**Step 3: `/agents` — a reminder, not a list**
+
+```text
+# Output may vary
+❯ /agents
+  ⎿  The /agents wizard has been removed.
+     Ask Claude to create or update subagents for you (e.g. "create a code-reviewer subagent that ..."),
+     or edit the files directly:
+       • .claude/agents/       (this project)
+       • ~/.claude/agents/     (all projects)
+```
+
+`/tasks` lists running and finished subagents.
+
+**Step 4: Two subagents in parallel (Orchestrator-Worker)**
+
 ```bash
-$ git diff --stat
- src/routes/userPreferences.ts   | 45 +++++++++++++++++++++
- src/services/preferences.ts      | 32 ++++++++++++++
- prisma/schema.prisma             |  1 +
+# docs: sub-agents#run-parallel-research
+claude --permission-mode default
 ```
 
-### Agent 3: Tester
+Prompt: `Use two subagents in parallel: one lists every exported function in src/, the other
+lists every TODO comment in the repo. Report both lists.`
 
-**Step 3: Testing Phase**
+The session is in `default`, so expect prompts: a background subagent reaching for Bash surfaces
+its request in *your* session, named.
+
+```text
+# Output may vary
+⏺ 2 background agents launched (↓ to manage)
+   ├ List exported functions in src/
+   └ List TODO comments in repo
+✻ Waiting for 2 background agents to finish
+⏺ Agent "List exported functions in src/" finished · 1m 1s
+  The first subagent finished: src/ has two exported functions, both in src/math.js. …
+```
+
+Both launched as background Explore agents. The first returned its summary: two lines, not a file
+listing. The second never finished — its `grep` needed an approval in the main session. Approve,
+switch mode, or pre-approve with `permissions.allow`.
+
+**Step 5: An agent team (Specialist Team)**
+
+Teams are enabled here via `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in `~/.claude/settings.json`.
+
 ```bash
-$ claude -p "Read architecture.md and src/routes/userPreferences.ts. Write comprehensive tests covering happy path, validation errors, not found cases. Use Jest and Supertest."
+# docs: agent-teams#start-your-first-agent-team
+claude --permission-mode default
 ```
 
-Expected output:
-```bash
-$ npm test
- PASS  src/routes/userPreferences.test.ts
-  ✓ POST /api/v1/users/:id/preferences - success (42ms)
-  ✓ POST /api/v1/users/:id/preferences - validation error (15ms)
-  ✓ POST /api/v1/users/:id/preferences - user not found (12ms)
+Prompt: `Spawn two teammates named reviewer and tester. reviewer reads src/math.js and lists 3
+edge cases; tester reads tests/math.test.mjs and lists 3 missing tests. Each reports back in
+bullets, then ask both to shut down and summarize.`
+
+```text
+# Output may vary
+⏺ 2 background agents launched (↓ to manage)
+   ├ @reviewer
+   └ @tester
+› Message from @reviewer (ctrl+o to expand)
+⏺ Teammate @reviewer finished
+› Message from @tester (ctrl+o to expand)
+⏺ Both reports are in. Sending shutdown requests to both.
+⏺ Shutdown requests sent to both teammates. Here's the summary:
+  reviewer — 3 edge cases in src/math.js
+  - divide by zero — divide(1, 0) → Infinity, divide(-1, 0) → -Infinity, divide(0, 0) → NaN; …
+  tester — 3 missing tests in tests/math.test.mjs
+  - divide happy path — divide is exported but never imported or tested at all …
+  Overlap worth acting on: both flagged divide(x, 0) … No files were modified by either teammate.
 ```
 
-### Agent 4: Documenter
-
-**Step 4: Documentation Phase**
-```bash
-$ claude -p "Read architecture.md and src/routes/userPreferences.ts. Update API.md with endpoint documentation including curl examples and response formats."
-```
-
-Expected output:
-```markdown
-## User Preferences
-
-### Update Preferences
-POST /api/v1/users/:id/preferences
-
-Request:
-{
-  "theme": "dark",
-  "language": "vi",
-  "notifications": true
-}
-...
-```
-
-### Result
-
-Four specialized agents with fresh context, file-based handoffs. Total: ~15 minutes vs. 45+ with degrading context.
+Teammates answer to `@reviewer`/`@tester`, message the lead, and exit on a shutdown request.
+Clean up with `rm -rf .claude/agents && git checkout -- tests`.
 
 ---
 
 ## 4. PRACTICE — Try It Yourself
 
-### Exercise 1: Build Your First Pipeline
+### Exercise 1: A read-only reviewer
 
-**Goal**: Implement a 3-phase pipeline for adding a new feature
-
-**Instructions**:
-1. Choose a small feature with clear phases (e.g., add rate limiting: design → implement → test)
-2. Write prompts for 3 agents following the DEMO pattern
-3. Create a bash script `pipeline.sh` that runs them in sequence
-4. Execute and observe how each agent reads previous output
-
-**Expected result**: Three distinct files (design.md, implementation code, tests), each agent referenced previous work without context pollution.
-
-<details>
-<summary>💡 Hint</summary>
-
-Your bash script should look like:
-```bash
-#!/bin/bash
-claude -p "Agent 1 prompt, write to design.md"
-claude -p "Agent 2 prompt, read design.md, implement"
-claude -p "Agent 3 prompt, read design.md and code, test"
-```
-</details>
+**Goal**: Define `security-reviewer` that can look but never edit.
+**Instructions**: create `.claude/agents/security-reviewer.md` with `tools: Read, Grep, Glob` and
+`model: sonnet`, then ask `Use the security-reviewer subagent to review src/`.
+**Expected result**: findings listed; `git status` unchanged.
 
 <details>
 <summary>✅ Solution</summary>
 
-```bash
-#!/bin/bash
-set -e
-
-echo "=== Agent 1: Architect ==="
-claude -p "Design rate limiting for our API. Strategy: token bucket. Output implementation plan to rate-limit-design.md"
-
-echo "=== Agent 2: Implementer ==="
-claude -p "Read rate-limit-design.md. Implement rate limiting middleware in src/middleware/rateLimit.ts using express-rate-limit"
-
-echo "=== Agent 3: Tester ==="
-claude -p "Read rate-limit-design.md and src/middleware/rateLimit.ts. Write tests that verify rate limiting works, including burst scenarios"
-
-echo "=== Pipeline complete ==="
-git diff --stat
-npm test
+```markdown
+---
+name: security-reviewer
+description: Read-only security review of source files. Use before merging.
+tools: Read, Grep, Glob
+model: sonnet
+---
+Review the files you are given for injection, secrets and unsafe defaults.
+Report each finding as: severity, file:line, one-sentence fix. Never edit files.
 ```
 
-**Result**: Each agent had focused context. Architect wasn't distracted by implementation details. Implementer didn't second-guess design. Tester verified against spec.
+Without `Edit`/`Write` in `tools` the agent cannot change anything — a fence, not a request.
 </details>
 
-### Exercise 2: Orchestrator-Worker Pattern
+### Exercise 2: Orchestrator with JSON summaries
 
-**Goal**: Use orchestrator-worker for parallel tasks
-
-**Instructions**:
-1. Task: Add error logging to 5 different service files
-2. Create orchestrator agent that analyzes files and writes logging-plan.md
-3. Create 5 worker agents (or loop through files) that each add logging to one file
-4. Run workers in parallel using `&` backgrounding in bash ⚠️ or sequentially
-
-**Expected result**: All 5 files updated with consistent logging, orchestrator's plan followed.
-
-<details>
-<summary>💡 Hint</summary>
-
-Orchestrator prompt: "List these 5 files and specify what logging each needs based on its function"
-Worker prompt template: "Read logging-plan.md. Add logging to FILE_NAME following the plan."
-</details>
+**Goal**: Three subagents, one merged report.
+**Instructions**: prompt `Use three subagents in parallel — exports, TODOs, test names. Each must
+return a JSON object {"area": …, "items": […]} and nothing else. Merge them into one JSON array.`
+Confirm three short objects came back, not transcripts.
 
 <details>
 <summary>✅ Solution</summary>
+The subagent's *report* enters your context; a strict shape keeps it near the 1–2K target (S6).
+</details>
 
-```bash
-#!/bin/bash
-# Orchestrator
-claude -p "Analyze src/services/{user,order,payment,auth,notification}.ts. Create logging-plan.md specifying what logging each file needs."
+### Exercise 3: Writer / Reviewer in two sessions (S1)
 
-# Workers (sequential for safety)
-for service in user order payment auth notification; do
-  claude -p "Read logging-plan.md. Add appropriate logging to src/services/${service}.ts following the plan."
-done
+**Goal**: A review with fresh context, unbiased by the code it wrote.
+**Instructions**:
+1. Session A: `claude --permission-mode acceptEdits` →
+   `Implement a clamp(x, lo, hi) function in src/math.js`.
+2. Session B: `claude --worktree review --permission-mode default` → `Review the clamp
+   implementation in @src/math.js. Look for edge cases and consistency with existing functions.`
+3. Paste B's findings into A: `Here's the review feedback: […]. Address these issues.`
 
-git diff --stat
-```
+<details>
+<summary>✅ Solution</summary>
+B never saw A's reasoning, so it reviews the code, not the intent. `--worktree` lets B run tests
+without disturbing A's tree.
 </details>
 
 ---
 
 ## 5. CHEAT SHEET
 
-### Pattern Selection
-
-| Scenario | Pattern | Why |
-|----------|---------|-----|
-| 10 similar tasks | Orchestrator-Worker | Parallel execution, same template |
-| Design → Code → Test | Pipeline | Sequential dependencies, clear handoff |
-| Frontend + Backend + DB | Specialist Team | Domain expertise per layer |
-| Refactoring one module | Single Agent | Coherent context, no specialization needed |
-
-### Agent Spawning
-
-| Method | Syntax | Use Case |
-|--------|--------|----------|
-| One-shot | `claude -p "prompt"` | Fresh agent, single task |
-| Interactive → one-shot | Start interactive, then spawn via bash | Exploratory then execution |
-| Script loop | `for file in *.ts; do claude -p "..."; done` | Batch processing |
-
-### Communication
-
-| Method | Pro | Con |
-|--------|-----|-----|
-| File handoffs | Clear, auditable, works everywhere | Extra file I/O |
-| Pipes | Elegant for simple chains | Hard to debug, no intermediate artifacts |
-| Environment vars | Fast for small data | Size limits, shell escaping issues |
+| Command / Feature | Description | Example |
+|---|---|---|
+| `.claude/agents/<name>.md` · `~/.claude/agents/` | Project / personal subagent | `name`, `description`, `tools`, `model` |
+| `--agents '{…}'` | Session-only subagents, as JSON | `claude --agents '{"reviewer": {"description": …, "prompt": …}}'` |
+| `Use the <name> subagent to …` | Delegation, Claude's choice | — |
+| `@"<name> (agent)"` | Force that subagent | `@"test-writer (agent)" cover src/math.js` |
+| `--agent <name>` | Session runs as that subagent | `claude --agent security-reviewer` |
+| Explore / Plan / general-purpose | Built-ins: read-only / plan research / everything | `Agent(Explore)` denies one |
+| `/tasks` | Background work, running and done | — |
+| `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` | Enable teams (experimental) | `env` in settings.json |
+| `Spawn N teammates …` | Start a team; name them for `@name` | — |
+| `Ask the <name> teammate to shut down` | Graceful teammate exit | — |
+| `--teammate-mode` | `in-process` (default), `auto`, `tmux`, `iterm2` | split panes need tmux |
 
 ---
 
@@ -341,28 +311,31 @@ git diff --stat
 
 | ❌ Mistake | ✅ Correct Approach |
 |---|---|
-| Using multi-agent for 10-minute single-file task | Use single agent for simple coherent tasks. Multi-agent overhead isn't worth it. |
-| Agents with overlapping responsibilities | Define clear boundaries. "Agent A designs, Agent B implements" — no overlap. |
-| No shared artifact between agents | Always use handoff files (design.md, spec.json). Agents can't read each other's minds. |
-| Running parallel agents on same file | Coordinate file ownership. Parallel agents should touch different files or risk merge conflicts. |
-| Over-engineering orchestration | Start simple (bash script). Only add complexity (n8n, etc.) when bash becomes unmanageable. |
-| Forgetting fresh context is the point | Don't pass massive context to each agent. Give them focused inputs and trust specialization. |
+| Bash loops of `claude -p` writing files, no permission flag | Native subagents, or `-p` with `--permission-mode acceptEdits` / `--allowedTools` |
+| Treating agents as sealed boxes that only talk via files | Subagents return a summary; teammates share a task list and message each other |
+| A team for a sequential, same-file change | Single session or chained subagents; each teammate costs a session's worth of tokens |
+| Subagents that return whole transcripts | Ask for a short, structured report (~1–2K tokens) |
+| `permissionMode: bypassPermissions` in a subagent | Ignored unless the main session bypasses; use `tools` as the fence |
+| Two teammates editing one file | Give each its own files; the docs are blunt that sharing one leads to overwrites |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: Vietnamese fintech startup building payment reconciliation across 6 microservices, 3 databases, 2 third-party APIs.
+**Scenario**: A Vietnamese fintech team building payment reconciliation across six services and
+two third-party APIs.
 
-**Problem**: Single session degraded after 3 days. API contracts inconsistent, tests referenced non-existent endpoints.
+**Problem**: One long session degraded after three days: contracts drifted and tests referenced
+endpoints that no longer existed.
 
-**Solution**: Specialist Team pattern:
-- **Coordinator**: Created `integration-contract.md` defining all service interfaces
-- **6 Service Agents**: Each implemented one microservice from contract
-- **Integration Agent**: Built orchestration layer
-- **Test Agent**: Added E2E contract compliance tests
+**Solution**: The lead wrote `integration-contract.md` in a plan-mode session, then, with agent
+teams enabled, spawned six teammates named after the services — each a `tools`-restricted
+subagent definition with the contract as its spawn prompt — plus a read-only `contract-tester`.
+Past the 3–5 starting band deliberately: one teammate per service boundary, no two sharing a
+file. Review ran in a fresh `--worktree` session (Writer/Reviewer).
 
-**Result**: Completed in 1 day. Zero API mismatches. Each agent had fresh, focused context. Contract document served as single source of truth.
+**Result**: The reconciliation layer shipped in a day with zero API mismatches. The seven agent
+files stayed in `.claude/agents/` and now run as plain subagents when a team isn't worth it.
 
 ---
 
