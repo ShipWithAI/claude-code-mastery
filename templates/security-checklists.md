@@ -3,7 +3,8 @@
 Source: Module 2.5 — System Control & Monitoring
 Date: 2026-09-21
 
-Checklists are how pilots prevent crashes and surgeons prevent mistakes. Here are your security checklists for Claude Code:
+Checklists are how pilots prevent crashes and surgeons prevent mistakes. Here are your security
+checklists for Claude Code.
 
 **Pre-Session Checklist:**
 - [ ] Am I in the correct project directory?
@@ -28,6 +29,9 @@ Checklists are how pilots prevent crashes and surgeons prevent mistakes. Here ar
 
 **Weekly Audit Checklist:**
 - [ ] Run full project scan: `gitleaks detect --verbose`
+- [ ] Re-run one violating command and confirm the deny rule / `PreToolUse` hook still blocks it
+      (Module 2.5, DEMO Step 4) — a control that stops blocking is worse than none
+- [ ] Open `/permissions` and check the Deny tab matches `.claude/settings.json`
 - [ ] Review CLAUDE.md for needed updates
 - [ ] Check for new .env variables not in .env.example
 - [ ] Review git history for any committed secrets

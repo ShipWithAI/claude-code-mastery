@@ -1,6 +1,8 @@
 ---
 title: 'Permission System Deep Dive'
-description: 'Configure Claude Code permission levels, understand safety prompts, and set appropriate approval policies.'
+description: 'Write allow/deny/ask rules, pick a permission mode, and prove the rule actually blocked the action.'
+verified: 2026-09-23
+claude_version: 2.1.280
 ---
 
 # Module 2.2: Permission System Deep Dive
@@ -9,377 +11,310 @@ description: 'Configure Claude Code permission levels, understand safety prompts
 >
 > **Prerequisite**: Module 2.1 (Threat Model)
 >
-> **Outcome**: After this module, you will understand Claude Code's permission system, know how to configure safety levels appropriately, and recognize when to approve or deny command requests
+> **Outcome**: You can write `allow` / `deny` / `ask` rules, pick a permission mode, say which
+> settings file wins, and prove a rule blocked what you meant it to.
 
 ---
 
 ## 1. WHY — Why This Matters
 
-You've read Module 2.1. You now know that Claude Code runs with YOUR permissions on YOUR machine. It can read your SSH keys, delete files, push to production. That's terrifying. But here's the thing: Claude Code isn't completely reckless. It has a permission system that prompts you before running dangerous commands. This module shows you exactly how that system works, what it protects you from, and — critically — where it fails. The permission prompt is your last line of defense. Understanding it is not optional.
+You put `NEVER read .env` in `CLAUDE.md`, and a session later a command printed your key into the
+transcript. Not a bug — the docs are blunt: *"Permission rules are enforced by Claude Code, not by
+the model. Instructions in your prompt or `CLAUDE.md` … don't change what Claude Code allows."*
+A settings rule is a control; a `CLAUDE.md` line is a suggestion. This module is the control.
 
 ---
 
 ## 2. CONCEPT — Core Ideas
 
-### Default Permission Behavior
+### Three lists, one order
 
-By default, Claude Code asks for permission before executing shell commands. When it wants to run something like `git push` or `npm install`, it shows you a prompt with the full command and waits for your approval. You can approve, deny, or approve once vs. always for that type of command.
+`allow` runs without a prompt, `ask` always prompts, `deny` blocks. *"Rules are evaluated in
+order: deny, then ask, then allow. The first match … determines the outcome, and rule specificity
+doesn't change the order."* `Bash(aws *)` in deny beats `Bash(aws s3 ls)` in allow:
+**allow never carves an exception out of deny.**
 
-**What triggers prompts**: ⚠️ Needs verification
-- Shell commands via the Bash tool
-- File writes that modify code outside safe paths
-- Network operations (curl, wget, API calls)
 
-**What does NOT trigger prompts**: ⚠️ Needs verification
-- Reading files (Claude Code can silently read anything you have access to)
-- Using language tools like `lsp_diagnostics`
-- Internal operations like searching with Grep
+### Rule syntax — `Tool` or `Tool(specifier)`
 
-**The approval flow**: You see the command, its description, and buttons to approve or deny. If you deny, Claude Code stops and reports the denial. If you approve, it runs immediately.
+| Rule | Matches |
+|---|---|
+| `Read`, `Bash` | every use; as a deny, removes the tool entirely |
+| `Bash(npm run build)` / `Bash(git status:*)` | exact command / plus anything after (`:*` ≡ trailing ` *`) |
+| `Read(./.env)`, `Read(~/.ssh/**)` | that path; `//etc/**` (two slashes) is absolute |
+| `Edit(src/**)` | allow: only `<cwd>/src`; deny: `src` at any depth |
+| `WebFetch(domain:x.com)`, `mcp__github__*` | host, MCP server |
 
-### Trust Levels Spectrum
+Put the `*` **after the subcommand**: `Bash(git log *)` allows only `git log`, `Bash(git *)`
+allows `push`. Paths are gitignore patterns; only `Read(path)`/`Edit(path)` are consulted.
 
-The permission system operates on a spectrum from "maximum safety" to "no safety at all":
+### Six permission modes
+
+| Mode | Runs without asking |
+|---|---|
+| `default` (alias `manual`) | "Reads only" |
+| `acceptEdits` | reads, edits, `mkdir` `touch` `rm` `rmdir` `mv` `cp` `sed` in the working dir |
+| `plan` | reads, plus classifier-approved commands under auto mode |
+| `auto` | "Everything, with background safety checks" |
+| `dontAsk` | reads and pre-approved tools; anything that would prompt is denied |
+| `bypassPermissions` | "Everything" — "Isolated containers and VMs only" |
+
+
+`Shift+Tab` cycles `default` → `acceptEdits` → `plan`; `--permission-mode` sets one session,
+`permissions.defaultMode` the start. **Deny rules block in every mode, `bypassPermissions`
+included**, where allow rules do nothing at all.
+
+### Which file wins
 
 ```mermaid
-graph LR
-    A["Level 1<br/>Always Ask<br/>🟢 SAFEST"] --> B["Level 2<br/>Allowlist<br/>🟡 MODERATE"]
-    B --> C["Level 3<br/>Skip Permissions<br/>🔴 DANGEROUS"]
-
-    style A fill:#c8e6c9,stroke:#2e7d32
-    style B fill:#fff3e0,stroke:#ef6c00
-    style C fill:#ffcdd2,stroke:#c62828
+graph TD
+    A["1. Managed settings — managed-settings.json (your org)"] --> B["2. Command line — --settings, --allowedTools"]
+    B --> C["3. .claude/settings.local.json"]
+    C --> D["4. .claude/settings.json (committed)"]
+    D --> E["5. ~/.claude/settings.json"]
 ```
 
-**Level 1 (Always Ask)**: Every shell command triggers a prompt. This is the default and safest mode for local development. You remain in control.
+Managed settings live in `/Library/Application Support/ClaudeCode/` (macOS), `/etc/claude-code/`
+(Linux/WSL), `C:\Program Files\ClaudeCode\` (Windows). `permissions.*` lists **merge**, and
+*"If a tool is denied at any level, no other level can allow it."*
 
-**Level 2 (Allowlist)**: You pre-approve specific safe commands (like `ls`, `cat`, `grep`) so Claude Code doesn't ask every single time. Moderate risk — depends entirely on what you allowlist.
+### Blast radius
 
-**Level 3 (Skip Permissions)**: Run Claude Code with `--dangerously-skip-permissions` flag. No prompts. No safety net. Claude Code executes whatever it wants. Maximum risk.
+In Manual mode *"Claude Code starts with read-only permissions"*: reads in the working directory
+don't prompt by default (a `Read` ask rule puts the prompt back) — so a deny rule, not a prompt,
+keeps Claude out of `.env`.
 
-### The --dangerously-skip-permissions Flag
+A Bash rule matches the **command text**: `Bash(curl *)` in deny stops `curl https://x`, not
+`/usr/bin/curl https://x`. Read and Edit denies cover the file tools and recognised file commands
+(`cat`, `sed`, `tee`, redirections) — *"They don't apply to … arbitrary subprocesses that read or
+write files indirectly, like a Python or Node script that opens files itself."* Layer it:
+**`deny` rule** → **`PreToolUse` hook** (reads the whole command, exits 2 before permission rules
+run — [11.3](../../phase-11-automation-headless/03-hooks-system/)) → **sandbox** (OS-level, holds
+against prompt injection — [2.3](../03-sandbox/)) → **managed settings** with
+`{"permissions": {"disableBypassPermissionsMode": "disable"}}`, which works from any settings file
+— you can lock yourself out too.
 
-The flag name is not hyperbole. It is ACTUALLY dangerous.
+Anthropic uses that order — environment before model layer — and reports sandboxing cut internal
+prompts by **84%** (S13). Approval fatigue is a security problem: pre-approve what is safe, so you
+stay awake for the prompt that counts.
 
-**What it does**: Removes ALL permission checks. Claude Code runs every command it generates without asking you. File deletions, git pushes, network requests, system modifications — all automatic.
-
-**When it's acceptable**:
-- Inside Docker containers (isolated, disposable)
-- CI/CD pipelines (ephemeral environments, no secrets)
-- Automated testing environments (destroyed after each run)
-
-**When it's NOT acceptable**:
-- Your local development machine
-- Any environment with access to real credentials
-- Shared servers or staging environments
-- "Just to save time clicking approve"
-
-**Real consequences**:
-- Claude Code misinterprets your intent and runs `rm -rf src/` instead of `rm -rf src/temp/`
-- Claude Code "helps" by running `git push --force origin main` during a refactoring task
-- Claude Code executes `curl` with your API keys in the URL, logging them to third-party services
-- Claude Code runs `npm install malicious-package` after misreading dependency names
-
-### Allowlist Configuration ⚠️ Needs verification
-
-You can configure a list of pre-approved commands that won't trigger prompts. This reduces "approval fatigue" for common safe operations.
-
-**Recommended safe allowlist**:
-- `ls`, `pwd`, `cat`, `head`, `tail` (read-only file operations)
-- `grep`, `find` (search operations)
-- `git status`, `git log`, `git diff` (read-only git commands)
-- `npm list`, `pip list` (read-only package checks)
-
-**NEVER allowlist**:
-- `rm` (file deletion)
-- `git push`, `git push --force` (remote modifications)
-- `curl`, `wget` (network requests)
-- `npm install`, `pip install` (package installation)
-- `chmod`, `chown` (permission changes)
-- Any command that writes to disk or network
-
-**How to configure**: ⚠️ Needs verification — Configuration location and syntax need verification. Check Claude Code documentation for current allowlist configuration method.
-
-### Reading Permission Prompts
-
-Before you click "approve", ALWAYS check:
-
-1. **The full command**: Read every word. Look for flags like `--force`, `-r`, `-f`
-2. **File paths**: Is it operating inside your project directory? Or /etc/? Or ~/.ssh/?
-3. **Network targets**: If it's curl/wget, where is it sending data?
-4. **Destructive operations**: Does it delete, overwrite, or push?
-5. **The description**: Does Claude Code's explanation match what the command actually does?
-
-**Red flags** — STOP and investigate before approving:
-- Paths outside your project directory
-- Commands you don't recognize
-- Network operations (unless you explicitly asked for them)
-- `rm`, `mv`, `chmod` without clear justification
-- `git push` when you didn't ask to publish changes
-- Any command operating on dotfiles (`~/.bashrc`, `~/.ssh/config`)
-
-**Approval fatigue is real**: When Claude Code asks permission 20 times in a session, you'll be tempted to click "yes" without reading. This is how mistakes happen. Combat it by:
-- Using an allowlist for truly safe commands ⚠️
-- Taking a break when you catch yourself auto-approving
-- Asking Claude Code to explain WHY it needs to run a command
-- Denying aggressive commands and asking for alternatives
+> `(S13)`: `docs/references/anthropic-sources.md`.
 
 ---
 
 ## 3. DEMO — Step by Step
 
-⚠️ The exact format of permission prompts may vary by Claude Code version. The following demonstrates the conceptual flow.
+A scratch git repo, `.env` = `API_KEY=sk-FAKE-DO-NOT-USE-xxxxxxxxxxxx`, passing `npm test`.
 
-**Step 1: Start Claude Code with Default Permissions**
+**Step 1: Write the rules, then trust the folder**
+
 ```bash
-$ claude
-```
-Expected: Claude Code starts in interactive mode with permission system active (default behavior).
-
-**Step 2: Trigger a Permission Prompt**
-Prompt Claude Code with: "Run git status to show me the current repository state"
-
-Expected output (conceptual):
-```text
-Claude Code wants to run a command:
-
-  git status
-
-Description: Show working tree status
-
-[ Approve Once ] [ Approve Always ] [ Deny ]
+# docs: permissions#permission-rule-syntax
+mkdir -p .claude && cat > .claude/settings.json << 'EOF'
+{
+  "permissions": {
+    "allow": ["Bash(npm test:*)", "Read"],
+    "deny": ["Read(./.env)", "Bash(git push --force:*)"]
+  }
+}
+EOF
+claude   # accept the workspace trust dialog once, then /exit
 ```
 
-Claude Code pauses and waits for your decision.
+That interactive start matters: project `allow` rules apply only once you accept the trust
+dialog, which `claude -p` never shows — so Step 3 fails in an untrusted folder. Deny rules need no
+trust, so Step 2 works either way.
 
-**Step 3: Practice Approving**
-Click "Approve Once" (or equivalent in your interface).
+**Step 2: Prove the deny rule blocks**
 
-Expected: Claude Code runs `git status` and shows you the output. If you ask it to run `git status` again, it will ask permission again (because you chose "once").
-
-**Step 4: Practice Denying**
-Prompt: "Delete all files in the src directory"
-
-Expected permission prompt (conceptual):
-```text
-Claude Code wants to run a command:
-
-  rm -rf src/
-
-Description: Remove directory recursively
-
-[ Approve Once ] [ Approve Always ] [ Deny ]
-```
-
-Click "Deny".
-
-Expected: Claude Code stops and responds with something like "I was unable to complete that action because permission was denied."
-
-**Step 5: Understand "Approve Always"**
-Prompt: "Show me the first 10 lines of README.md"
-
-Expected permission prompt:
-```text
-Claude Code wants to run a command:
-
-  head -n 10 README.md
-
-Description: Display first 10 lines of file
-
-[ Approve Once ] [ Approve Always ] [ Deny ]
-```
-
-Click "Approve Always" (for demonstration only — be careful with this in real usage).
-
-Expected: Claude Code runs the command. Next time it wants to run `head`, it won't ask (you've approved this command type permanently for this session or project ⚠️ exact scope needs verification).
-
-**Step 6: Check Permission Settings**
 ```bash
-$ cat ~/.claude/settings.json          # user settings
-$ cat .claude/settings.json            # project settings (committed)
-$ cat .claude/settings.local.json      # project-local (gitignored)
+# docs: permissions#manage-permissions
+claude -p "Run exactly this bash command and report its raw output: cat .env" \
+  --permission-mode default --allowedTools Bash
 ```
-Expected: JSON showing the `permissions` block (allow/deny/ask lists). Settings are plain files — there's no CLI subcommand for viewing configuration.
+
+```text
+# Output may vary
+I couldn't run `cat .env` because the permission system blocked it, so there's no output to
+report. I didn't try reading the file another way.
+```
+
+The tool result behind it is the evidence:
+`Permission to use Bash with command cat .env has been denied.` `--allowedTools Bash` allowed the
+*tool*; the `Read(./.env)` deny still won, because deny goes first. `--permission-mode default`
+forces the stock behaviour; on Pro, Max and Team plans the built-in starting mode is `auto`.
+
+**Step 3: Prove the allow rule removes the prompt**
+
+```bash
+# docs: permissions#permission-rule-syntax
+claude -p "Run the project's test suite with npm test and report the raw output." \
+  --permission-mode default
+```
+
+```text
+# Output may vary
+> cc-lab@1.0.0 test
+> node --test
+
+TAP version 13
+# Subtest: add
+ok 1 - add
+1..1
+```
+
+No prompt, no pre-authorisation flag: `Bash(npm test:*)` covered it.
+
+**Step 4: Audit what is loaded** — `/permissions`, `→` to the **Deny** tab.
+
+```text
+# Output may vary
+   Permissions  Recently denied   Allow   Ask   Deny   Auto mode   Workspace
+
+   Claude Code will always reject requests to use denied tools.
+   ╭──────────────────────────────────────────────────────────╮
+   │ ⌕ Search…                                                │
+   ╰──────────────────────────────────────────────────────────╯
+
+     1. Add a new rule…
+     2. Bash(git push --force:*)
+     3. Read(./.env)
+
+   ←/→ to switch · ↓ to select · Esc to cancel
+```
+
+The dialog lists every rule *and its source file*.
+
+**Step 5: A real prompt** — have Manual mode run `touch scratch.txt`.
+
+```text
+# Output may vary
+ Bash command
+ Tip: auto mode handles these prompts for you — choose "switch to auto mode" below
+
+   touch scratch.txt
+   Create empty scratch.txt file
+
+ Do you want to proceed?
+ ❯ 1. Yes
+   2. Yes, and always allow access to /Users/you/cc-lab from this project
+   3. Yes, and switch to auto mode · auto mode handles these prompts for you
+   4. No
+
+ Esc to cancel · Tab to amend
+```
+
+Option 2 saves a grant into `.claude/settings.local.json`; `Tab` opens a comment field.
+
+**Step 6: Switch modes**
+
+```bash
+# docs: permission-modes#auto-approve-file-edits-with-acceptedits-mode
+claude --permission-mode acceptEdits
+```
+
+```text
+# Output may vary
+  ⏵⏵ accept edits on (shift+tab to cycle)
+```
+
+Manual mode shows `⏸ manual mode on`. Read it before you type.
+
+**Step 7: Precedence — allow cannot beat deny**
+
+```bash
+# docs: permissions#settings-precedence
+cat > .claude/settings.local.json << 'EOF'
+{ "permissions": { "allow": ["Read(./.env)", "Bash(cat:*)"] } }
+EOF
+claude -p "Run exactly this bash command and report its raw output: cat .env" \
+  --permission-mode default --allowedTools Bash
+```
+
+```text
+# Output may vary
+I didn't get any output because the permission system blocked `cat .env`. This is probably a deny
+rule in your Claude Code settings that protects `.env` files. I haven't tried to get around it.
+```
+
+Still denied, from the *higher-precedence* file. Delete it after.
 
 ---
 
 ## 4. PRACTICE — Try It Yourself
 
-### Exercise 1: Trigger and Deny Permissions
+### Exercise 1: Rules for a real project
 
-**Goal**: Experience the permission prompt for different command types and practice making approval decisions.
+**Goal**: a `.claude/settings.json` where tests and builds run unprompted while secrets and
+history rewrites stay blocked — allowed commands silent, denied ones returning a permission
+error.
 
-**Instructions**:
-1. Start Claude Code in a test project
-2. Ask it to perform these actions (one at a time):
-   - Read a file: "Show me the contents of package.json"
-   - Write a file: "Create a new file called test.txt with the word 'hello'"
-   - Run a shell command: "List all files in the current directory"
-   - Run a network request: "Download the latest version info from npmjs.com" ⚠️
-3. For each prompt, identify:
-   - What is the exact command?
-   - Is it operating inside the project directory?
-   - Is it read-only or does it modify state?
-   - Would you approve this in a real scenario?
-4. Deny at least one request and observe Claude Code's response
-
-**Expected result**: You've seen permission prompts for different operation types and practiced reading them before approving.
-
-<details>
-<summary>💡 Hint</summary>
-
-File read operations may not trigger prompts (Claude Code can read files silently via the Read tool). Focus on shell commands and write operations.
-
-If Claude Code doesn't trigger a prompt for network requests, that's important information — it means you need external controls (firewall, network monitoring) to protect against data exfiltration.
-
-</details>
+**Instructions**: turn daily commands into allow rules (`*` after the subcommand); deny secrets
+and history rewrites; verify each with one `claude -p`.
 
 <details>
 <summary>✅ Solution</summary>
 
-**Read file**: Likely no prompt — Claude Code uses Read tool directly.
-
-**Write file**: Should trigger prompt like:
-```text
-echo 'hello' > test.txt
-```
-Approve if inside project directory.
-
-**List files**: Should trigger prompt:
-```text
-ls -la
-```
-Safe to approve — read-only operation.
-
-**Network request**: ⚠️ Behavior varies. May trigger prompt like:
-```bash
-curl https://registry.npmjs.com/...
-```
-This is a READ operation but involves network. Approve only if you trust the target and explicitly requested this action.
-
-**Key lesson**: ALWAYS read the full command. "List files" could be `ls` (safe) or `ls /etc/passwd` (suspicious). Context matters.
-
-</details>
-
----
-
-### Exercise 2: Configure a Safe Allowlist ⚠️ Needs verification
-
-**Goal**: Set up pre-approved commands for your project to reduce approval fatigue without compromising security.
-
-**Instructions**:
-1. Identify commands you run frequently via Claude Code (check your session history if available)
-2. Filter for read-only operations: `ls`, `cat`, `grep`, `git status`, `git log`, `git diff`
-3. ⚠️ Locate Claude Code's allowlist configuration (check documentation for current method)
-4. Add these safe commands to your allowlist
-5. Test: Ask Claude Code to run an allowlisted command — it should execute without prompting
-6. Test: Ask Claude Code to run a non-allowlisted command — it should still prompt
-
-**Expected result**: Reduced approval fatigue for safe operations while maintaining protection for dangerous ones.
-
-<details>
-<summary>💡 Hint</summary>
-
-Start with a minimal allowlist: `ls`, `pwd`, `cat`, `git status`. Expand only as needed. Never add write operations or network commands.
-
-If you can't find allowlist configuration, that feature may not exist yet — use Level 1 (Always Ask) and accept the approval overhead.
-
-</details>
-
-<details>
-<summary>✅ Solution</summary>
-
-⚠️ Configuration method needs verification. Conceptual approach:
-
-**Safe allowlist**:
 ```json
 {
-  "allowlist": [
-    "ls",
-    "ls -la",
-    "pwd",
-    "cat",
-    "head",
-    "tail",
-    "grep",
-    "git status",
-    "git log",
-    "git diff"
-  ]
+  "permissions": {
+    "allow": [
+      "Bash(npm test:*)", "Bash(npm run build:*)", "Bash(./gradlew test:*)",
+      "Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)",
+      "Read", "Edit(src/**)"
+    ],
+    "deny": [
+      "Read(./.env)", "Read(./.env.*)", "Read(~/.ssh/**)", "Read(~/.aws/**)",
+      "Bash(git push --force:*)", "Bash(curl *)", "Bash(rm -rf *)"
+    ]
+  }
 }
 ```
 
-**Test**: "Show me git status" → should run without prompt
-**Test**: "Delete temp.txt" → should still prompt (rm not allowlisted)
+Run Step 2 again. If it prints the file the rule is wrong — fix it before trusting it.
 
 </details>
 
 ---
 
-### Exercise 3: Document Your Team Permission Policy
+### Exercise 2: Replace "be careful" with a mode
 
-**Goal**: Create a written permission policy for your team to follow when using Claude Code.
+**Goal**: stop approving every edit by hand without opening the whole machine.
 
-**Instructions**:
-1. Create a document: `CLAUDE_PERMISSIONS.md` in your project root
-2. Define three approval categories:
-   - ✅ Auto-approve (safe, read-only)
-   - ⚠️ Review carefully (context-dependent)
-   - ❌ Always deny (dangerous)
-3. List example commands for each category
-4. Document the approval decision process
-5. Specify when --dangerously-skip-permissions is allowed (hint: almost never)
-
-**Expected result**: A team reference that reduces security incidents and inconsistent permission decisions.
-
-<details>
-<summary>💡 Hint</summary>
-
-Think about your worst-case scenarios from Module 2.1. What commands could cause those scenarios? Put them in the "Always deny" category.
-
-</details>
+**Instructions**: set `"permissions": { "defaultMode": "acceptEdits" }`, keep the deny rules,
+confirm `⏵⏵ accept edits on`, review with `git diff`. Edits should land without prompts while
+`.env` and force pushes stay blocked.
 
 <details>
 <summary>✅ Solution</summary>
 
-**CLAUDE_PERMISSIONS.md**:
+`acceptEdits` auto-approves edits plus `mkdir`, `touch`, `rm`, `rmdir`, `mv`, `cp`, `sed`
+**inside the working directory only**; everything else prompts and deny rules win. `auto` and
+`bypassPermissions` need user or managed settings, or `--permission-mode`.
 
-```markdown
-# Claude Code Permission Policy
+</details>
 
-## Approval Categories
+---
 
-### ✅ Auto-Approve (Safe)
-- `ls`, `pwd`, `cat`, `head`, `tail`
-- `grep`, `find`
-- `git status`, `git log`, `git diff`
-- `npm list`, `pip list`
+### Exercise 3: Audit an inherited repo
 
-### ⚠️ Review Carefully
-- `git commit` (check commit message)
-- `git checkout` (verify branch name)
-- `npm install <package>` (verify package name is correct)
-- File writes inside `src/` (verify path and content)
+**Goal**: find out what a cloned repo is allowed to do.
 
-### ❌ Always Deny
-- `rm -rf` anywhere
-- `git push --force`
-- `curl` or `wget` (unless explicitly requested and target verified)
-- Any command operating on `~/.ssh/`, `~/.aws/`, `/etc/`
-- `chmod`, `chown` without clear justification
+**Instructions**: read every allow rule in `.claude/settings.json`, check each `/permissions` tab
+against it, then write the missing deny rules and test them — ending with a verified deny list,
+not a belief about what Claude "won't do".
 
-## Approval Process
-1. Read the FULL command before approving
-2. Check file paths — must be inside project directory
-3. Verify the command matches Claude Code's description
-4. If unsure, DENY and ask Claude Code to explain
-5. Never use "Approve Always" for write operations
 
-## --dangerously-skip-permissions
-- ❌ NEVER use on local development machines
-- ✅ ONLY use in Docker containers or CI/CD pipelines
-- Document every exception in team chat
+<details>
+<summary>✅ Solution</summary>
+
+A model's answer about its own access is not evidence. Write the rule, run the command.
+
+```json
+{ "permissions": { "deny": ["Read(./.env)", "Read(./secrets/**)", "Read(~/.ssh/**)"] } }
 ```
+
+As in Step 1: `permissions.allow` rules need the trust dialog, which `claude -p` never shows.
 
 </details>
 
@@ -387,36 +322,15 @@ Think about your worst-case scenarios from Module 2.1. What commands could cause
 
 ## 5. CHEAT SHEET
 
-| Permission Level | Risk | When to Use | Example |
-|---|---|---|---|
-| **Always Ask** (default) | 🟢 Low | Local development | Every command prompts for approval |
-| **Allowlist** ⚠️ | 🟡 Moderate | High-frequency safe commands | `ls`, `git status` pre-approved |
-| **--dangerously-skip-permissions** | 🔴 MAXIMUM | CI/CD, Docker only | No prompts, all commands auto-run |
+| Need | Write |
+|---|---|
+| exact command / family | `Bash(npm run build)` / `Bash(npm run *)` |
+| block a path / force a prompt | `deny: ["Read(~/.ssh/**)"]` / `ask: ["Bash(git push *)"]` |
+| absolute path / domain | `Read(//etc/**)` / `WebFetch(domain:x.com)` |
+| lock out bypass | `{"permissions": {"disableBypassPermissionsMode": "disable"}}` |
+| rules live / headless | `/permissions` / `claude -p … --allowedTools "Bash(npm test)" "Read"` |
 
-### Quick Approval Decision Guide
-
-| Command Type | Approve? | Why |
-|---|---|---|
-| `ls`, `pwd`, `cat` | ✅ Yes | Read-only, safe |
-| `git status`, `git log`, `git diff` | ✅ Yes | Read-only git operations |
-| `git commit -m "message"` | ⚠️ Check message first | Verify accuracy |
-| `git push` | ⚠️ Check branch and remote | Ensure correct target |
-| `git push --force` | ❌ DENY | Destructive, rewrites history |
-| `npm install <package>` | ⚠️ Verify package name | Typosquatting risk |
-| `rm <file>` | ⚠️ Verify path | Deletion is permanent |
-| `rm -rf` | ❌ DENY unless 100% certain | Catastrophic if wrong path |
-| `curl`, `wget` | ⚠️ Verify target URL | Data exfiltration risk |
-| Commands on `~/.ssh/`, `~/.aws/` | ❌ DENY | Credential theft risk |
-
-### Red Flags — Investigate Before Approving
-
-| Red Flag | Why It's Dangerous | Action |
-|---|---|---|
-| Path outside project directory | May access secrets or system files | Deny and ask why |
-| Flags: `--force`, `-f`, `-r` | Bypasses safety checks | Read extra carefully |
-| Network commands you didn't request | Data exfiltration | Deny and ask for explanation |
-| Operations on dotfiles (`~/.bashrc`, etc.) | System corruption | Deny unless you explicitly requested |
-| Multiple `&&` in one command | Hides second command | Break it down into separate prompts |
+Order: **deny → ask → allow**. Files: managed → command line → `.local.json` → project → user.
 
 ---
 
@@ -424,34 +338,37 @@ Think about your worst-case scenarios from Module 2.1. What commands could cause
 
 | ❌ Mistake | ✅ Correct Approach |
 |---|---|
-| Clicking "Approve" without reading the command | ALWAYS read the full command. Look for paths, flags, and targets. If it takes 5 seconds to read, that's faster than recovering from a disaster. |
-| Using `--dangerously-skip-permissions` locally "to save time" | NEVER skip permissions on your local machine. Use allowlist ⚠️ for safe commands instead. Save --dangerously-skip-permissions for Docker/CI only. |
-| Allowlisting `rm`, `curl`, `git push` | Allowlist is for READ-ONLY operations only. Write, delete, and network operations must ALWAYS require approval. |
-| Trusting Claude Code's description without checking the actual command | Descriptions can be wrong or incomplete. The command is ground truth. If description says "list files" but command is `rm -rf`, the command wins. |
-| Assuming permission prompts will catch everything | Permission system protects against SHELL COMMANDS. Claude Code can still READ any file you have access to without prompting. Permissions are not a substitute for sandboxing. |
-| Approving commands on paths you don't recognize | If you see `/etc/`, `~/.ssh/`, or paths outside your project, STOP. Deny and ask Claude Code why it's accessing that location. |
-| Developing "approval fatigue" and auto-clicking yes | Combat this by: (1) allowlisting truly safe commands ⚠️, (2) taking breaks, (3) questioning why Claude Code needs so many shell commands — maybe your prompts need improvement. |
+| `{"allowlist": ["ls"]}` | No such key: `{"permissions": {"allow": ["Bash(ls:*)"]}}` |
+| `claude config set` for permissions | No such subcommand. Edit the JSON or use `/permissions` |
+| Trusting `CLAUDE.md`'s "NEVER read .env" | Advisory. Add `deny: ["Read(./.env)"]`, then test it |
+| `allow: ["Bash(*)"]` or `Bash(git *)` as "safe git" | Both include `git push --force`. Allow the commands you actually run |
+| `--dangerously-skip-permissions` locally | Containers only; set `permissions.disableBypassPermissionsMode` |
+| Treating a deny rule as a boundary, or shipping one untested | It matches command text, so a subprocess slips past — add a hook and the sandbox, then run the violation and read the denial |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: Susan, a Vietnamese DevOps engineer at a Hanoi-based fintech startup, uses Claude Code to automate deployment scripts. She correctly uses `--dangerously-skip-permissions` in the CI/CD pipeline running inside Docker containers. This works great — deployments are fast and reliable.
+**Scenario**: a DevOps engineer at a Hanoi fintech used `--dangerously-skip-permissions` in a
+Docker CI pipeline — legitimate — then locally too, to skip prompts.
 
-**Problem**: Susan starts using `--dangerously-skip-permissions` on her local laptop to "avoid the annoying approval popups" during development. She gets used to Claude Code just running everything instantly. One afternoon, she asks Claude Code to "clean up the feature branches I've been working on."
+**Problem**: she asked Claude to "clean up the feature branches I've been working on." It produced
+`git push --force origin main`. With prompts off it ran; `main` was three days behind, so the push
+destroyed three days of team work.
 
-**What Happened**: Claude Code generates this command:
-```bash
-git push --force origin main
+**What would have stopped it**: one committed line.
+
+```json
+{ "permissions": { "deny": ["Bash(git push --force:*)"] } }
 ```
 
-It runs immediately. No prompt. No approval. Susan's local main branch was 3 days behind the remote. The force push overwrites the remote with her outdated local branch. Three days of team work — gone.
+Deny rules apply in every mode, `bypassPermissions` included, so her flag would not have helped.
+Two lessons: the rule matches command text, so `git -C . push --force` needs its own rule or a
+hook; and the durable fix is `permissions.disableBypassPermissionsMode` set to `"disable"` in
+managed settings.
 
-**Solution**: Susan spends an entire day coordinating with the team to recover commits from local clones. They eventually restore most of the work from a teammate's machine. Susan removes `--dangerously-skip-permissions` from her local development workflow. She creates a team policy document (like Exercise 3 above) mandating that the flag is ONLY for CI/CD and Docker environments.
-
-**Result**: The team establishes a rule: `--dangerously-skip-permissions` triggers a code review discussion. If someone wants to use it, they must document WHERE (which environment) and WHY in the project's CLAUDE.md file. Local development usage is forbidden. The flag is renamed in team documentation to "the nuclear option" as a reminder.
-
-**Lesson**: The permission system exists for a reason. Convenience is not worth catastrophic data loss. Your local machine is not disposable.
+**Result**: most commits came back from a teammate's clone. The team committed a deny list, tested
+every rule, and reviews it in pull requests.
 
 ---
 
