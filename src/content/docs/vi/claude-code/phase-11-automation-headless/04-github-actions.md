@@ -46,10 +46,9 @@ graph LR
     E --> F["Commit + link tạo PR, hoặc comment lên PR"]
 ```
 
-Input chính (đầy đủ ở CHEAT SHEET): `prompt`, `claude_args` (CLI flags, vd
-`--max-turns 5 --model claude-sonnet-5`), `anthropic_api_key` hoặc `claude_code_oauth_token`,
-`github_token`, `trigger_phrase`, `settings`, và `use_bedrock` / `use_vertex` / `use_foundry` để
-xác thực qua OIDC với cloud provider.
+Input chính (đầy đủ ở CHEAT SHEET): `prompt`, `claude_args`, `anthropic_api_key` hoặc
+`claude_code_oauth_token`, `github_token`, `trigger_phrase`, `settings`, `allowed_bots`, và
+`use_bedrock` / `use_vertex` / `use_foundry` để xác thực qua OIDC với cloud provider.
 
 Khối `permissions:` quyết định token của action — và Claude — chạm được gì. Bộ tối thiểu:
 `contents: write`, `pull-requests: write`, `issues: write`, cộng `id-token: write` (App auth lẫn
@@ -59,16 +58,14 @@ Ai trigger được: actor cần quyền write trên repo cho issue/PR/comment/r
 khi nằm trong `allowed_bots`. GitHub cũng không trigger lại workflow từ commit dùng `GITHUB_TOKEN`
 mặc định, nên commit của Claude không thể lặp vô hạn job.
 
-Bảo mật được xây sẵn, không phải thêm sau: action tự strip markdown ẩn (HTML comment, ký tự vô
-hình) khỏi comment không tin cậy, và giá trị context của GitHub không bao giờ được chạm thẳng vào
-một step shell (DEMO Step 5).
+Bảo mật được xây sẵn: action tự strip markdown ẩn khỏi comment không tin cậy, và giá trị context
+của GitHub không bao giờ chạm thẳng vào một step shell (DEMO Step 5).
 
 ---
 
 ## 3. DEMO — Từng bước thực hành
 
-**Scenario**: nối một repo để mention `@claude` được phản hồi, cộng thêm job triage hàng tuần —
-dùng action chính thức, không phải script tự dựng.
+**Scenario**: nối một repo để mention `@claude` được phản hồi, cộng thêm job triage hàng tuần.
 
 **Step 1: Cài Claude GitHub App**
 
@@ -147,8 +144,7 @@ Không có input `prompt` — interactive mode, Claude chờ `@claude`.
 
 Comment `@claude add a README section about tests` trên một issue hoặc PR. Mặc định Claude không
 tự mở PR cho bạn — nó "commits code changes to a new branch [and] provides a link to the GitHub PR
-creation page... the user must click the link" (`claude-code-action/docs/security.md`). Con người
-vẫn là người quyết định khi nào PR được mở.
+creation page... the user must click the link" (`claude-code-action/docs/security.md`).
 
 **Step 4: Automation mode — chạy theo lịch, không cần mention**
 
@@ -208,6 +204,10 @@ stages:
 claude:
   stage: ai
   image: node:24-alpine3.21
+  # Adjust rules to fit how you want to trigger the job:
+  # - manual runs
+  # - merge request events
+  # - web/API triggers when a comment contains '@claude'
   rules:
     - if: '$CI_PIPELINE_SOURCE == "web"'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -217,9 +217,12 @@ claude:
     - apk update
     - apk add --no-cache git curl bash
     - curl -fsSL https://claude.ai/install.sh | bash
+    # The installer places claude in ~/.local/bin, which isn't on PATH in this image
     - export PATH="$HOME/.local/bin:$PATH"
   script:
+    # Optional: start a GitLab MCP server if your setup provides one
     - /bin/gitlab-mcp-server || true
+    # Use AI_FLOW_* variables when invoking via web/API triggers with context payloads
     - echo "$AI_FLOW_INPUT for $AI_FLOW_CONTEXT on $AI_FLOW_EVENT"
     - >
       claude
@@ -244,7 +247,8 @@ bao giờ để trong `.gitlab-ci.yml`.
 2. Set `prompt:` review, giới hạn bằng `claude_args: "--max-turns 5"`.
 3. Giới hạn `permissions:` đúng nhu cầu của một reviewer.
 
-**Expected result**: mọi PR đều có comment review tự động, tối đa 5 turns.
+**Expected result**: mọi PR chạy một lượt review giới hạn; kết quả mặc định nằm trong run log (xem
+Solution để post ra PR).
 
 <details>
 <summary>💡 Hint</summary>
@@ -261,7 +265,7 @@ on:
     types: [opened, synchronize]
 permissions:
   contents: read
-  pull-requests: write
+  pull-requests: read
   id-token: write
 jobs:
   review:
@@ -274,11 +278,13 @@ jobs:
           prompt: "Review this pull request for bugs, security issues, and missing tests."
           claude_args: "--max-turns 5"
 ```
-Không cần `contents: write` — post comment review không đụng vào repo.
+Không có posting tool, kết quả chỉ tới run log. Để post inline comment, thêm
+`--allowedTools "mcp__github_inline_comment__create_inline_comment"` vào `claude_args` và bảo
+Claude comment trong `prompt` — giống ví dụ "Run a skill" của docs.
 </details>
 
 ### Exercise 2: Sửa cặp filter xung đột
-**Goal**: Workflow `pull_request` của đồng nghiệp set hai path filter; một cái bị bỏ qua âm thầm.
+**Goal**: Workflow `pull_request` của đồng nghiệp set hai path filter GitHub không cho dùng chung.
 
 **Instructions**:
 1. Tìm hai filter key không thể cùng áp dụng trên một event.
@@ -357,6 +363,7 @@ tranh với nó.
 | `github_token` | Token tùy chỉnh; bỏ trống để auth như App |
 | `trigger_phrase` | Mention phrase (mặc định `@claude`) |
 | `settings` | Claude Code settings JSON nhúng trực tiếp |
+| `allowed_bots` | Allow-list bot được trigger (mặc định không bot nào được) |
 | `use_bedrock` / `use_vertex` / `use_foundry` | Cloud provider qua OIDC |
 
 ### `permissions:` tối thiểu
@@ -383,7 +390,7 @@ permissions:
 | Option | Secret / variable | Phù hợp cho |
 |---|---|---|
 | API key | `ANTHROPIC_API_KEY` | CI dùng chung/org |
-| OAuth token | `CLAUDE_CODE_OAUTH_TOKEN` | repo cá nhân, plan Pro/Max/Team |
+| OAuth token | `CLAUDE_CODE_OAUTH_TOKEN` | repo cá nhân, plan Pro/Max/Team/Enterprise |
 | OIDC federation | `anthropic_federation_rule_id` | không cần secret tĩnh nào |
 
 ---
@@ -393,8 +400,8 @@ permissions:
 | ❌ Sai | ✅ Đúng |
 |---|---|
 | Tự dựng `npm install -g @anthropic-ai/claude-code` + step `claude -p` viết tay | Dùng `anthropics/claude-code-action@v1` — đã lo sẵn install, App auth, kiểm tra actor |
-| Nhét `${{ github.event.comment.body }}` (hay bất kỳ context không tin cậy nào) thẳng vào `run:` | Đưa qua `env:` trước — cách sửa script injection GitHub tài liệu hóa |
-| Set cả `paths` và `paths-ignore` trên cùng một trigger `pull_request` | Chỉ giữ một filter key; cái kia bị bỏ qua âm thầm |
+| Nhét `${{ github.event.comment.body }}` (hay bất kỳ context không tin cậy nào) thẳng vào `run:` | Đưa qua `env:` trước — cách GitHub sửa script injection |
+| Set cả `paths` và `paths-ignore` trên cùng một trigger `pull_request` | [GitHub](https://docs.github.com/en/actions/writing-workflows/workflow-syntax-for-github-actions): "cannot use both... for the same event" — chỉ giữ một |
 | Commit API key hoặc OAuth token vào file workflow | Lưu làm GitHub Secret (`ANTHROPIC_API_KEY` / `CLAUDE_CODE_OAUTH_TOKEN`) |
 | Quên `id-token: write` | Cần cho App auth và OIDC federation, kể cả khi tự truyền `github_token` |
 | Chạy `/install-github-app` trên remote GitLab hoặc Bitbucket | Lệnh in thông báo rồi thoát — dùng tích hợp GitLab CI/CD thay thế |
@@ -404,15 +411,16 @@ permissions:
 
 ## 7. REAL CASE — Câu chuyện thực tế
 
-**Scenario**: Một thư viện TypeScript mã nguồn mở nhận PR từ contributor rải khắp múi giờ.
-Maintainer chỉ muốn review khi họ chủ động yêu cầu, không phải mỗi lần push.
+**Scenario**: Một thư viện mã nguồn mở nhận PR từ contributor rải khắp múi giờ. Maintainer chỉ muốn
+review khi họ chủ động yêu cầu, không phải mỗi lần push.
 
-**Problem**: Workflow tự dựng cũ review mọi commit trên mọi lần update PR, chạy lại cả khi chỉ sửa
-lỗi chính tả, xếp hàng runs nhanh hơn tốc độ maintainer đọc kịp.
+**Problem**: Workflow tự dựng cũ review mọi commit trên mọi lần update, chạy lại cả khi chỉ sửa lỗi
+chính tả, xếp hàng runs nhanh hơn tốc độ maintainer đọc kịp.
 
-**Solution**: Dựng lại trên `anthropics/claude-code-action@v1` với ba cơ chế kiểm soát: chỉ trigger
-khi maintainer gắn label `needs-review`, giới hạn mỗi lần chạy bằng `claude_args: "--max-turns 5"`,
-và hủy review đang chạy dở khi có push mới thay thế nó.
+**Solution**: Dựng lại trên `anthropics/claude-code-action@v1` với bốn cơ chế: chỉ trigger khi
+maintainer gắn label `needs-review`, dùng automation mode với `prompt:` review (event label không
+mang theo mention `@claude` nào để chờ), giới hạn chạy bằng `--max-turns 5`, và hủy review đang
+chạy dở khi có push mới thay thế nó.
 
 ```yaml
 on:
@@ -427,18 +435,19 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: write
+      pull-requests: read
       id-token: write
     steps:
       - uses: actions/checkout@v6
       - uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: "Review this pull request for bugs, security issues, and missing tests."
           claude_args: "--max-turns 5"
 ```
 
-**Result**: review chỉ chạy khi maintainer yêu cầu qua label, mỗi lần chạy có giới hạn turn cứng,
-và các lần chạy bị thay thế tự hủy thay vì xếp chồng lên nhau.
+**Result**: review chỉ trigger qua label; kết quả nằm trong run log (thêm posting tool, như Exercise
+1, để comment thay vì vậy); mỗi lần chạy có giới hạn turn cứng, và các lần chạy bị thay thế tự hủy.
 
 ---
 
