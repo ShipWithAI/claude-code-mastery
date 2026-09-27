@@ -104,27 +104,26 @@ $ claude
      ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   Estimated usage by category
      ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   ⛁ System prompt: 3.8k tokens (0.4%)
      ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   ⛁ System tools: 14.2k tokens (1.4%)
-     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   ⛁ MCP tools: 659 tokens (0.1%)
-     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛝ ⛝ ⛝ ⛝ ⛝ ⛝ ⛝   ⛁ Custom agents: 4k tokens (0.4%)
+     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶   ⛁ MCP tools: … tokens (…)
+     ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛶ ⛝ ⛝ ⛝ ⛝ ⛝ ⛝ ⛝   ⛁ Custom agents: … tokens (…)
                                                ⛁ Memory files: 7.1k tokens (0.7%)
-                                               ⛁ Skills: 9.9k tokens (1.0%)
+                                               ⛁ Skills: … tokens (…)
                                                ⛁ Messages: 1.3k tokens (0.1%)
                                                ⛶ Free space: 924.4k (92.4%)
                                                ⛝ Autocompact buffer: 33k tokens (3.3%)
      Auto-compact window: 1m tokens
      MCP tools · /mcp (loaded on-demand)
-     └ 248 tools · 659 tokens
+     └ … tools · … tokens
      Custom agents · .claude/agents/
-     └ 51 agents · 4k tokens
+     └ … agents · … tokens
      Memory files · /memory
      └ 1 file · 7.1k tokens
      Skills · /skills
-     └ 170 skills · 9.9k tokens
+     └ … skills · … tokens
      /context all to expand
 ```
 
-MCP tools, agents, and skills roll up into one count each — per-item names below are
-machine-specific, trimmed here.
+MCP tools, custom agents, and skills rows depend on what you have installed — redacted here.
 
 > In a script or CI job, `claude -p "/context"` prints this same data as a Markdown table
 > instead of a grid — same numbers, plain-text form (# docs: context).
