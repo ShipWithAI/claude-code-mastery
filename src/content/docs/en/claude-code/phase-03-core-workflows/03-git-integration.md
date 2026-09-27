@@ -1,6 +1,8 @@
 ---
 title: 'Git Integration'
-description: 'Streamline your Git workflow with Claude Code for commits, merge conflicts, diffs, and PR management.'
+description: 'Claude commits and opens PRs itself with gh/glab, with default attribution trailers, worktrees for parallel branches, and no /pr-comments.'
+verified: 2026-09-27
+claude_version: 2.1.283
 ---
 
 # Module 3.3: Git Integration
@@ -9,263 +11,170 @@ description: 'Streamline your Git workflow with Claude Code for commits, merge c
 >
 > **Prerequisite**: Module 3.2 (Writing & Editing Code)
 >
-> **Outcome**: After this module, you will be able to use Claude Code to streamline your entire Git workflow — from writing commit messages to resolving merge conflicts, reviewing diffs, and managing branches intelligently.
+> **Outcome**: After this module, you will be able to have Claude Code commit and open pull
+> requests itself with correct attribution, find PR review comments without `/pr-comments`, and
+> run parallel branches in isolated worktrees.
 
 ---
 
 ## 1. WHY — Why This Matters
 
-You've just finished a 2-hour coding session with Claude Code. Changes across 15 files. New features, bug fixes, refactored code, updated tests. Now comes the part most developers dread: the git workflow. Stage the right files. Write meaningful commit messages. Handle that merge conflict from your colleague's branch. Prepare a clean PR.
+You've just finished a 2-hour coding session with Claude Code. Changes across 7 files. Now comes
+the part most developers dread: stage the right files, write a message that isn't "fix stuff", and
+open a clean PR. Most people either dump everything into one commit or spend 30 minutes crafting
+history by hand.
 
-Most developers take one of two paths: dump everything in one commit ("fix stuff and add features") or spend 30 minutes manually crafting git history. Neither is good. Claude Code can handle your entire git workflow — writing precise commit messages, splitting changes into logical commits, resolving merge conflicts with full code context — if you know how to direct it.
+Claude Code doesn't just draft a message for you to paste — it can run `git commit` and
+`gh pr create` itself, tag the commit with who actually wrote it, and open a worktree so a second
+branch never touches your main checkout. This module shows the real mechanics, not the theory.
 
 ---
 
 ## 2. CONCEPT — Core Ideas
 
-### Claude Code as Git Co-pilot
+### Claude commits and opens PRs itself
 
-Claude Code doesn't just generate commit messages from templates. It understands WHAT changed and WHY because it has your code context. When you ask for a commit message, Claude reads the actual diff, understands the purpose of each change, and writes messages that future developers (including you) will thank you for.
-
-### The 4 Layers of Git Workflow
+Ask directly — `create a pr for my changes` — and Claude drafts the summary, runs
+`gh pr create` (or `glab mr create` on GitLab), and prints the URL. Claude Code then links the
+session to that PR, so `claude --from-pr 1234` reopens the session picker filtered to it.
 
 ```mermaid
-graph TD
-    subgraph "Layer 1: Commit Craft"
-        A[Staging] --> B[Commit Messages]
-        B --> C[Splitting Commits]
-    end
-
-    subgraph "Layer 2: Branch Intelligence"
-        D[Branch Management] --> E[Merge vs Rebase]
-        E --> F[Branch Comparison]
-    end
-
-    subgraph "Layer 3: Conflict Resolution"
-        G[Understand Both Sides] --> H[Resolve Intelligently]
-        H --> I[Verify Resolution]
-    end
-
-    subgraph "Layer 4: History & Review"
-        J[Analyze Git Log] --> K[PR Description]
-        K --> L[Code Review Prep]
-    end
-
-    C --> D
-    F --> G
-    I --> J
+graph LR
+    A[git add / git commit] --> B[Co-Authored-By trailer]
+    C[gh pr create] --> D["Generated with Claude Code" line]
+    E[claude -w name] --> F[.claude/worktrees/name<br/>branch worktree-name]
 ```
 
-### Atomic Commits with AI
+### Attribution is a default, not a guess
 
-Large changesets are hard to review and harder to revert. Claude Code can analyze your changes and suggest how to split them into logical, atomic commits — each with a clear purpose. "Add payment validation" is one commit. "Refactor error handling" is another. "Update tests" is a third.
+Every commit Claude makes gets a trailer; every PR gets a footer. Both are **defaults you can
+change**, not something Claude invents per commit:
 
-### Convention Enforcement
+- Commit trailer: `Co-Authored-By: <model> <noreply@anthropic.com>` — "the name is the model in
+  use when the commit is made, such as `Claude Sonnet 5`."
+- PR footer: `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
+- `attribution.commit` / `attribution.pr` in settings override each line; `attribution: false`
+  (v2.1.281+) hides both. `includeCoAuthoredBy` is **deprecated since v2.0.62** — still honored
+  until you set `attribution.commit` or `attribution.pr`, then ignored.
 
-Add your commit message format to CLAUDE.md:
+Claude Code tells Claude that your own CLAUDE.md or memory instructions about attribution take
+precedence — **unless** an admin fixed them in managed settings. That's the general rule for
+every convention you write in CLAUDE.md: advisory, not enforced. A rule that must hold every time
+belongs in a hook or managed settings (Module 2.2), not prose.
+
+### Atomic commits, by prompt
+
+Large changesets are hard to review and harder to revert. Ask Claude to split a diff into atomic
+commits — "add payment validation" is one, "refactor error handling" is another — and stage each
+group before asking for the message. Encode your team's format once, and every generated message
+follows it:
 
 ```markdown
 ## Git Conventions
-- Use Conventional Commits: feat:, fix:, chore:, docs:, refactor:
+- Conventional Commits: feat:, fix:, chore:, docs:, refactor:
 - Format: <type>(<scope>): <description>
-- Example: feat(payment): add Stripe webhook handler
 ```
 
-Now every commit message Claude generates follows your team's standard.
+### Finding PR comments without `/pr-comments`
+
+`/pr-comments` was **removed in v2.1.91**. Ask Claude directly instead — "what did the reviewer
+say on PR 42" — or reopen the linked session with `claude --from-pr 42`, which accepts a PR
+number or a full GitHub/GitLab/Bitbucket URL.
+
+### Worktrees for parallel branches
+
+`claude --worktree <name>` (or `-w`) creates an isolated checkout at
+`.claude/worktrees/<name>/` on a new branch `worktree-<name>`, sharing history with your main
+repo. It needs **at least one commit** to resolve a base branch — an empty repo fails with
+`Failed to resolve base branch "HEAD": git rev-parse failed`. A `.worktreeinclude` file (gitignore
+syntax) copies gitignored files like `.env` into every new worktree automatically. Point
+`/install-github-app` (Module 11.4) at a real GitHub repo once you want Claude responding to
+`@claude` mentions on PRs, not just running locally.
 
 ---
 
 ## 3. DEMO — Step by Step
 
-**Scenario**: You're on a feature branch `feature/payment-processing`. You've added payment validation, refactored error handling, updated config, and added tests. Time to commit and prepare a PR.
+**Step 1: Ask Claude to commit for you**
 
----
-
-**Step 1: Review what changed**
-
-```text
-What files have I changed? Summarize what each change does.
-```
-
-Expected output:
-```text
-Modified files (7):
-
-1. src/payment/validator.ts
-   - Added credit card validation using Luhn algorithm
-   - Added expiry date validation
-
-2. src/payment/processor.ts
-   - Refactored error handling to use Result type
-   - Extracted retry logic into separate function
-
-3. src/payment/types.ts
-   - Added PaymentError enum
-   - Added ValidationResult interface
-
-4. src/config/payment.ts
-   - Added Stripe API configuration
-   - Added retry limits and timeout settings
-
-5. tests/payment/validator.test.ts
-   - Added 12 test cases for card validation
-
-6. tests/payment/processor.test.ts
-   - Updated tests for new Result type error handling
-
-7. package.json
-   - Added stripe dependency
-```
-
----
-
-**Step 2: Split into logical commits**
-
-```text
-Help me split these changes into logical atomic commits. Group related changes together.
-```
-
-Expected output:
-```text
-Recommended commit structure:
-
-Commit 1: Add payment validation
-- src/payment/validator.ts
-- src/payment/types.ts (ValidationResult interface)
-- tests/payment/validator.test.ts
-
-Commit 2: Refactor payment processor error handling
-- src/payment/processor.ts
-- src/payment/types.ts (PaymentError enum)
-- tests/payment/processor.test.ts
-
-Commit 3: Add Stripe configuration
-- src/config/payment.ts
-- package.json
-
-Shall I stage and commit each group?
-```
-
----
-
-**Step 3: Generate commit messages**
-
-After staging the first group:
 ```bash
-$ git add src/payment/validator.ts src/payment/types.ts tests/payment/validator.test.ts
+# docs: en/common-workflows — "create a pr for my changes"
+claude -p "Stage src/math.js and commit it with a conventional commit message." \
+  --permission-mode acceptEdits \
+  --allowedTools "Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*)"
 ```
 
-Then ask:
 ```text
-Write a commit message for these staged changes. Use Conventional Commits format.
+# Output may vary
+I committed `src/math.js` as `2967e45`:
+
+fix(math): throw on division by zero
+
+The change makes `divide(a, b)` throw `Error('divide by zero')` when `b === 0` instead of
+returning `Infinity` or `NaN`.
 ```
 
-Expected output:
-```text
-feat(payment): add credit card validation with Luhn algorithm
+**Step 2: Check the trailer Claude actually wrote**
 
-- Implement card number validation using Luhn checksum
-- Add expiry date validation with future date check
-- Add CVV format validation (3-4 digits)
-- Create ValidationResult type for structured error reporting
-- Add 12 test cases covering valid/invalid card scenarios
-
-Refs: PAY-123
-```
-
----
-
-**Step 4: Handle a merge conflict**
-
-After pulling, you have a conflict:
 ```bash
-$ git merge origin/develop
-CONFLICT (content): Merge conflict in src/payment/processor.ts
+git log -1
 ```
-
-Ask Claude:
-```text
-I have a merge conflict in src/payment/processor.ts. Show me both sides and help resolve it. Keep our new Result type error handling but integrate their updated PaymentGateway interface.
-```
-
-Expected output:
-```text
-Conflict analysis:
-
-OURS (feature/payment-processing):
-- Uses Result<PaymentResult, PaymentError> return type
-- Has retry logic extracted to retryWithBackoff()
-
-THEIRS (develop):
-- Updated PaymentGateway interface with new timeout parameter
-- Added gateway.setConfig() call in initialization
-
-Resolution strategy:
-Keep our Result type pattern AND integrate their interface updates.
-
-[Shows resolved code merging both changes]
-
-Run tests to verify: npm test src/payment/
-```
-
----
-
-**Step 5: Pre-push review**
 
 ```text
-Review all commits on this branch compared to main. Is the history clean? Any commits that should be squashed?
+# Output may vary
+commit 2967e45db706822654d3dfa844ba81f61b8d082e
+Author: … <…>
+Date:   Sun Sep 27 23:48:05 2026 +0700
+
+    fix(math): throw on division by zero
+
+    Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ```
 
-Expected output:
+The name matches whatever model ran the session — expect `Claude Sonnet 5` if you're on Sonnet.
+
+**Step 3: Ask for a PR (no repo required to see the pattern)**
+
+```bash
+# docs: en/common-workflows — Claude links the session when it runs gh pr create/glab mr create
+claude -p "Summarize my changes, then create a pr." --permission-mode acceptEdits
+```
+
+Without a pushed remote, `gh pr create` — even with the real `--dry-run` flag (verified with
+`gh pr create --help`) — refuses with `no git remotes found`. On a real repo, expect the PR URL
+back, and `claude --from-pr <number>` to reopen this session later.
+
+**Step 4: Open an isolated worktree, non-interactively**
+
+```bash
+# docs: en/worktrees — non-interactive runs with -p skip the trust check
+claude -p --worktree fix-divide "What is your current working directory? Just the path." \
+  --permission-mode acceptEdits
+```
+
 ```text
-Branch: feature/payment-processing (3 commits ahead of main)
-
-Commit history:
-1. feat(payment): add credit card validation with Luhn algorithm
-2. refactor(payment): migrate processor to Result type error handling
-3. chore(payment): add Stripe configuration and dependency
-
-Assessment:
-✅ Each commit is atomic and focused
-✅ Commit messages follow Conventional Commits
-✅ Logical progression: validation → error handling → config
-✅ No fixup commits or WIP commits to squash
-
-Ready for PR.
+# Output may vary
+`/Users/you/cc-lab/.claude/worktrees/fix-divide`
 ```
 
----
-
-**Step 6: Generate PR description**
+```bash
+git worktree list
+```
 
 ```text
-Write a PR description for this branch. Include: summary, changes breakdown, testing done, and deployment notes.
+# Output may vary
+/Users/you/cc-lab                              2967e45 [main]
+/Users/you/cc-lab/.claude/worktrees/fix-divide  2967e45 [worktree-fix-divide] locked
 ```
 
-Expected output:
-```markdown
-## Summary
-Adds payment processing foundation with credit card validation, improved error handling, and Stripe integration.
+**Step 5: Clean up** — `-p` runs don't get an exit prompt, so the worktree stays locked until you
+remove it:
 
-## Changes
-- **Validation**: Luhn algorithm for card numbers, expiry date validation, CVV format check
-- **Error Handling**: Migrated to Result type pattern for type-safe error handling
-- **Configuration**: Added Stripe API config with retry and timeout settings
-
-## Testing
-- 12 new unit tests for card validation (100% coverage)
-- Updated processor tests for Result type
-- Manual testing with Stripe test cards
-
-## Deployment Notes
-- Requires STRIPE_API_KEY environment variable
-- No database migrations
-- Backwards compatible — no breaking changes
-
-## Checklist
-- [x] Tests pass
-- [x] Linting passes
-- [x] Documentation updated
+```bash
+# docs: en/worktrees — "To remove one, run git worktree remove"
+git worktree unlock .claude/worktrees/fix-divide
+git worktree remove .claude/worktrees/fix-divide
+git branch -D worktree-fix-divide
 ```
 
 ---
@@ -274,74 +183,63 @@ Adds payment processing foundation with credit card validation, improved error h
 
 ### Exercise 1: Commit Surgeon
 
-**Goal**: Split a large changeset into clean atomic commits.
+**Goal**: Split a large changeset into clean atomic commits with correct attribution.
 
 **Instructions**:
-1. Make changes to 5+ files in any project (add features, fix bugs, update tests)
-2. Start Claude Code: `$ claude`
-3. Ask Claude to analyze your changes
-4. Have Claude split them into 3+ logical commits
-5. Generate Conventional Commits messages for each
-6. Run `git log --oneline` — does the history tell a story?
+1. Change 3+ files in a scratch repo.
+2. Ask Claude: "Group these changes by purpose, then stage and commit each group with a
+   Conventional Commits message."
+3. Run `git log --oneline -5` and `git log -1 --format=%B` on the last commit.
+
+**Expected result**: One commit per logical unit, each carrying a `Co-Authored-By` trailer.
 
 <details>
 <summary>💡 Hint</summary>
 
-Ask Claude: "Group these changes by purpose, not by file. What are the distinct logical units of work?"
+Ask for the plan first ("what are the distinct units of work here?") before telling Claude to
+stage and commit — reviewing the split costs you nothing and catches wrong groupings early.
 
 </details>
 
 <details>
 <summary>✅ Solution</summary>
 
-**Effective sequence**:
+1. `git status` — see all changed files.
+2. Ask: "Analyze my changes and group them by purpose into atomic commits."
+3. For each group: "Stage and commit these with a Conventional Commits message."
+4. Verify: `git log --oneline -5`, then `git log -1 --format=%B` to confirm the trailer.
 
-1. `git status` — see all changed files
-2. Ask: "Analyze my changes and group them by purpose into atomic commits"
-3. For each group, stage only those files: `git add [specific files]`
-4. Ask: "Write a Conventional Commits message for these staged changes"
-5. Commit: `git commit -m "[message]"`
-6. Repeat for each group
-7. Verify: `git log --oneline -5`
-
-**Success criteria**: Each commit can be reverted independently without breaking the others.
+**Success criteria**: each commit reverts independently; every one has the attribution trailer,
+not a hand-written co-author line.
 
 </details>
 
 ---
 
-### Exercise 2: Conflict Commander
+### Exercise 2: Find a PR Comment the New Way
 
-**Goal**: Resolve a merge conflict intelligently using Claude Code.
+**Goal**: Practice the `/pr-comments` replacement on a real PR you have access to.
 
 **Instructions**:
-1. Create a test branch: `git checkout -b conflict-test`
-2. Modify a function in any file, commit
-3. Checkout main/develop, modify the SAME function differently, commit
-4. Merge conflict-test into current branch: `git merge conflict-test`
-5. Use Claude Code to understand both sides and resolve
+1. Pick an open PR number you can `gh pr view` locally.
+2. Ask Claude: "What did reviewers say on PR &lt;number&gt;?"
+3. Run `claude --from-pr <number>` in a second terminal.
+
+**Expected result**: Claude answers from `gh pr view --comments` or similar, and `--from-pr` opens
+the session picker filtered to that PR.
 
 <details>
 <summary>💡 Hint</summary>
 
-Be specific: "Keep the algorithm from our side but use the function signature from theirs."
+If Claude never worked on that PR before, `--from-pr` finds nothing to filter to — expected.
 
 </details>
 
 <details>
 <summary>✅ Solution</summary>
 
-**Conflict resolution sequence**:
-
-1. `git merge conflict-test` — triggers conflict
-2. Ask Claude: "Show me the merge conflict in [file]. Explain what each side changed."
-3. Specify intent: "Resolve by keeping our [X] but using their [Y]"
-4. Review Claude's resolution
-5. Test: `npm test` or compile
-6. Stage: `git add [file]`
-7. Commit: `git commit` (uses auto-generated merge commit message)
-
-**Success criteria**: Both intended changes are preserved, code compiles, tests pass.
+Claude reads comments through `gh`/`glab`, the same CLI it used to open the PR — no separate
+comments API. `--from-pr` only surfaces sessions Claude Code already linked to that PR.
 
 </details>
 
@@ -349,61 +247,51 @@ Be specific: "Keep the algorithm from our side but use the function signature fr
 
 ## 5. CHEAT SHEET
 
-| Prompt | What It Does | When to Use |
-|--------|--------------|-------------|
-| `What files have I changed? Summarize each change.` | Analyzes current diff | Before committing |
-| `Split these changes into logical atomic commits` | Groups changes by purpose | Large changesets |
-| `Write a Conventional Commits message for staged changes` | Generates commit message | After staging |
-| `Show me the merge conflict in [file]. Explain both sides.` | Conflict analysis | After merge fails |
-| `Resolve conflict: keep our X, integrate their Y` | Intelligent merge | During conflict resolution |
-| `Review commits on this branch vs main` | History analysis | Before PR |
-| `Write a PR description for this branch` | Generates PR summary | Before submitting PR |
-| `What would happen if I rebase onto main?` | Rebase preview | Before rebasing |
-| `I need to undo the last commit but keep changes` | Soft reset guidance | After bad commit |
-| `What should I add to .gitignore for [framework]?` | Ignore file suggestions | Project setup |
-| `Show me commits that touched [file] in the last month` | File history | Debugging/archaeology |
-| `Squash the last 3 commits with a new message` | History cleanup | Before PR |
+| Command / Prompt | What It Does |
+|---|---|
+| `create a pr for my changes` | Claude runs `gh pr create` / `glab mr create` |
+| `claude --from-pr <n>` | Reopen the session linked to PR/MR `<n>` |
+| `what did reviewers say on PR <n>` | Replaces removed `/pr-comments` |
+| `claude --worktree <name>` / `-w` | Isolated checkout at `.claude/worktrees/<name>/` |
+| `.worktreeinclude` | Copies gitignored files (`.env`) into new worktrees |
+| `attribution.commit` / `attribution.pr` | Change or empty-string the commit/PR line |
+| `attribution: false` | Hide all attribution (v2.1.281+) |
+| `git reset --soft HEAD~N` + ask Claude for one message | Squash without an interactive editor |
+| `git worktree remove` / `git worktree unlock` | Clean up a `-p`-created worktree |
 
 ---
 
 ## 6. PITFALLS — Common Mistakes
 
 | ❌ Mistake | ✅ Correct Approach |
-|-----------|---------------------|
-| Letting Claude commit without reviewing | Always read the generated message before confirming |
-| One giant commit for all changes | Ask Claude to split into atomic commits by purpose |
-| "Fix the merge conflict" with no guidance | Specify: "Keep our X but integrate their Y" |
-| Blindly accepting conflict resolution | Always compile and run tests after resolution |
-| Not encoding conventions in CLAUDE.md | Add your team's commit format: `feat:`, `fix:`, etc. |
-| Force push without understanding | Ask Claude to explain before any destructive operation |
-| Skipping the diff review | Always ask Claude to review changes before committing |
-| Committing generated code without testing | Run tests between staging and committing |
+|---|---|
+| Letting Claude commit without reading the message | Always read the generated message before the next prompt |
+| Assuming CLAUDE.md commit conventions are enforced | They're advisory; put hard rules in a hook or managed settings |
+| Asking Claude to `git rebase -i` to squash | Interactive rebase needs an editor Claude can't drive — use `git reset --soft HEAD~N` then ask Claude to write one message |
+| Expecting `/pr-comments` to still work | Removed in v2.1.91 — ask Claude directly, or `claude --from-pr <n>` |
+| Running `claude --worktree` in a repo with zero commits | Make one commit first, or the base-branch lookup fails |
+| Forgetting a `-p --worktree` session leaves its worktree locked | `git worktree unlock` then `git worktree remove` |
+| Trusting a bare "Generated with Claude Code" PR without review | Ask Claude to highlight risks before you submit |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: An outsourcing company in Da Nang maintains 3 client projects simultaneously. Eight developers work on feature branches throughout the week. Every Friday was "merge hell" — 3-4 hours of manual conflict resolution, inconsistent commit messages, and PRs that took forever to review.
+**Scenario**: An outsourcing company in Da Nang maintains 3 client projects. Eight developers push
+feature branches all week; Friday used to mean 3-4 hours of manual conflict resolution and commit
+messages like "fix", "update", "wip".
 
-**Before Claude Code**:
-- Commit messages: "fix bug", "update", "wip", "asdf"
-- Merge conflicts: manual line-by-line resolution without understanding context
-- PR descriptions: copy-paste from Jira tickets
-- Friday merge: 3-4 hours, often requiring senior developer intervention
+**Solution**: Each developer asks Claude to stage, group, and commit with Conventional Commits;
+the `Co-Authored-By` trailer flags which commits went through Claude. Before merge, someone runs
+`claude -w` to test the merge in an isolated worktree without touching their in-progress branch.
+PRs go out with `create a pr for my changes`, then a human read before submit.
 
-**After adopting Claude Code Git workflow**:
-1. **During development**: Each developer uses Claude Code to write Conventional Commits. Messages are clear: `fix(auth): prevent session timeout during OAuth flow`
-2. **Before merge**: Claude Code reviews branch against develop, flags files likely to conflict
-3. **During conflict**: Claude resolves with full context — knows which changes are bug fixes vs features
-4. **PR generation**: Auto-generated descriptions with accurate change summaries
+**Result**: Friday merge dropped from 3-4 hours to 45 minutes; PR review time fell about 60%,
+since reviewers trust the generated summaries enough to skim instead of re-deriving intent.
 
-**Results**:
-- **Friday merge**: 3-4 hours → 45 minutes
-- **PR review time**: Reduced by 60% (reviewers understand changes faster)
-- **Onboarding**: New developers understand project history without asking seniors
-- **Rollbacks**: Atomic commits make reverting specific changes trivial
-
-**Team Lead's quote**: "Our git log used to be a mystery novel where everyone dies and no one knows why. Now it reads like documentation."
+**Team Lead's quote**: "Our git log used to be a mystery novel where everyone dies and no one
+knows why. Now it reads like documentation — and I can tell from the trailer which commits I
+should look at twice."
 
 ---
 
