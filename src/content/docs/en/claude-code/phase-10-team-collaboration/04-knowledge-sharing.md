@@ -103,7 +103,7 @@ Cover the happy path, one edge case, and one error case. Print the code only.
 
 **Step 2: Invoke it — this is what makes it a library, not a doc**
 ```bash
-claude -p "/testing:gen-unit-tests src/math.js percentOf"
+claude -p "/testing:gen-unit-tests src/math.js percentOf" --allowedTools "Read,Glob"
 ```
 Expected output (trimmed):
 ```text

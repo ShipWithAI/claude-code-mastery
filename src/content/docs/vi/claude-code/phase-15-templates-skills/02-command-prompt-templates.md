@@ -42,7 +42,9 @@ Docs quote (trang skills): "A file at `.claude/commands/deploy.md` and a skill a
 `.claude/skills/deploy/SKILL.md` both create `/deploy` and work the same way. Your existing
 `.claude/commands/` files keep working." Skill (Module 15.3) thêm folder cho supporting file và
 control invocation chi tiết hơn; command file một file đơn giản hơn khi bạn chỉ cần vậy. Nếu skill
-và command file trùng tên, skill chạy.
+và command file trùng tên, skill chạy. [Module 4.3](../../phase-04-prompt-memory/03-slash-commands/)
+cover cơ chế slash-command rộng hơn — built-in, `/help`, và command ở session-level — mà command
+file này plug vào.
 
 ### Frontmatter (command file support cùng field với skill, trừ `name`/`paths`)
 
@@ -112,7 +114,7 @@ Expected output:
 ```
 
 ```bash
-claude -p "/pr-review security"
+claude -p "/pr-review security" --allowedTools "Read,Bash(git diff *)"
 ```
 Expected output (rút gọn):
 ```text

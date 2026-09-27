@@ -44,6 +44,8 @@ Docs quote (skills page): "A file at `.claude/commands/deploy.md` and a skill at
 `.claude/commands/` files keep working." A skill (Module 15.3) adds a folder for supporting files
 and finer invocation control; a single-file command is simpler when that's all you need. If a
 skill and a command file share a name, the skill runs.
+[Module 4.3](../../phase-04-prompt-memory/03-slash-commands/) covers the broader slash-command
+mechanism — built-ins, `/help`, and session-level commands — that a command file plugs into.
 
 ### Frontmatter (command files support the same fields as skills, except `name`/`paths`)
 
@@ -115,7 +117,7 @@ Expected output:
 ```
 
 ```bash
-claude -p "/pr-review security"
+claude -p "/pr-review security" --allowedTools "Read,Bash(git diff *)"
 ```
 Expected output (trimmed):
 ```text

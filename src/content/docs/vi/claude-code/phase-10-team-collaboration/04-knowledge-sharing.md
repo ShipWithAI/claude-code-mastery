@@ -99,7 +99,7 @@ Cover the happy path, one edge case, and one error case. Print the code only.
 
 **Bước 2: Invoke nó — đây là thứ biến nó thành library, không phải doc**
 ```bash
-claude -p "/testing:gen-unit-tests src/math.js percentOf"
+claude -p "/testing:gen-unit-tests src/math.js percentOf" --allowedTools "Read,Glob"
 ```
 Expected output (rút gọn):
 ```text

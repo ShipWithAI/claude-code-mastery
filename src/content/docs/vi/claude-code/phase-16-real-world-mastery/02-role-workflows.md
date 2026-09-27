@@ -102,7 +102,7 @@ RangeError: Invalid array length
 ```bash
 claude -p "/triage-stacktrace RangeError: Invalid array length
     at renderBar (scripts/report.mjs:4:10)
-    at scripts/report.mjs:8:13"
+    at scripts/report.mjs:8:13" --allowedTools "Read,Grep,Glob"
 ```
 Expected output (rút gọn):
 ```text
