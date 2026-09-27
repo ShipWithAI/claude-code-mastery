@@ -1,363 +1,250 @@
 ---
 title: 'CLAUDE.md cho Team'
-description: 'Thiết lập CLAUDE.md dùng chung cho team: chuẩn hóa convention, chia sẻ context và đồng bộ quy tắc.'
+description: 'Phân phối CLAUDE.md cho cả team bằng managed policy file, .claude/rules/ scoped theo path, và xác nhận thứ gì thật sự load.'
+verified: 2026-09-27
+claude_version: 2.1.283
 ---
 
 # Module 10.1: CLAUDE.md cho Team
 
 > **Thời gian học**: ~30 phút
 >
-> **Yêu cầu trước**: Module 4.2 (CLAUDE.md — Bộ nhớ dự án), Phase 9 (Legacy Code)
+> **Yêu cầu trước**: Module 4.2 (CLAUDE.md — Bộ Nhớ Dự Án), Phase 9 (Legacy Code)
 >
-> **Kết quả**: Sau module này, bạn sẽ biết create và maintain shared CLAUDE.md cho team, thiết lập contribution workflow, và ensure consistent Claude behavior across tất cả team member.
+> **Kết quả**: Sau module này, bạn biết chọn đúng cơ chế cho instruction dùng chung cả team —
+> `CLAUDE.md` của repo, `.claude/rules/` scoped theo path, hay managed policy toàn org — và biết
+> xác nhận thứ gì thật sự load cho một file cụ thể.
 
 ---
 
-## 1. WHY — Tại Sao Cần Hiểu
+## 1. WHY — Tại Sao Cần Quan Tâm
 
-Team 5 developer đều dùng Claude Code. Dev A's Claude dùng camelCase. Dev B dùng snake_case. Dev C import lodash cho mọi thứ. Dev D đã train Claude avoid lodash. Mỗi PR có style conflict. Claude supposed to help nhưng tạo inconsistency.
-
-Team CLAUDE.md giải quyết: MỘT shared file cho TẤT CẢ team member's Claude đọc. Same rule, same pattern, same knowledge. Consistency at scale.
+Năm developer, năm thói quen Claude khác nhau: người này viết camelCase, người kia snake_case,
+người thứ ba import lodash khắp nơi. Một `CLAUDE.md` chung giải quyết vấn đề "cùng repo, khác
+rule" — nhưng không giải quyết chuyện "rule frontend lại load khi Claude đang sửa backend" hay
+"không ai chứng minh được file nào thật sự đã đọc." Module 4.2 dạy viết `CLAUDE.md` gọn nhẹ; module
+này dạy phân phối instruction cho cả team và nhiều app, và chứng minh chúng đã load.
 
 ---
 
 ## 2. CONCEPT — Ý Tưởng Cốt Lõi
 
-### Individual vs Team CLAUDE.md
+### Individual vs. team CLAUDE.md
 
-| Aspect | Individual | Team |
+| Khía cạnh | Cá nhân (`CLAUDE.local.md`) | Team (`CLAUDE.md`) |
 |--------|-----------|------|
-| Location | Personal project | Repo root (committed) |
-| Scope | Personal preference | Team standard |
-| Updates | Bạn decide | Team consensus |
-| Versioned | Optional | Required (git) |
+| Vị trí | Root repo, gitignored | Root repo, committed |
+| Phạm vi | Sở thích cá nhân | Chuẩn của team |
+| Cập nhật | Bạn tự quyết | PR + review |
+| Load cho mọi người | Không | Có |
 
-### Team CLAUDE.md Structure
+### Hierarchy trong monorepo (nối chuỗi, không ghi đè)
 
-```markdown
-# Project: [Name]
-
-## Team Conventions
-- Coding style, naming, file organization
-
-## Architecture Decisions
-- Tại sao chọn X thay vì Y
-- Pattern nên follow
-
-## Forbidden Patterns
-- Cái gì KHÔNG làm và tại sao
-
-## Dependencies Policy
-- Library được approve
-- Library bị ban và lý do
-
-## Testing Requirements
-- Coverage expectation
-- Test pattern
-
-## Claude-Specific Instructions
-- Claude nên behave thế nào cho project này
-```
-
-### Contribution Workflow
-
-1. CLAUDE.md sống trong repo root
-2. Change qua PR như code bình thường
-3. Team review CLAUDE.md change
-4. Merge = team consensus
-
-### Layered CLAUDE.md
-
-Cho complex project:
-- `/CLAUDE.md` — Global team rule
-- `/backend/CLAUDE.md` — Backend-specific rule
-- `/frontend/CLAUDE.md` — Frontend-specific rule
-
-Claude đọc tất cả applicable file khi work trong directory.
-
-### Phân Cấp CLAUDE.md Trong Monorepo
-
-Trong các monorepo lớn (Turborepo, Nx, Lerna), cách tiếp cận phân tầng trở nên đặc biệt quan trọng. Cơ chế loading CLAUDE.md của Claude Code giúp điều này hoạt động hiệu quả:
-
-#### Cách Claude Load CLAUDE.md
+Claude Code đi **ngược lên** từ thư mục làm việc lúc khởi động, load ngay mọi `CLAUDE.md` nằm
+trên đường đi đó. File ở package anh em hoặc con **không** load lúc khởi động — chúng load lười
+(lazy), chỉ khi Claude đọc một file bên trong package đó (cơ chế đầy đủ, gồm cả `@imports` và thứ
+tự precedence, nằm ở Module 4.2):
 
 ```mermaid
 graph TD
-    CWD[Your cwd: packages/web/] --> Walk[Walk UPWARD to root]
-    Walk --> Root["/monorepo/CLAUDE.md ✅ Loaded immediately"]
-    Walk --> Pkg["/monorepo/packages/web/CLAUDE.md ✅ Loaded immediately"]
-
-    Other1["packages/api/CLAUDE.md ❌ Not loaded"] -.->|"Lazy: loaded when Claude reads files in api/"| Later[Loaded on demand]
-    Other2["packages/shared/CLAUDE.md ❌ Not loaded"] -.->|"Lazy: loaded when Claude reads files in shared/"| Later
-
-    style Root fill:#c8e6c9
-    style Pkg fill:#c8e6c9
-    style Other1 fill:#ffcdd2
-    style Other2 fill:#ffcdd2
+    CWD["cwd: packages/web/"] --> Walk[Đi NGƯỢC LÊN tới root filesystem]
+    Walk --> Root["/monorepo/CLAUDE.md — load ngay"]
+    Walk --> Pkg["packages/web/CLAUDE.md — load ngay"]
+    Other["packages/api/CLAUDE.md — CHƯA load"] -.->|"lazy: load khi Claude đọc file trong api/"| Later[Gia nhập context khi cần]
 ```
 
-**Hành vi quan trọng**:
-- Khi khởi động, Claude đi **ngược lên** từ thư mục hiện tại đến root
-- Load tất cả CLAUDE.md trên đường đi **ngay lập tức**
-- Các CLAUDE.md ở thư mục ngang hàng hoặc con **KHÔNG** được load khi khởi động
-- Chúng chỉ được **lazy-load** khi Claude đọc file trong những thư mục đó
+### Hai cách scope một rule cho team
 
-#### Cấu Trúc Monorepo Mẫu
+| Cơ chế | Load khi nào | Ai exclude được |
+|---|---|---|
+| `CLAUDE.md` (root hoặc package) | Lúc khởi động, nếu nằm trên đường đi ngược lên | `claudeMdExcludes` (không áp dụng cho managed policy) |
+| `.claude/rules/*.md` có `paths:` | "Khi Claude đọc file khớp pattern, không phải mỗi lần gọi tool" | Như trên |
+| `.claude/rules/*.md` **không có** `paths:` | Lúc khởi động, priority ngang `.claude/CLAUDE.md` | Như trên |
 
-```text
-monorepo/
-├── CLAUDE.md                    # Chung: TypeScript strict, commit format, PR template
-├── packages/
-│   ├── web/
-│   │   └── CLAUDE.md            # Quy tắc Next.js, component patterns
-│   ├── api/
-│   │   └── CLAUDE.md            # Express patterns, quy tắc truy cập DB
-│   ├── shared/
-│   │   └── CLAUDE.md            # Shared types, không có side effects
-│   └── mobile/
-│       └── CLAUDE.md            # React Native patterns, platform specifics
-└── .claude/
-    └── rules/                   # File rule modular (tự động load)
-        ├── testing.md           # Quy tắc test cho tất cả packages
-        └── security.md          # Quy tắc bảo mật cho toàn repo
-```
+`paths:` là field duy nhất trong frontmatter Claude Code đọc ở rule file (budget: 1.000 glob
+pattern đã expand / 4 MiB). Đây là cách team giữ cho convention chỉ áp dụng `apps/web/**` không
+bao giờ vào context khi ai đó đang làm `apps/api/`.
 
-#### Đặt Gì Ở Đâu
+### Cấp org: managed policy CLAUDE.md
 
-| Cấp độ | Nội dung | Ví dụ |
-|--------|----------|-------|
-| **Root CLAUDE.md** | Quy tắc chung toàn repo | TypeScript strict, no `any`, commit format |
-| **Package CLAUDE.md** | Quy tắc riêng framework | "Server Components by default" |
-| **`.claude/rules/*.md`** | Quy tắc xuyên suốt | Tiêu chuẩn testing, quy tắc security |
-| **CLAUDE.local.md** | Tùy chọn cá nhân (thêm vào `.gitignore`) | Debug shortcuts, editor config |
+Với rule bắt buộc áp dụng cho mọi developer bất kể repo có gì, admin deploy một **managed policy
+CLAUDE.md**, load trước cả user và project file, và không thể exclude bằng `claudeMdExcludes`:
 
-> **Mẹo**: Thêm `CLAUDE.local.md` vào `.gitignore`. Dùng nó cho các hướng dẫn cá nhân không cần chia sẻ với team — alias riêng, debug workflow, format output ưa thích.
+| OS | Đường dẫn |
+|---|---|
+| macOS | `/Library/Application Support/ClaudeCode/CLAUDE.md` |
+| Linux / WSL | `/etc/claude-code/CLAUDE.md` |
+| Windows | `C:\Program Files\ClaudeCode\CLAUDE.md` |
 
-### Living Document Principle
+Hoặc bỏ qua file riêng, inline nội dung bằng key `claudeMd` trong `managed-settings.json` (Module
+10.5 dạy cách deploy file đó). `CLAUDE.md` committed vẫn là công cụ đúng cho convention team tự sở
+hữu và tự review; managed policy dành cho số ít rule org bắt buộc phải giữ dù repo có hợp tác hay
+không.
 
-- CLAUDE.md evolve với project
-- Sau mỗi "Claude làm sai" → update CLAUDE.md
-- Sau mỗi architectural decision → document vào CLAUDE.md
-- Regular review (monthly/quarterly)
+### Xác nhận thứ gì đã load
+
+`/memory` liệt kê mọi file thuộc họ CLAUDE.md đang trong scope, cho biết auto-memory bật hay tắt,
+và cho mở thư mục auto-memory. Nó **không** liệt kê `.claude/rules/` — những file đó chỉ xuất hiện
+khi có file khớp được đọc (xem DEMO). `/init` phân tích repo và viết `CLAUDE.md` khởi đầu, hoặc đề
+xuất sửa nếu đã có sẵn (Module 4.2, Exercise 1, có đầy đủ quy trình prune một file quá dài).
 
 ---
 
 ## 3. DEMO — Từng Bước
 
-**Scenario**: Setup Team CLAUDE.md cho team 5 người.
+**Kịch bản**: monorepo 2 app (`apps/web` Next.js, `apps/api` Express) với một `CLAUDE.md` ở root
+và một rule scoped chỉ cho frontend.
 
-### Step 1: Initialize với Team Context
-
-```bash
-$ claude
-```
-
-```text
-Bạn: Setup CLAUDE.md cho team. Read codebase và generate starting
-CLAUDE.md capture:
-- Coding convention đang dùng
-- Tech stack
-- Pattern bạn observe
-
-Claude: [Đọc codebase, generate initial CLAUDE.md]
-```
-
-### Step 2: Thêm Team-Specific Rule
-
-```markdown
-# Project: E-commerce Platform
-
-## Team Conventions
-- TypeScript strict mode, không `any`
-- React functional component only, không class
-- File naming: kebab-case cho file, PascalCase cho component
-- Import: absolute path từ `@/` alias
-
-## Architecture Decisions
-- State management: Zustand (KHÔNG Redux — quá nhiều boilerplate)
-- API layer: React Query cho server state
-- Styling: Tailwind CSS, không inline style
-
-## Forbidden Patterns
-- ❌ `any` type — luôn define proper type
-- ❌ `console.log` trong production code — dùng logger service
-- ❌ Direct DOM manipulation — dùng React ref
-- ❌ lodash — dùng native JS method (bundle size)
-
-## Dependencies Policy
-- New dependency cần team discussion
-- Check bundle size trước khi add (bundlephobia.com)
-- Security: không package có known CVE
-
-## Testing Requirements
-- Unit test cho all util
-- Integration test cho API route
-- E2E test cho critical user flow
-- Minimum 70% coverage cho new code
-
-## Claude-Specific Instructions
-- Luôn run `npm run lint` sau code change
-- Suggest test cho mọi new function
-- Khi không chắc về architecture, hỏi thay vì assume
-```
-
-### Step 3: Commit và Establish Workflow
+**Bước 1: Root CLAUDE.md + một rule scoped**
 
 ```bash
-$ git add CLAUDE.md && git commit -m "docs: add team CLAUDE.md for AI assistant context"
+mkdir -p apps/web/src apps/api/src .claude/rules
+cat > CLAUDE.md <<'EOF'
+# Storefront Monorepo
+- Hai app: apps/web (Next.js) và apps/api (Express).
+- TypeScript strict mode ở mọi nơi. Không dùng `any`.
+EOF
+cat > .claude/rules/frontend-testing.md <<'EOF'
+---
+paths: apps/web/**
+---
+# Frontend testing rule
+- Mỗi component trong apps/web cần một *.test.tsx nằm cùng thư mục.
+- Dùng React Testing Library, không dùng Enzyme.
+EOF
+git add -A && git commit -q -m "init monorepo demo"
 ```
 
-Output:
+**Bước 2: Xác nhận họ CLAUDE.md bằng `/memory`**
+
 ```text
-[main abc1234] docs: add team CLAUDE.md for AI assistant context
- 1 file changed, 45 insertions(+)
- create mode 100644 CLAUDE.md
+> /memory
+```
+```text
+# Output may vary
+Memory
+❯ Auto-memory  true
+❯ User instructions   Saved in ~/.claude/CLAUDE.md
+  Project instructions   Checked in at ./CLAUDE.md
+  Open auto-memory folder
 ```
 
-### Step 4: Verify Nó Work
+`.claude/rules/frontend-testing.md` chưa xuất hiện ở đây — nó chưa được trigger.
+
+**Bước 3: Mở một file trong `apps/web` — rule load**
 
 ```text
-Bạn: Rule của team về lodash là gì?
-
-Claude: Theo CLAUDE.md, lodash bị forbidden. Dùng native JS method
-thay vì vì lý do bundle size.
+> Read apps/web/src/Button.tsx, then tell me what our testing rule for this file requires.
 ```
+```text
+# Output may vary
+Opening Button.tsx loaded the project rule .claude/rules/frontend-testing.md, which covers
+everything in apps/web. It requires: a test file next to the component (apps/web/src/Button.test.tsx)
+and React Testing Library, not Enzyme.
+```
+
+**Bước 4: Cùng câu hỏi cho `apps/api` — rule vẫn im lặng**
+
+```text
+> Read apps/api/src/index.ts. Does the frontend testing rule apply to this file?
+```
+```text
+# Output may vary
+No, it doesn't apply. .claude/rules/frontend-testing.md is scoped to paths: apps/web/**, and
+apps/api/src/index.ts is in the Express API app.
+```
+
+Sự bất đối xứng đó — load cho `apps/web`, im lặng với `apps/api` — chính là mục đích của `paths:`.
 
 ---
 
 ## 4. PRACTICE — Tự Thực Hành
 
-### Bài 1: Audit Current State
+### Exercise 1: Tách một rule ra khỏi CLAUDE.md
 
-**Goal**: Tạo initial Team CLAUDE.md từ existing standard.
+**Goal**: Chuyển một convention scoped theo thư mục ra khỏi file root.
 
 **Instructions**:
-1. Nếu team có coding standard doc, convert sang CLAUDE.md format
-2. Nếu không, ask Claude analyze codebase và generate initial convention
-3. Review và refine với team input
+1. Chọn một rule trong `CLAUDE.md` chỉ áp dụng cho một package hoặc thư mục.
+2. Chuyển nó vào `.claude/rules/<name>.md` với `paths:` glob cho thư mục đó.
+3. Commit cả hai file, mở PR như mọi thay đổi code khác.
+4. Xác nhận theo pattern ở Bước 3 của DEMO: đọc một file khớp, rồi một file không khớp.
 
 <details>
 <summary>💡 Hint</summary>
 
-```text
-"Read codebase. Generate CLAUDE.md capture:
-- Coding convention bạn observe
-- Tech stack và pattern
-- Anti-pattern nên avoid"
-```
+`paths:` nhận YAML list hoặc chuỗi phân tách bằng dấu phẩy — cả `apps/web/**` và
+`["apps/web/**", "packages/ui/**"]` đều hoạt động.
 </details>
 
-### Bài 2: Forbidden Patterns Section
+### Exercise 2: Managed hay committed — chọn đúng lớp
 
-**Goal**: Prevent common mistake với explicit rule.
+**Goal**: Quyết định 3 rule dưới đây thuộc `CLAUDE.md`, `.claude/rules/`, hay managed policy.
 
-**Instructions**:
-1. Nghĩ 5 thứ developer trong team hay làm sai
-2. Add vào "Forbidden Patterns" với clear explanation
-3. Test: ask Claude làm một trong những thứ đó, verify nó refuse
-
-### Bài 3: Layered CLAUDE.md
-
-**Goal**: Setup directory-specific rule.
-
-**Instructions**:
-1. Tạo root CLAUDE.md với global rule
-2. Tạo subdirectory CLAUDE.md cho một area cụ thể (e.g., `/api/CLAUDE.md`)
-3. Verify Claude đọc cả hai khi work trong area đó
+**Instructions**: Với mỗi rule sau, nêu tên cơ chế và lý do:
+1. "Dùng Zustand, không dùng Redux, cho state management."
+2. "File trong `payments/**` cần security review trước khi merge."
+3. "Không bao giờ tắt permission-bypass mode trên máy công ty."
 
 <details>
 <summary>✅ Solution</summary>
 
-Structure:
-```text
-/CLAUDE.md           # "All code must be TypeScript"
-/api/CLAUDE.md       # "API route dùng Express middleware pattern"
-```
-
-Test bằng cách ask Claude về API convention khi ở `/api/` directory — nó should biết cả global và API-specific rule.
+1. `CLAUDE.md` — convention team tự quyết và có thể đổi bằng PR.
+2. `.claude/rules/payments.md` với `paths: payments/**` — cross-cutting nhưng chỉ liên quan trong
+   thư mục đó.
+3. Managed policy (`disableBypassPermissionsMode`, Module 10.5) — phải giữ nguyên dù developer có
+   sửa hay xoá `CLAUDE.md` của repo.
 </details>
+
+### Exercise 3: Contribution workflow
+
+**Goal**: Biến việc maintain CLAUDE.md thành thói quen của cả team, không phải việc của một người.
+
+**Instructions**: Soạn một checkbox trong PR template: "Đã update `CLAUDE.md` hoặc một rule sau
+thay đổi này chưa?" Thêm vào repo và dùng thử trong một tuần.
 
 ---
 
 ## 5. CHEAT SHEET
 
-### Team CLAUDE.md Template
-
-```markdown
-# Project: [Name]
-
-## Team Conventions
-- [Coding style rule]
-
-## Architecture Decisions
-- [Tại sao chọn X]
-
-## Forbidden Patterns
-- ❌ [Thứ cần avoid] — [lý do]
-
-## Dependencies Policy
-- [Cái gì allowed/banned]
-
-## Testing Requirements
-- [Coverage, pattern]
-
-## Claude-Specific Instructions
-- [Claude nên behave thế nào]
-```
-
-### Workflow
-
-1. CLAUDE.md trong repo root (committed)
-2. Change qua PR
-3. Team review
-4. Update sau mỗi "Claude mistake"
-
-### Layered Structure
-
-```text
-/CLAUDE.md           # Global rule
-/backend/CLAUDE.md   # Backend-specific
-/frontend/CLAUDE.md  # Frontend-specific
-```
+| Cơ chế | Load khi nào | Phạm vi |
+|---|---|---|
+| `./CLAUDE.md` | Lúc khởi động, nếu trên đường đi ngược lên | Cả repo (hoặc subtree nếu nested) |
+| `.claude/rules/*.md` (không `paths:`) | Lúc khởi động | Cả repo |
+| `.claude/rules/*.md` (`paths:`) | Khi có file khớp được đọc | Chỉ path glob đó |
+| `CLAUDE.local.md` | Lúc khởi động, gitignored | Cá nhân |
+| Managed policy CLAUDE.md | Trước user/project file, mỗi session | Toàn org, không exclude được |
+| `claudeMd` (trong `managed-settings.json`) | Như trên, inline thay vì file | Toàn org |
+| `/memory` | — | Liệt kê họ CLAUDE.md, toggle auto-memory |
+| `/init` | — | Sinh/update `CLAUDE.md` (chỉ interactive) |
 
 ---
 
-## 6. PITFALLS — Lỗi Thường Gặp
+## 6. PITFALLS — Sai Lầm Thường Gặp
 
-| ❌ Sai Lầm | ✅ Đúng Cách |
-|-----------|-------------|
-| Individual CLAUDE.md không git | Team CLAUDE.md MUST committed và shared |
-| Một người maintain CLAUDE.md | Team ownership. PR for change. Everyone contribute. |
-| Write once, never update | Living document. Update sau mỗi issue. |
-| Quá vague ("viết code tốt") | Specific, actionable ("dùng camelCase, không snake_case") |
-| Quá dài (không ai đọc) | Concise. Important rule first. |
-| Chỉ coding style | Include architecture, dependency, testing, Claude behavior |
-| Không test Claude đọc không | Verify bằng cách ask Claude về rule |
+| ❌ Sai | ✅ Đúng |
+|-----------|---------------------|
+| Một `CLAUDE.md` 600 dòng không ai đọc | Chạy S1 prune test cho từng phần — "Bỏ dòng này Claude có mắc lỗi không?" (Module 4.2) — rồi chuyển phần còn lại vào `.claude/rules/` scoped |
+| Chỉ một người sửa `CLAUDE.md` | Team sở hữu chung, PR + review như code |
+| Tưởng rule không có `paths:` sẽ lazy-load | Nó load lúc khởi động, priority ngang `.claude/CLAUDE.md` — chỉ `paths:` mới làm nó lazy |
+| Tưởng `CLAUDE.md`/rules chặn được hành động nguy hiểm | Chỉ mang tính advisory — dùng `permissions.deny` hoặc hook (Module 2.2, 11.3) cho thứ tuyệt đối không được xảy ra |
+| Commit sở thích cá nhân vào `CLAUDE.md` | Dùng `CLAUDE.local.md`, gitignored |
+| Viết managed CLAUDE.md cho lựa chọn style của team | Dành managed policy cho rule phải giữ dù repo không hợp tác; style của team vẫn nằm trong file committed |
 
 ---
 
 ## 7. REAL CASE — Câu Chuyện Thực Tế
 
-**Scenario**: Startup fintech Việt Nam, 8 developer, đều dùng Claude Code. Trước Team CLAUDE.md: mỗi PR có style conflict, different error handling pattern, inconsistent API response.
-
-**Implementation**:
-1. Tech lead draft initial CLAUDE.md từ existing (informal) standard
-2. Team review trong 1 giờ meeting, thêm forbidden pattern từ past incident
-3. Commit vào repo, announce trong Slack
-4. Rule: "Nếu Claude làm sai, fix AND update CLAUDE.md"
-
-**CLAUDE.md highlight**:
-- VND currency: luôn dùng integer (không decimal)
-- Error response: dùng standard ApiError class
-- Forbidden: direct database query trong controller
-
-**Result sau 1 tháng**:
-- Style conflict trong PR: giảm 80%
-- "Tại sao Claude làm thế này?" question: giảm 90%
-- New developer onboarding: từ 2 tuần xuống 3 ngày (Claude biết hết rule)
-
-**Quote**: "CLAUDE.md là best onboarding document. Nó teach Claude VÀ new developer cùng lúc."
+Một team fintech ở TP.HCM chạy một `CLAUDE.md` gốc cho ba service trong monorepo:
+payments, ledger, và một public API. Mỗi session load convention của cả ba service, kể cả rule
+riêng của payments ("luôn dùng value type `Money`, không dùng raw float") dù ai đó chỉ đang đụng
+public API. Sau khi tách rule từng service vào
+`.claude/rules/payments/**.md`, `.claude/rules/ledger/**.md`, chỉ giữ convention cross-cutting
+(commit format, TypeScript strict mode) ở file root, team xác nhận bằng `/context`
+session public API không còn mang token rule payments nữa — quan trọng hơn, reviewer chỉ thẳng
+được file rule chịu trách nhiệm khi Claude sai convention riêng của service, thay vì debug một
+document lớn.
 
 ---
 
-> **Tiếp theo**: [Module 10.2: Quy ước Git](../02-git-conventions/) →
+> **Next**: [Module 10.2: Quy ước Git](../02-git-conventions/) →
