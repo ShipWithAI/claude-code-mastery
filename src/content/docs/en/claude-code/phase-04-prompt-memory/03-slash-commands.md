@@ -1,6 +1,8 @@
 ---
 title: 'Slash Commands'
-description: 'Learn every Claude Code slash command for context management, session control, and efficient workflows.'
+description: 'Find any built-in slash command, write a custom command in .claude/commands/, and know when to promote it to a skill.'
+verified: 2026-09-27
+claude_version: 2.1.283
 ---
 
 # Module 4.3: Slash Commands
@@ -9,469 +11,254 @@ description: 'Learn every Claude Code slash command for context management, sess
 >
 > **Prerequisite**: Module 4.2 (CLAUDE.md — Project Memory)
 >
-> **Outcome**: After this module, you will know every slash command available in Claude Code, when to use each one, and how they fit into efficient workflows — especially context management commands that are critical for long sessions.
+> **Outcome**: After this module, you will be able to find any built-in command with `/`, write a project command in `.claude/commands/` that takes arguments and pre-runs a shell check, and know when to promote that command to a skill.
 
 ---
 
 ## 1. WHY — Why This Matters
 
-You're 45 minutes into a complex refactoring session. Claude's responses are getting slower. The context window is full. You need to compress the conversation history to keep working, but what's the command? Is it `/compact`? `/compress`? `/summarize`? You type `/help` and realize you've been using Claude Code for months but only know 2-3 commands. You're flying blind through a feature-rich system. Most developers never learn the full command set and waste hours restarting sessions or working with degraded performance. This module gives you the complete picture — every verified slash command, when to use it, and how they fit together into efficient workflows.
+You type `/` and a wall of names scrolls past — some built into Claude Code, some skills a teammate installed, some plugins you forgot you enabled. You need `/compact`, but is it `/compact` or `/context`? Meanwhile your team keeps pasting the same "review this diff for security issues" prompt into every session. Both problems have the same fix: know the built-in command surface, and turn your own repeated prompts into commands your whole team gets for free from git.
 
 ---
 
-## 2. CONCEPT — Core Ideas
+## 2. CONCEPT — Three Kinds of `/`
 
-### What Are Slash Commands?
+Everything that starts with `/` falls into one of three buckets:
 
-**Slash commands** are built-in commands that start with `/` and control Claude Code's behavior during a session. Unlike your regular prompts (which ask Claude to do work), slash commands change the session state, display information, or trigger system-level actions.
+| Kind | Where it lives | Invoked as |
+|---|---|---|
+| **Built-in** | Shipped with Claude Code | `/context`, `/compact`, `/model`, … |
+| **Custom command** | `.claude/commands/<name>.md` (project, committed) or `~/.claude/commands/<name>.md` (personal, all projects) | `/name` |
+| **Skill / plugin** | `.claude/skills/<name>/SKILL.md`; plugin skills load as `<plugin>:<skill>` | `/name`, or Claude auto-invokes it |
 
-Think of them as the control panel for your AI session. Regular prompts are what you want built. Slash commands are how you maintain the building environment.
+Custom commands and skills overlap on purpose: "A file at `.claude/commands/deploy.md` and a skill at `.claude/skills/deploy/SKILL.md` both create `/deploy` and work the same way." A subdirectory namespaces the command: `.claude/commands/frontend/component.md` becomes `/frontend:component`. If a skill and a command file share a name, the skill runs.
 
-### Command Categories
+### Frontmatter a command can set
 
-Claude Code's slash commands fall into three main categories:
+| Field | Meaning |
+|---|---|
+| `description` | What it does; Claude reads this to decide when to invoke it itself |
+| `argument-hint` | Autocomplete hint, e.g. `"<issue-number>"` |
+| `allowed-tools` | Pre-approve tools for *this invocation only*, `Tool(pattern)` syntax |
+| `model` | Override the session model while this command runs |
+| `disable-model-invocation` | `true` — only you can run it, never Claude on its own |
 
-| Category | Purpose | Commands |
-|----------|---------|----------|
-| **Context Management** | Control conversation history and memory | `/compact`, `/clear`, `/context` |
-| **Information** | Inspect session state and costs | `/help`, `/cost`, `/status`, `/stats` |
-| **Project Setup** | Initialize project-specific configuration | `/init`, `/memory`, `/add-dir` |
-| **Model & Config** | Switch models and settings | `/model`, `/config`, `/theme`, `/statusline`, `/vim` |
-| **Session Management** | Navigate and manage sessions | `/resume`, `/rename`, `/export`, `/copy` |
-| **Diagnostics** | Troubleshoot and report issues | `/doctor`, `/bug`, `/debug` |
+Inside the body: `$ARGUMENTS` is everything typed after the command name; `$0`, `$1`, `$2`… are positional pieces of it. `` !`command` `` runs a shell command before your prompt reaches Claude and substitutes its output — but "a failed command aborts the entire invocation," so append `|| true` when failure is expected. `@file` references a file's contents inline.
 
-### The Decision Tree
+### Built-in commands worth knowing by heart
 
-When should you use each command? Here's the mental model:
+| Group | Commands |
+|---|---|
+| **Session** | `/clear` (fresh conversation, keeps memory) · `/compact [instructions]` (summarize to free context) · `/context` (colored grid of what's using space) · `/resume` (reopen a past session) · `/rewind` (roll code/conversation back to a checkpoint) |
+| **Config** | `/model` (switch model) · `/effort` (low…xhigh reasoning) · `/permissions` (allow/ask/deny rules) · `/config` (theme, output style, settings) · `/memory` (edit CLAUDE.md, toggle auto memory) |
+| **Extend** | `/agents` (create/manage subagents) · `/hooks` (view hook config) · `/mcp` (MCP server connections) · `/plugin` (install/enable/disable plugins) · `/skills` (list and toggle skill visibility) |
+| **Account** | `/login` / `/status` (version, model, account, connectivity) · `/usage` (session cost, plan limits — `/cost` and `/stats` are aliases) · `/doctor` (setup checkup, can fix issues) |
 
-```mermaid
-graph TD
-    A[Problem?] --> B{Session feels slow?}
-    A --> C{Starting new topic?}
-    A --> D{Want to check spending?}
-    A --> E{New project setup?}
-    A --> F{Forgot what commands exist?}
-
-    B -->|Yes| G["/compact"]
-    C -->|Yes, unrelated to current work| H["/clear"]
-    D -->|Yes| I["/cost"]
-    E -->|Yes| J["/init"]
-    F -->|Yes| K["/help"]
-
-    G --> L[Continue working with freed context]
-    H --> M[Fresh start, all context erased]
-    I --> N["Review usage, decide if need /compact"]
-    J --> O[CLAUDE.md created, configure project]
-    K --> P[See all available commands]
-```
-
-### The /compact Lifecycle (Most Important)
-
-The `/compact` command is your most critical tool for long sessions. Here's how it works:
-
-**What it does:**
-- Summarizes the conversation history up to this point
-- Compresses verbose exchanges into concise summaries
-- Frees up context window space for new work
-- Preserves key decisions, architectural choices, and important code snippets
-
-**When to use it:**
-- Every 30-40 minutes in active sessions
-- Before starting a new sub-task within the same project
-- When you notice responses becoming less precise or slower
-- When `/cost` shows you're approaching token limits
-
-**What it preserves vs. summarizes:**
-- ✅ Preserves: Recent decisions, active file contents, key architectural choices
-- 📝 Summarizes: Step-by-step implementation details, verbose explanations, redundant exchanges
-- ⚠️ May lose: Exact wording of earlier code snippets, nuanced reasoning from early in session
-
-**Pro tip:** `/compact` is not destructive — it's more like "save and compress" than "delete". Use it liberally. The only downside is losing some verbatim detail from earlier exchanges.
-
-### Custom Slash Commands
-
-Claude Code supports custom slash commands via Markdown files in the `.claude/commands/` directory:
-
-Project commands live in `.claude/commands/<name>.md` and are invoked as `/<name>`.
-User commands live in `~/.claude/commands/<name>.md` (available in every project) and are
-also invoked as `/<name>`.
-
-**Project-level commands** (shared with team via git):
-```text
-.claude/commands/review.md     → appears as /review
-.claude/commands/test.md       → appears as /test
-```
-
-**User-level commands** (available in all projects):
-```text
-~/.claude/commands/my-prompt.md  → appears as /my-prompt
-```
-
-**Example:** Create a reusable code review command:
-
-```markdown
-<!-- .claude/commands/review.md -->
-Review the current changes with focus on:
-1. Security vulnerabilities
-2. Performance bottlenecks
-3. Error handling completeness
-4. Test coverage gaps
-
-Use the project's coding conventions from CLAUDE.md.
-```
-
-Now type `/review` in any REPL session to invoke it. Custom commands can also use the `$ARGUMENTS` placeholder to accept parameters.
+Skills like `/deploy` are a natural next step once a command file grows a supporting script or reference doc commands can't hold (Module 15.3).
 
 ---
 
 ## 3. DEMO — Step by Step
 
-Let's walk through a realistic long coding session using every verified slash command.
+Working directory: `~/cc-lab`.
 
-**Scenario:** You're building a new REST API service. This is your first time working on this project, and you expect the session to run 60+ minutes.
+**Step 1: Type `/` and look at what's actually offered**
 
+```text
+# Output may vary — this list is whatever skills/plugins/commands you have installed
+❯ /
+  …                                                       … (redacted — your own installed skill)
+  …                                                       … (redacted — your own installed skill)
+  …                                                       … (redacted — your own installed skill)
+  …                                                       … (redacted — your own installed skill)
+```
+The popup is short and scrollable — press `↓` to page through the rest, including every built-in command from the table above, alphabetically.
+
+**Step 2: `/help` for the quick reference**
+
+```text
+# Output may vary
+❯ /help
+   Help  General   Commands   Custom commands
+   Claude understands your codebase, makes edits with your permission, and executes commands.
+   New here? Run /powerup to learn the features most people miss.
+   Shortcuts
+   ! for shell mode          double tap esc to clear input      ctrl + shift + _ to undo
+   / for commands            shift + tab to auto-accept edits    ctrl + z to suspend
+   @ for file paths          ctrl + o for verbose output         ctrl + v to paste images
+   /btw for side question    ctrl + t to toggle tasks            opt + p to switch model
+   Esc to cancel
+```
+The **Commands** tab lists every built-in; **Custom commands** lists skills and `.claude/commands/` files, tagged with their source.
+
+**Step 3: Write a project command with an argument and a pre-run check**
+
+```markdown
+<!-- .claude/commands/review-file.md -->
+---
+description: Review a file against its current git diff
+argument-hint: "<path>"
+allowed-tools: Read, Bash(git diff *)
 ---
 
-**Step 1: Start session and check available commands**
+Diff stat for context:
 
+!`git diff --stat`
+
+Review the file at $1. Flag bugs, missing error handling, and missing tests.
+```
+`allowed-tools` pre-approves the `!` block; it does not pre-approve anything Claude decides to do afterward.
+
+**Step 4: Run it**
+
+```text
+# Output may vary — real run against a one-line uncommitted change to src/math.js
+❯ /review-file src/math.js
+⏺ Review: src/math.js
+  What changed: you added one line, subtract(a, b), at src/math.js:3.
+  Bugs
+  1. divide doesn't guard against division by zero (src/math.js:2, existing
+     code). divide(1, 0) returns Infinity with no error…
+  Missing tests
+  3. subtract (the new function) has no test…
+```
+Claude also asked to run `npm test`, which is outside `Bash(git diff *)` — proof that `allowed-tools` covers exactly the pattern you listed, nothing more.
+
+**Step 5: Namespace a command in a subdirectory**
+
+```markdown
+<!-- .claude/commands/frontend/component.md -->
+---
+description: Scaffold a new frontend component with a matching test file
+argument-hint: "<ComponentName>"
+---
+
+Create a new component named $1 under src/components/, plus a matching test file.
+```
+
+```text
+# Output may vary
+❯ /frontend
+  /frontend:component                                    Scaffold a new frontend component with a matching test file (project)
+  …                                                       (redacted — your own installed skill)
+```
+The `(project)` tag confirms it came from `.claude/commands/`, and the subdirectory became the namespace prefix.
+
+**Step 6: Clean up**
 ```bash
-$ claude
+git -C ~/cc-lab checkout -- . && git -C ~/cc-lab clean -fd
 ```
-
-You're in the session. First, see what's available:
-
-```text
-/help
-```
-
-Expected output:
-```text
-Available commands:
-  /help     - Show this help message
-  /compact  - Compress conversation history to free context space
-  /clear    - Clear all conversation history and start fresh
-  /cost     - Show token usage and estimated cost for this session
-  /init     - Initialize CLAUDE.md for current project
-
-Type a command or describe what you want to build.
-```
-
-**Why this matters:** You now have a reference. Bookmark this mentally — `/help` is your lifeline when you forget syntax.
-
----
-
-**Step 2: Initialize project configuration**
-
-You're starting fresh on a new project. Set up project memory:
-
-```text
-/init
-```
-
-Expected output:
-```text
-Creating CLAUDE.md in current directory...
-
-I've created a starter CLAUDE.md file. Let me open it so we can configure
-it for your project.
-
-[CLAUDE.md opens with template content]
-
-What kind of project is this? I'll help you customize the configuration.
-```
-
-**Why this matters:** You're setting up project-specific context early. Claude will now remember your stack, conventions, and constraints across sessions.
-
----
-
-**Step 3: Work for 20 minutes, then check token usage**
-
-You've implemented the first two API endpoints. Time to check cost:
-
-```text
-/cost
-```
-
-Expected output:
-```text
-Session Token Usage:
-  Input tokens:  12,847
-  Output tokens:  8,392
-  Total tokens:  21,239
-
-Estimated cost: $0.18
-Context window: ~21% full
-
-💡 Tip: Context is healthy. Continue working normally.
-```
-
-**Why this matters:** You now know your burn rate. You're fine to continue without compacting yet.
-
----
-
-**Step 4: Work another 20 minutes, quality feels degraded — compress context**
-
-You're 40 minutes in. Responses feel slightly less precise. Check cost again, then compact:
-
-```text
-/cost
-```
-
-Expected output:
-```text
-Session Token Usage:
-  Input tokens:  38,291
-  Output tokens: 24,103
-  Total tokens:  62,394
-
-Estimated cost: $0.52
-Context window: ~62% full
-
-⚠️ Consider using /compact to free context space.
-```
-
-Now compact:
-
-```text
-/compact
-```
-
-Expected output:
-```text
-Compacting conversation history...
-
-✓ Compressed 62,394 tokens → 18,203 tokens (71% reduction)
-✓ Preserved:
-  - Current CLAUDE.md configuration
-  - API endpoint implementations (users, products)
-  - Database schema decisions
-  - Error handling patterns
-
-You can continue working. Context window freed.
-```
-
-**Why this matters:** You just got ~44k tokens back. You can work another 30-40 minutes before needing to compact again.
-
----
-
-**Step 5: Finish API work, switch to completely different task — clear context**
-
-The API is done. Now you need to work on a React dashboard (totally different codebase). Clear everything:
-
-```text
-/clear
-```
-
-Expected output:
-```text
-Are you sure you want to clear all conversation history? This cannot be undone.
-Type 'yes' to confirm, or anything else to cancel.
-```
-
-```text
-yes
-```
-
-Expected output:
-```text
-✓ Conversation history cleared.
-✓ Context window reset.
-
-Starting fresh. What would you like to work on?
-```
-
-**Why this matters:** You've completely reset. No API context will bleed into your dashboard work. Clean mental slate for both you and Claude.
 
 ---
 
 ## 4. PRACTICE — Try It Yourself
 
-### Exercise 1: Session Marathon
+### Exercise 1: `/fix-issue`
 
-**Goal:** Experience the full lifecycle of context management in a long session.
+**Goal**: Write `.claude/commands/fix-issue.md` that takes an issue number and pre-loads the issue body.
 
-**Instructions:**
-1. Start a new Claude session
-2. Pick a meaty task (multi-file refactoring, new feature, bug investigation)
-3. Work for 10 minutes, then run `/cost` — note the token count
-4. Work another 10 minutes, run `/cost` again — observe growth rate
-5. Continue working until `/cost` warns you or responses feel slower
-6. Run `/compact` and note the token reduction
-7. Continue working for another 20 minutes
-8. Run `/cost` one final time — compare to pre-compact numbers
-
-**Expected result:**
-- You should see token reduction of 60-80% after `/compact`
-- Responses should feel crisper after compacting
-- You should develop an intuition for when compaction is needed (the "sluggish" feeling)
+**Instructions**: Use `$1` for the number and `` !`gh issue view $1` `` to inject the issue before Claude reads your instructions.
 
 <details>
 <summary>💡 Hint</summary>
-
-Most developers wait too long to compact. If you're doing complex work, compact every 30 minutes even if responses still feel OK — it's preventative maintenance.
-
+The `!` block needs its own permission. Pre-approve it in frontmatter.
 </details>
 
 <details>
 <summary>✅ Solution</summary>
 
-There's no single "correct" answer here — the goal is to internalize the rhythm. But here's a typical pattern:
-
-- 0-10 min: ~8k tokens
-- 10-20 min: ~18k tokens (growth rate high, lots of code generation)
-- 20-30 min: ~32k tokens (context warning threshold on some models)
-- After `/compact`: ~12k tokens (preserves recent work, summarizes early exploration)
-- 30-50 min post-compact: ~28k tokens
-- **Key insight:** Without compacting, you'd have hit limits around 35 minutes. With compacting, you can work 60+ minutes continuously.
-
-</details>
-
+```markdown
+---
+description: Investigate and fix a GitHub issue
+argument-hint: "<issue-number>"
+allowed-tools: Bash(gh issue view *)
 ---
 
-### Exercise 2: Fresh Start Protocol
+Issue #$1:
 
-**Goal:** Understand the difference between `/compact` (summarize) and `/clear` (reset).
+!`gh issue view $1`
 
-**Instructions:**
-1. Start a session, implement a small feature (e.g., validation function)
-2. Run `/compact`
-3. Ask Claude "What did we just build?" — note the response
-4. Now run `/clear` and confirm
-5. Ask Claude "What did we just build?" again
-
-**Expected result:**
-- After `/compact`: Claude remembers the validation function (summarized)
-- After `/clear`: Claude has no idea, context fully reset
-
-<details>
-<summary>💡 Hint</summary>
-
-Use `/compact` when switching sub-tasks within the same project. Use `/clear` only when switching to a completely unrelated project or when you want to eliminate all prior context (rare).
-
+Read the issue above, find the relevant code, and propose a fix.
+```
 </details>
+
+### Exercise 2: Command outgrows its file
+
+**Goal**: Decide when `.claude/commands/deploy.md` should become `.claude/skills/deploy/SKILL.md` instead.
+
+**Instructions**: A command file can't ship a supporting script or a reference doc alongside it — a skill directory can. Once your command needs a second file, move it. See Module 15.3 for the skill directory layout.
 
 <details>
 <summary>✅ Solution</summary>
-
-**After /compact:**
-```text
-You: What did we just build?
-
-Claude: We implemented an email validation function with regex pattern matching,
-custom error messages, and edge case handling for plus-addressing and
-internationalized domains.
-```
-
-**After /clear:**
-```text
-You: What did we just build?
-
-Claude: I don't have any context about what we built previously. The conversation
-history was cleared. What would you like to work on?
-```
-
-This demonstrates that `/compact` is lossy summarization, while `/clear` is total amnesia.
-
+If `deploy.md` starts saying "see the checklist below" and the checklist keeps growing, split it into `SKILL.md` (short) plus `checklist.md` (loaded only when needed) — same `/deploy` invocation, lower context cost per turn.
 </details>
+
+### Exercise 3: `/compact` vs `/clear`
+
+**Goal**: Confirm the difference between summarizing and erasing.
+
+**Instructions**: Implement something small, run `/compact`, ask "what did we just build?" Then run `/clear` and ask again.
+
+**Expected result**: After `/compact`, Claude answers from the summary. After `/clear`, Claude has nothing — `/clear` starts a new conversation while keeping project memory (CLAUDE.md), not the conversation history.
 
 ---
 
 ## 5. CHEAT SHEET
 
-### All Verified Commands
+| Command | Purpose |
+|---|---|
+| `/clear` | New conversation, keeps CLAUDE.md |
+| `/compact [instructions]` | Summarize now, optionally with a focus |
+| `/context [all]` | Colored grid of context usage |
+| `/resume` | Reopen a session |
+| `/branch` | Fork the conversation, keep the original |
+| `/rewind` | Roll code/conversation back |
+| `/model` | Switch model |
+| `/effort` | Set reasoning effort |
+| `/permissions` | Allow/ask/deny rules |
+| `/config` | Theme, output style, settings |
+| `/memory` | Edit CLAUDE.md, toggle auto memory |
+| `/agents` | Manage subagents |
+| `/hooks` | View hook config |
+| `/mcp` | Manage MCP connections |
+| `/plugin` | Install/enable/disable plugins |
+| `/skills` | List and toggle skills |
+| `/skill-doctor` | Skill context-cost report |
+| `/login` / `/logout` | Account |
+| `/usage` | Cost, plan limits (`/cost`, `/stats` = aliases) |
+| `/status` | Version, model, connectivity |
+| `/doctor` | Setup checkup, can fix issues |
+| `/bug` / `/feedback` | Report a bug / send feedback |
 
-#### Context & Memory
+**Custom command syntax**
 
-| Command | What It Does | When to Use |
-|---------|--------------|-------------|
-| `/help` | List all available slash commands | When you forget syntax |
-| `/compact` | Compress conversation history | Every 30-40 min, or when responses degrade |
-| `/compact [focus]` | Compact with instruction to preserve specific context | `/compact Preserve the auth decisions and API list` |
-| `/clear` | Erase ALL conversation history | Switching to unrelated project |
-| `/cost` | Show token usage and estimated cost | Every 20-30 min to track spending |
-| `/init` | Initialize CLAUDE.md for project | First time on a new project |
-| `/memory` | Edit CLAUDE.md memory files | Update project memory mid-session |
-| `/context` | Show visual context usage grid | See exactly how full your context window is |
-| `/add-dir` | Add directories to working context | Expand the files Claude can see |
+| File | Invoked as |
+|---|---|
+| `.claude/commands/<name>.md` | `/name` |
+| `.claude/commands/<subdir>/<name>.md` | `/subdir:name` |
+| `~/.claude/commands/<name>.md` | `/name` (every project) |
 
-#### Model & Configuration
-
-| Command | What It Does | When to Use |
-|---------|--------------|-------------|
-| `/model` | Switch AI model; use arrows to adjust effort | Change between Haiku/Sonnet/Opus mid-session |
-| `/config` | Open settings interface | Adjust session or global settings |
-| `/permissions` | View/update tool permissions | Check or change what tools are allowed |
-| `/theme` | Change color theme | Customize appearance |
-| `/statusline` | Configure status line UI | Customize bottom status bar |
-| `/vim` | Enable/configure vim mode | For vim users |
-| `/terminal-setup` | Install terminal keybindings | Enable Shift+Enter for multi-line input |
-
-#### Session Management
-
-| Command | What It Does | When to Use |
-|---------|--------------|-------------|
-| `/resume` | Resume session or show picker | Return to a previous conversation |
-| `/rename <name>` | Rename current session | Give meaningful names to important sessions |
-| `/rewind` | Rewind conversation/code changes | Undo recent messages |
-| `/export [file]` | Export conversation to file/clipboard | Save session for documentation |
-| `/copy` | Copy last assistant response | Quick copy to clipboard |
-| `/tasks` | List/manage background tasks | Monitor parallel operations |
-| `/todos` | List current TODO items | Check pending items |
-
-#### Diagnostics
-
-| Command | What It Does | When to Use |
-|---------|--------------|-------------|
-| `/status` | Show version, model, account info | Quick session overview |
-| `/stats` | Show daily usage and streaks | Track your productivity |
-| `/doctor` | Check installation health | Diagnose setup issues |
-| `/bug` | Report a bug | Send feedback to Anthropic |
-| `/debug` | Troubleshoot session with debug log | Investigate session problems |
-
-### Pro Combos
-
-Combine commands for powerful workflows:
-
-| Combo | Workflow | Use Case |
-|-------|----------|----------|
-| `/cost` → `/compact` | Check token usage, then compress if needed | Preventative maintenance every 30 min |
-| `/clear` → `/init` → work | Full reset, configure new project, start fresh | Switching projects mid-day |
-| `/compact` → continue → `/cost` | Compact, work more, verify token reduction | Long sessions (60+ min) |
-| `/help` → try command → `/cost` | Learn new command, test it, check impact | Experimentation mode |
+**Related shortcuts**: `/` opens the menu, keep typing to filter · `Tab`/arrows navigate · `!` at line start = shell mode · `@` = file-path autocomplete · `?` on empty input = shortcut help panel.
 
 ---
 
 ## 6. PITFALLS — Common Mistakes
 
 | ❌ Mistake | ✅ Correct Approach |
-|-----------|---------------------|
-| Using `/clear` when you meant `/compact` — losing all context when you just needed compression | Use `/clear` ONLY for unrelated new projects. Use `/compact` for same-project sub-tasks. |
-| Never compacting until context is 100% full and responses are slow | Compact proactively every 30-40 min. It's free, fast, and prevents degradation. |
-| Never checking `/cost` until the end of session | Run `/cost` every 20-30 min. Develop intuition for token burn rate. Catch expensive patterns early. |
-| Assuming `/compact` keeps verbatim code from 30 minutes ago | `/compact` summarizes. If you need exact code, save it to a file or CLAUDE.md before compacting. |
-| Using `/clear` for every sub-task (e.g., after implementing each function) | `/clear` destroys context. Only use it when switching to a COMPLETELY different project. For sub-tasks, just continue or use `/compact`. |
-| Ignoring `/init` for new projects, then wondering why Claude forgets your stack across sessions | Always `/init` on new projects. CLAUDE.md is persistent memory. Slash commands are session memory. |
+|---|---|
+| Prefixing a command name with the old `project` / `user` scope + colon namespace | That namespace is gone. It's just `/name`, or `/subdir:name` when the command lives in a subdirectory. |
+| Hand-typing what `/help` or `/usage` "probably" prints | Run it for real in your lab and paste the actual output — it changes across versions. |
+| A `!` block with a command that can legitimately fail | Append `\|\| true`, since a failed command aborts the whole invocation, not just that line. |
+| A command with side effects (`/deploy`, `/commit`) left invocable by Claude itself | Set `disable-model-invocation: true` so only you can trigger it. |
+| Reaching for `/pr-comments` | Removed in v2.1.91. Ask Claude directly to view pull request comments instead. |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
-**Scenario:** A senior backend engineer at a Vietnamese fintech startup was refactoring a payment microservice — 8 hours of work touching 30+ files across authentication, transaction processing, and reconciliation logic.
+A backend team at a Vietnamese fintech kept three prompts alive only in Slack: "review this diff for auth bugs," "draft the changelog entry," and "investigate issue #N." New hires never found them. The team committed three files to `.claude/commands/`: `review-file.md`, `ship-notes.md`, and `fix-issue.md`, each with an `argument-hint` and a pre-run `!` block pulling the relevant diff or issue.
 
-**Problem:** Before learning slash commands, his workflow was brutal: work for 45 minutes, notice degraded responses, restart Claude entirely, re-explain context for 10 minutes, work another 45 minutes, repeat. Four forced restarts per day. He estimated he lost 90 minutes daily just to context resets.
-
-**Solution:** After this module, he implemented a slash command discipline:
-- `/init` at project start (CLAUDE.md captured service architecture)
-- `/cost` every 20 minutes (set a timer)
-- `/compact` every 40 minutes or when `/cost` showed >50% context usage
-- `/clear` only when switching to a different service
-
-**Result:**
-- Zero forced restarts in an 8-hour session
-- Token usage dropped 30% (compacting freed space, no redundant re-explanations)
-- Subjective quality improvement: "Responses stayed sharp all day. The difference between sprinting with rest stops vs. running until you collapse."
-
-His team now includes slash command discipline in their onboarding docs: "If you're not using `/compact` every 30 minutes, you're doing it wrong."
+Result: every teammate got the same three commands the moment they cloned the repo — no onboarding doc, no copy-pasted prompt. When `fix-issue.md` grew a second file (a triage checklist), they promoted it to a skill under `.claude/skills/fix-issue/`, keeping the same `/fix-issue` name their muscle memory already knew.
 
 ---
 
