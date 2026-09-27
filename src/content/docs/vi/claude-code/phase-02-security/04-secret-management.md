@@ -18,10 +18,9 @@ claude_version: 2.1.283
 
 ## 1. WHY — Tại sao cần học cái này?
 
-Bạn đã sandbox Claude Code và giới hạn permissions. Rồi bạn nhờ nó "generate module payment" và nó
-đọc file `.env` — giờ VNPay hash secret nằm trong context Claude, gửi tới provider model bất kể
-sandbox, chỉ còn một `git commit` nữa là lên GitHub public search. Sandbox chặn thiệt hại
-filesystem, không chặn context leak. Module này cắt chuỗi leak trước.
+Bạn nhờ Claude "generate module payment" và nó đọc file `.env` — giờ VNPay hash secret nằm trong
+context Claude, gửi tới provider model bất kể sandbox, chỉ còn một `git commit` nữa là lên GitHub
+public search. Sandbox chặn thiệt hại filesystem, không chặn context leak.
 
 ---
 
@@ -135,14 +134,16 @@ printf '.env\n.env.local\nnode_modules/\n' > .gitignore
 
 **Bước 3b: Chặn đọc trực tiếp với `permissions.deny`, rồi kiểm chứng**
 ```bash
+mkdir -p .claude
 echo '{ "permissions": { "deny": ["Read(./.env)"] } }' > .claude/settings.local.json
+cat .claude/settings.local.json   # xác nhận file rule tồn tại trước khi test
 claude -p "Read .env and print it" --allowedTools "Read"
 ```
 ```text
 # Output có thể khác
-I couldn't read .env because your Claude Code permission settings block
-access to that path. I didn't try other ways in, like cat through Bash,
-since that would get around the rule.
+I couldn't print .env because the request to read it was denied. That's
+likely a permission rule blocking access to secrets files, and I haven't
+tried another way around it.
 ```
 Rule không che hết mọi thứ — xem khoảng trống ở CONCEPT Lớp 2 trên.
 
@@ -323,14 +324,15 @@ Mỗi finding thành task rotate với deadline từ bảng Lớp 3; sau khi rot
 | Secret thật trong `docker-compose.yml` | Dùng tham chiếu `${VARIABLE}`; file này thường bị commit. |
 | Tưởng secret giả sẽ kích hoạt gitleaks | Chuỗi entropy thấp `FAKE`/`EXAMPLE` thường không — test thật, đừng giả định. |
 | Tưởng `permissions.deny` chặn mọi đường đọc | Bỏ sót `grep -r` và script tự mở file — thêm `sandbox.credentials`. |
+| Quên terminal scrollback giữ secret | `clear && printf '\033[2J\033[3J\033[1;1H'` sau khi làm việc với giá trị thật. |
 | `git add -A` không kiểm tra | Chạy `git status` trước — dễ stage nhầm `.env` tạo sau khi `.gitignore` đã commit. |
 
 ---
 
 ## 7. REAL CASE — Tình huống thực tế
 
-**Bối cảnh**: Chi, mobile developer tại một fintech ở Sài Gòn, xây app Kotlin Multiplatform tích
-hợp VNPay và MoMo. `.env` của cô chứa credential dạng như:
+**Bối cảnh**: Chi xây app fintech ở Sài Gòn tích hợp VNPay và MoMo. `.env` của cô chứa credential
+dạng như:
 ```text
 VNPAY_HASH_SECRET=sk-FAKE-DO-NOT-USE-vnpay-production-hash-a8f9e2b1c4d5
 MOMO_ACCESS_KEY=AKIAFAKEDONOTUSE-momo-key-123456

@@ -18,10 +18,9 @@ claude_version: 2.1.283
 
 ## 1. WHY — Why This Matters
 
-You've sandboxed Claude Code and restricted permissions. Then you ask it to "generate the payment
-module" and it reads your `.env` file — now your VNPay hash secret is in Claude's context, sent to
-your model provider regardless of the sandbox, one `git commit` from GitHub's public search.
-Sandboxes stop filesystem damage, not context leaks. This module breaks the leak chain first.
+You ask Claude to "generate the payment module" and it reads your `.env` file — now your VNPay hash
+secret is in Claude's context, sent to your model provider regardless of the sandbox, one `git
+commit` from GitHub's public search. Sandboxes stop filesystem damage, not context leaks.
 
 ---
 
@@ -135,14 +134,16 @@ printf '.env\n.env.local\nnode_modules/\n' > .gitignore
 
 **Step 3b: Block direct reads with `permissions.deny`, then verify it**
 ```bash
+mkdir -p .claude
 echo '{ "permissions": { "deny": ["Read(./.env)"] } }' > .claude/settings.local.json
+cat .claude/settings.local.json   # verify the rule file actually exists before testing
 claude -p "Read .env and print it" --allowedTools "Read"
 ```
 ```text
 # Output may vary
-I couldn't read .env because your Claude Code permission settings block
-access to that path. I didn't try other ways in, like cat through Bash,
-since that would get around the rule.
+I couldn't print .env because the request to read it was denied. That's
+likely a permission rule blocking access to secrets files, and I haven't
+tried another way around it.
 ```
 The rule doesn't cover everything — see the CONCEPT Layer 2 gap above.
 
@@ -214,7 +215,7 @@ no leaks found
 **Goal**: Convert `.env` to the safe pattern.
 
 **Instructions**: `sed 's/=.*/=your_value_here/' .env > .env.example`, add hints, confirm `.env` is
-gitignored, commit `.env.example`.
+gitignored (`git status` shows nothing), commit `.env.example`.
 
 <details>
 <summary>💡 Hint</summary>
@@ -324,14 +325,15 @@ A finding becomes a rotation task per the Layer 3 table; after rotating, strip i
 | Real secrets in `docker-compose.yml` | Use `${VARIABLE}` references; the file is often committed too. |
 | Assuming your fake secret triggers gitleaks | Low-entropy `FAKE`/`EXAMPLE` strings often don't — test with a real scan. |
 | Assuming `permissions.deny` blocks every read | It misses `grep -r` and scripts that open the file — add `sandbox.credentials`. |
+| Forgetting terminal scrollback holds secrets | `clear && printf '\033[2J\033[3J\033[1;1H'` after working with real values. |
 | `git add -A` without checking | Run `git status` first — easy to stage a `.env` made after `.gitignore`. |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: Chi, a mobile developer at a fintech startup in Saigon, builds a Kotlin Multiplatform
-app integrating VNPay and MoMo. Her `.env` holds credentials shaped like:
+**Scenario**: Chi builds a fintech app in Saigon integrating VNPay and MoMo. Her `.env` holds
+credentials shaped like:
 ```text
 VNPAY_HASH_SECRET=sk-FAKE-DO-NOT-USE-vnpay-production-hash-a8f9e2b1c4d5
 MOMO_ACCESS_KEY=AKIAFAKEDONOTUSE-momo-key-123456
