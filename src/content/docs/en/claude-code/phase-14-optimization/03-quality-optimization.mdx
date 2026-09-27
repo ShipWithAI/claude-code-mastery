@@ -1,6 +1,8 @@
 ---
 title: 'Quality Optimization'
-description: 'Improve Claude Code output quality with configuration techniques and quality/speed tradeoff strategies.'
+description: 'Replace the "reason it through out loud" habit with a real quality gate — hooks, a fresh-context reviewer subagent, and output styles.'
+verified: 2026-09-27
+claude_version: 2.1.283
 ---
 
 # Module 14.3: Quality Optimization
@@ -9,266 +11,267 @@ description: 'Improve Claude Code output quality with configuration techniques a
 >
 > **Prerequisite**: Module 14.2 (Speed Optimization)
 >
-> **Outcome**: After this module, you will know techniques to improve Claude Code output quality, understand quality/speed tradeoffs, and configure Claude for high-quality results.
+> **Outcome**: After this module, you can wire a deterministic quality gate — a `PostToolUse`
+> lint hook, a `Stop` test hook, and a fresh-context reviewer subagent — instead of asking Claude
+> to reason out loud and hoping.
 
 ---
 
 ## 1. WHY — Why This Matters
 
-Claude produces code quickly, but it's not quite right. Variable names don't match your conventions. Error handling is missing. It works but doesn't fit your architecture. You spend 30 minutes fixing what Claude generated — defeating the purpose.
+Claude ships code fast. It's not quite right: a missing edge case, a lint violation, a design
+choice that doesn't survive review. You catch it in code review — after the fact, by hand, every
+time. That's not a quality strategy, it's a tax you pay per pull request.
 
-Quality optimization ensures Claude's output is production-ready from the start. Less fixing, more shipping. The time invested in setup pays off on every task.
+A gate that runs the same way every time, without you asking, beats any prompt phrasing.
 
 ---
 
 ## 2. CONCEPT — Core Ideas
 
-### Quality Dimensions
+> "Give Claude a check it can run: tests, a build, a screenshot to compare." (S1)
 
-| Dimension | Low Quality | High Quality |
-|-----------|-------------|--------------|
-| **Correctness** | Has bugs | Works correctly |
-| **Standards** | Generic patterns | Matches your style |
-| **Architecture** | Tightly coupled | Clean separation |
-| **Robustness** | Happy path only | Error handling |
-| **Maintainability** | Hard to change | Easy to extend |
+Verification is one of three kinds: "rules-based, visual, or LLM as judge" (S7). A lint rule is
+rules-based; a screenshot diff is visual; a subagent reading a diff is LLM-as-judge — and it only
+works with a fresh context, since "the agent that wrote the code has no way to approve it" (S3)
+and same-session self-review tends toward "confident praising" over real criticism (S12).
 
-### Quality Levers
-
-```text
-CLAUDE.md Setup      → Establishes standards upfront
-Examples             → Show, don't just tell
-Think Mode           → Better reasoning for complex tasks
-Iterative Refinement → Review and improve
-Explicit Constraints → State what you want and don't want
+```mermaid
+graph LR
+    A[Claude edits a file] --> B["PostToolUse hook<br/>lint --fix"]
+    A --> C[Claude finishes responding]
+    C --> D["Stop hook<br/>run tests"]
+    B -.->|fails deterministically, every time| E[Quality gate]
+    D -.-> E
+    F["Fresh-context reviewer subagent"] -.->|different context, not the same session| E
 ```
 
-### The Examples Principle
+Three real levers, in order of how hard they are to skip:
 
-```text
-Without example:
-"Use proper error handling"
-→ Claude guesses what you mean
+- **Hooks** — `PostToolUse` after every edit, `Stop` before Claude can end its turn. Deterministic:
+  "Unlike CLAUDE.md instructions which are advisory, hooks are deterministic and guarantee the
+  action happens" (S1). Module 11.3 covers the mechanics; this module reuses the smallest useful
+  pair.
+- **A reviewer subagent** — a separate `.claude/agents/reviewer.md` with read-only tools, invoked
+  on the diff. It starts with no memory of writing the code, so it reviews it instead of defending
+  it.
+- **`.claude/rules/` and output styles** — `.claude/rules/` holds coding standards Claude reads
+  like any other project file (Module 4.2 covers authoring them); `/output-style
+  Explanatory|Learning|Concise|Proactive` changes how much Claude narrates its own reasoning as it
+  works, which is a different lever from correctness but shapes how easy a change is to review.
 
-With example:
-"Use this error handling pattern:
-try {
-  await operation();
-} catch (error) {
-  logger.error('Operation failed', { error, context });
-  throw new AppError('OPERATION_FAILED', error);
-}"
-→ Claude follows exactly
-```
+None of this replaces reading the diff yourself. It replaces remembering to ask for a lint pass
+and a second opinion on every change.
 
-### Think Mode for Quality
+What doesn't work: telling Claude to reason through it step by step in the prompt. Extended
+thinking is already on by default on current models (Module 6.1) — the phrase doesn't add
+reasoning budget; it's a leftover habit from models that needed the nudge.
 
-Complex tasks benefit from reasoning. Ask Claude to "think step by step" about architecture. Trade speed for better decisions. Use for: design, debugging, refactoring.
-
-### Explicit Constraints
-
-```text
-DO:
-- Use TypeScript strict mode
-- Add JSDoc for public functions
-- Handle null/undefined explicitly
-
-DON'T:
-- Use any type
-- Ignore error cases
-- Use deprecated APIs
-```
+Past "does this look right," a mini-eval beats a vibe: run the same 20-50 real tasks against a
+change, read the transcripts, see what actually breaks (S11) — it catches regressions a single
+manual review won't.
 
 ---
 
 ## 3. DEMO — Step by Step
 
-**Scenario**: Implement a user service with CRUD operations.
+**Step 1: A deterministic lint gate — `PostToolUse`**
 
-### Without Quality Setup
-
-```text
-You: Create a user service with CRUD operations.
-
-Claude: [Generates code]
-```
-
-```javascript
-// user-service.js
-const users = [];
-
-function createUser(data) {
-  const user = { id: Date.now(), ...data };
-  users.push(user);
-  return user;
-}
-
-function getUser(id) {
-  return users.find(u => u.id === id);
-}
-```
-
-**Issues**: No TypeScript, no error handling, in-memory storage, no validation, doesn't match team standards.
-
-### With Quality Setup
-
-**CLAUDE.md includes**:
-- TypeScript strict mode
-- Repository pattern
-- Error handling with custom AppError
-- Zod for validation
-- Example code from existing services
-
-```text
-You: Create a user service following our repository pattern
-with proper validation and error handling.
-
-Think through the design first:
-- What validation rules do we need?
-- What errors could occur?
-- How does this fit our existing services?
-
-Claude: [Thinks through design, then generates]
-```
-
-```typescript
-// src/services/UserService.ts
-import { UserRepository } from '../repositories/UserRepository';
-import { CreateUserSchema } from '../schemas/user';
-import { AppError } from '../errors/AppError';
-import { logger } from '../utils/logger';
-
-export class UserService {
-  constructor(private readonly repository: UserRepository) {}
-
-  async create(data: unknown): Promise<User> {
-    const validated = CreateUserSchema.parse(data);
-
-    const existing = await this.repository.findByEmail(validated.email);
-    if (existing) {
-      throw new AppError('DUPLICATE_EMAIL', 'Email already registered');
-    }
-
-    try {
-      const user = await this.repository.create(validated);
-      logger.info('User created', { userId: user.id });
-      return user;
-    } catch (error) {
-      logger.error('Failed to create user', { error });
-      throw new AppError('CREATE_FAILED', 'Could not create user', error);
-    }
+```json
+// docs: en/hooks — .claude/settings.json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "jq -r '.tool_input.file_path' | xargs npx eslint --fix" }
+        ]
+      }
+    ]
   }
 }
 ```
 
-### Quality Comparison
+Tested directly against the hook's own input, the same way the docs recommend testing a hook
+before trusting it (`hooks-guide`):
 
-| Without Setup | With Quality Setup |
-|---------------|-------------------|
-| JavaScript | TypeScript strict |
-| No validation | Zod schemas |
-| No error handling | Custom errors + logging |
-| Doesn't fit project | Matches existing patterns |
-| Needs rewriting | Production-ready |
+```bash
+echo "{\"tool_input\":{\"file_path\":\"$(pwd)/src/messy.js\"}}" \
+  | jq -r '.tool_input.file_path' | xargs npx eslint --fix
+```
+
+```text
+# Output may vary
+/Users/you/cc-lab/src/messy.js
+  2:9  error  'unused' is assigned a value but never used  no-unused-vars
+
+✖ 1 problem (1 error, 0 warnings)
+```
+
+The missing semicolon got fixed silently; `no-unused-vars` isn't auto-fixable, so it still shows
+up — `PostToolUse` can't block (the edit already happened), but its stderr lands next to the tool
+result so Claude sees the real problem immediately, not at review time.
+
+**Step 2: A gate Claude can't skip — `Stop`**
+
+```json
+// docs: en/hooks
+{
+  "hooks": {
+    "Stop": [
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "npm test" }] }
+    ]
+  }
+}
+```
+
+```bash
+npm test
+```
+
+```text
+# Output may vary
+> cc-lab@1.0.0 test
+> node --test
+# tests 1
+# pass 1
+# fail 0
+```
+
+A failing `Stop` hook exit-2's and Claude keeps working instead of ending the turn — up to 8
+consecutive blocks before Claude Code overrides it, so a genuinely broken test suite can't loop
+forever.
+
+**Step 3: A fresh-context reviewer subagent**
+
+```markdown
+---
+# docs: en/sub-agents — .claude/agents/reviewer.md
+name: reviewer
+description: Reviews a diff for correctness, style, and missed edge cases. Fresh context — never the session that wrote the code.
+tools: Read, Grep, Glob
+model: sonnet
+---
+You are a code reviewer. Read the diff you are given, check it against the
+surrounding code, and report concrete, actionable issues. Do not praise; list
+problems or state there are none.
+```
+
+Invoke it by name so it — not a generic helper — runs the review:
+
+```text
+Use the reviewer subagent on the diff of src/messy.js against HEAD
+```
+
+{/* AUTHOR-CAPTURE: run
+  claude -p "Use the reviewer subagent on the diff of src/messy.js against HEAD
+  (git diff HEAD -- src/messy.js)." --allowedTools "Read,Grep,Glob,Bash(git diff*)"
+  in a clean ~/cc-lab checkout with no third-party plugins installed. In this author's
+  environment, a SubagentStop hook from an installed plugin replaced the reviewer's final
+  message with a generic "Task complete," so the captured transcript wasn't representative
+  of default behavior — re-run in a plain install to get a real reviewer transcript. */}
+
+The subagent gets the diff and the invoking instruction, plus `CLAUDE.md` and git status — not
+your conversation history. Whatever it flags, it flags with no stake in having written the code.
+
+**Step 4: Check the output style**
+
+```text
+/output-style
+```
+
+```text
+# Output may vary
+  Output style: default
+
+     Available styles:
+     - default (current)
+     - Proactive: Claude executes immediately, minimizes interruptions, and prefers action over
+       planning
+     - Concise: Claude responds tersely, leading with results and skipping preamble and narration
+     - Explanatory: Claude explains its implementation choices and codebase patterns
+     - Learning: Claude pauses and asks you to write small pieces of code for hands-on practice
+```
+
+`Explanatory` is worth the extra text during review-heavy weeks — Claude narrates *why*, which is
+exactly what a reviewer needs and a "code only" mode throws away.
 
 ---
 
 ## 4. PRACTICE — Try It Yourself
 
-### Exercise 1: Quality CLAUDE.md
+### Exercise 1: Wire the two-hook gate
 
-**Goal**: Enhance your CLAUDE.md for quality.
+**Goal**: A lint fix and a test run that happen without you asking.
 
 **Instructions**:
-1. Audit your current CLAUDE.md for quality guidance
-2. Add: coding standards, error handling pattern, example code
-3. Test: Generate same feature before/after
-4. Compare quality differences
+1. Add the `PostToolUse` and `Stop` hooks from Step 1–2 to `.claude/settings.local.json`.
+2. Ask Claude to make an edit that breaks a test.
+3. Confirm the turn doesn't end cleanly until the test passes.
 
 <details>
 <summary>💡 Hint</summary>
 
-Include at least one code example for your most important pattern (e.g., error handling, API endpoint structure).
+Check `stop_hook_active` in your own `Stop` hooks if you write more than one — Claude Code
+overrides a hook that blocks 8 times in a row without progress.
 
 </details>
 
 <details>
 <summary>✅ Solution</summary>
 
-Add to CLAUDE.md:
-````markdown
-## Code Quality Standards
-- TypeScript strict mode
-- No `any` type
-- All errors must be handled with AppError
-- Public functions need JSDoc
-
-## Error Handling Example
-```typescript
-try {
-  const result = await operation();
-  return result;
-} catch (error) {
-  logger.error('Operation failed', { error });
-  throw new AppError('OPERATION_FAILED', error);
-}
-```
-````
+A broken test keeps the `Stop` hook exiting 2 and the turn open; Claude sees the failure and
+fixes it before you have to ask — or the 8-block cap kicks in and hands control back to you.
 
 </details>
 
-### Exercise 2: Example-Driven Quality
+### Exercise 2: Write your own reviewer
 
-**Goal**: Use examples to enforce patterns.
+**Goal**: A subagent that reviews your project's most common mistake.
 
 **Instructions**:
-1. Pick a pattern you want Claude to follow
-2. Write one clear example
-3. Add to CLAUDE.md
-4. Test if Claude replicates the pattern
+1. Pick one recurring review comment from your last few PRs.
+2. Write `.claude/agents/reviewer.md` telling it to check specifically for that.
+3. Run it on a real diff and see whether it catches what a human reviewer would.
 
 <details>
 <summary>💡 Hint</summary>
 
-Examples work best when they're real code from your project, not generic samples.
+`tools: Read, Grep, Glob` is enough for a reviewer — it never needs to edit anything.
 
 </details>
 
 <details>
 <summary>✅ Solution</summary>
 
-Pick your most repeated pattern. Extract a clean example. Reference it: "Follow the pattern in the Error Handling Example section."
-
-Claude will match the style, naming, and structure of your example.
+The narrower the reviewer's brief, the more useful it is. "Review everything" produces vague
+output; "check every new database call for a missing index" produces a real finding or a clean
+bill of health.
 
 </details>
 
-### Exercise 3: Think Mode for Design
+### Exercise 3: Build a 20-task mini-eval
 
-**Goal**: Compare direct implementation vs. think-first approach.
+**Goal**: Move past "looks fine to me" for one recurring task type.
 
 **Instructions**:
-1. Pick a complex feature
-2. First: ask Claude to implement directly
-3. Second: ask Claude to think through design, then implement
-4. Compare architectural quality
+1. Collect 20 real examples of a task you give Claude often (e.g., "add an endpoint").
+2. Run each through the same prompt template.
+3. Read every transcript, not just the diffs. Note the pattern in what breaks.
 
 <details>
 <summary>💡 Hint</summary>
 
-Ask: "Think step by step about what could go wrong, what edge cases exist, and how this fits our architecture."
+20-50 real tasks is the range S11 uses — fewer than that and one outlier skews your read.
 
 </details>
 
 <details>
 <summary>✅ Solution</summary>
 
-Think-first typically produces:
-- Better error handling (considers edge cases)
-- Cleaner architecture (considers fit with existing code)
-- More complete implementations (considers full requirements)
-
-Use for features that touch multiple parts of the system.
+Most teams find one or two recurring failure modes, not twenty different ones. Fix the prompt or
+add a hook for those, then re-run the same 20 tasks to confirm it's fixed.
 
 </details>
 
@@ -276,36 +279,14 @@ Use for features that touch multiple parts of the system.
 
 ## 5. CHEAT SHEET
 
-### Quality Levers
-
-| Lever | Effect |
-|-------|--------|
-| CLAUDE.md | Standards and patterns |
-| Examples | Show what you want |
-| Think Mode | Better reasoning |
-| Constraints | DO/DON'T lists |
-| Review Loop | Iterate to improve |
-
-### Quality Prompts
-
-```text
-"Follow our existing patterns in [file]"
-"Think through the design before implementing"
-"Use the same error handling as [example]"
-"Don't use [pattern], use [better pattern] instead"
-```
-
-### CLAUDE.md Quality Template
-
-```markdown
-## Code Quality Standards
-- TypeScript strict mode
-- No `any` type
-- All errors must be handled
-
-## Example Pattern
-[Include actual code example from your project]
-```
+| Lever | What it guarantees |
+|---|---|
+| `PostToolUse` hook (lint `--fix`) | Runs after every edit, every time — advisory prompt text doesn't |
+| `Stop` hook (`npm test`) | Blocks the turn from ending until it passes (cap: 8 consecutive blocks) |
+| `.claude/agents/reviewer.md` | Fresh-context review — no bias toward code it just wrote |
+| `.claude/rules/` | Coding standards Claude reads as project files (Module 4.2) |
+| `/output-style Explanatory` | Claude narrates *why*, useful during review-heavy work |
+| 20-50 task mini-eval (S11) | Replaces "looks right" with "verified on real cases" |
 
 ---
 
@@ -313,36 +294,28 @@ Use for features that touch multiple parts of the system.
 
 | ❌ Mistake | ✅ Correct Approach |
 |---|---|
-| No CLAUDE.md quality guidance | Define standards explicitly |
-| Telling without showing | Include code examples |
-| Accepting first output | Review and iterate |
-| Vague quality requirements | Specific: "use Zod validation" |
-| Ignoring existing patterns | "Follow pattern in [file]" |
-| Never using think mode | Think mode for complex decisions |
-| Speed over quality always | Know when quality matters most |
+| "Think step by step" to raise quality | Extended thinking is already on by default (Module 6.1); the phrase does nothing on current models |
+| Letting the same session review its own diff | Spawn a fresh-context reviewer subagent (S3, S12) |
+| Coding standards only in a prompt or CLAUDE.md | Advisory, not enforced — back them with a `PostToolUse` hook for anything non-negotiable |
+| Accepting the first output with no check to run | Give Claude a test or lint pass it can run against itself (S1) |
+| One glance at a diff as your whole quality process | A 20-50 task mini-eval catches patterns a single review misses (S11) |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: Vietnamese fintech found Claude-generated code had consistent issues: missing error handling, inconsistent naming, no logging. Code reviews caught it, but wasted time.
+**Scenario**: A Hanoi team reviewed every Claude-authored pull request the same way they reviewed
+human ones — a full manual pass, every time, because nothing ran automatically in between.
 
-**Quality Improvement Initiative**:
+**Problem**: The same three issues kept reaching review: an unhandled null case, an inconsistent
+error-logging call, a missing test for the new branch. None of them needed a human to catch.
 
-| Week | Focus | Action |
-|------|-------|--------|
-| 1 | Audit | Reviewed 20 PRs: errors (80%), naming (60%), logging (70%) |
-| 2 | CLAUDE.md | Added patterns with examples for each issue |
-| 3 | Examples | Created /examples folder, one per pattern |
-| 4 | Policy | Think mode required for complex features |
+**Solution**: A `PostToolUse` lint hook for the logging convention, a `Stop` hook that fails the
+turn if `npm test` doesn't pass on the new file, and a `.claude/agents/reviewer.md` scoped
+specifically to null-safety and test coverage, run on every diff before it reached a human.
 
-**Results (4 weeks later)**:
-- Error handling issues: 80% → 10%
-- Naming consistency: 60% → 5%
-- Code review rejections: 40% → 8%
-- Time to production: -30% (less rework)
-
-**Quote**: "We stopped blaming Claude for bad code and started teaching Claude our standards. Quality isn't magic — it's setup."
+**Result**: Reviewers stopped re-finding the same three issues and started reviewing design and
+naming instead — the things a hook and a scoped subagent can't judge for them.
 
 ---
 
