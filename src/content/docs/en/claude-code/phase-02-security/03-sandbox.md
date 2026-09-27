@@ -289,9 +289,9 @@ overrides local settings (Module 10.5).
 | `/sandbox` | Open panel (Mode/Overrides/Config) | Config tab shows resolved rules |
 | `sandbox.enabled` | Turn sandbox on | Config tab non-empty |
 | `allowUnsandboxedCommands: false` | Disable escape hatch | Overrides → "Strict sandbox mode" |
-| `network.allowedDomains` | Pre-approve domains; others prompt | Allowed reaches; others prompt |
-| `network.strictAllowlist: true` | Hard-deny unlisted (user/managed/`--settings`) | `403` / `blocked-by-allowlist` |
-| `filesystem.denyRead` + `permissions.deny: ["Read(path/**)"]` | Block a path for Bash *and* Read | `Operation not permitted`; Read refused, no prompt |
+| `network.allowedDomains` | Pre-approve; others prompt | Allowed reaches, others prompt |
+| `network.strictAllowlist: true` | Hard-deny unlisted (user/managed/`--settings`) | `403 blocked-by-allowlist` |
+| `filesystem.denyRead` + `permissions.deny` | Block a path for Bash *and* Read | `Operation not permitted`; Read refused |
 | `failIfUnavailable` | Refuse unsandboxed start | Missing dep on Linux blocks startup |
 | `init-firewall.sh` | Default-deny iptables + allowlist | Self-test prints "verification passed" |
 | `disableBypassPermissionsMode: "disable"` | Block `--dangerously-skip-permissions` | `/status` → managed source |
@@ -313,9 +313,9 @@ overrides local settings (Module 10.5).
 ## 7. REAL CASE — Production Story
 
 A Vietnamese fintech runs an unattended overnight agent (dependency bumps, changelog drafts) in
-the reference devcontainer with `--dangerously-skip-permissions` — safe only because it's non-root.
-Its firewall allowlist is the reference defaults plus one addition: an internal GitHub Enterprise
-host.
+the reference devcontainer with `--dangerously-skip-permissions`, allowed only because it's
+non-root — the CLI refuses the flag as root. Its firewall allowlist adds one host to the
+defaults: an internal GitHub Enterprise host.
 
 **Blast radius, and the firewall doesn't need to fail**: "Only use dev containers when developing
 with trusted repositories, and monitor Claude's activities" — because "dev containers do not
@@ -323,8 +323,7 @@ prevent a malicious project from exfiltrating anything accessible inside the con
 the Claude Code credentials stored in `~/.claude`." The allowlist resolves every GitHub IP range
 live, so a *working* firewall still lets a compromised dependency push data to any public repo or
 gist on `github.com` — the exfiltration path, not a misconfiguration. The team reviews the script
-on every base-image bump and never mounts `~/.ssh` — cloud credentials go in as scoped, short-lived
-env vars.
+on every base-image bump and never mounts `~/.ssh` — cloud credentials go in as scoped env vars.
 
 **Result**: jobs run unattended on trusted repos only; a monthly allowlist review is the real
 control, not a hope the agent "wouldn't do that."

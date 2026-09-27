@@ -312,8 +312,8 @@ Triển khai qua managed settings (macOS:
 ## 7. REAL CASE — Câu chuyện thực tế
 
 Một fintech Việt Nam chạy agent qua đêm (bump dependency, soạn changelog) trong devcontainer tham
-chiếu với `--dangerously-skip-permissions` — an toàn chỉ vì chạy non-root. Allowlist firewall của
-họ là mặc định của reference cộng một thứ thêm vào: một host GitHub Enterprise nội bộ.
+chiếu với `--dangerously-skip-permissions`, được phép chỉ vì chạy non-root — CLI từ chối flag này
+nếu chạy bằng root. Allowlist firewall của họ là mặc định cộng một host GitHub Enterprise nội bộ.
 
 **Blast radius, và firewall không cần hỏng**: "Only use dev containers when developing with
 trusted repositories, and monitor Claude's activities" — vì "dev containers do not prevent a
