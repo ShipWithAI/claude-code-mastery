@@ -59,7 +59,9 @@ graph TD
 Docker containers cung cấp isolation xuất sắc cho công việc development:
 
 - **Mount CHỈ project directory** — Claude chỉ thấy code project của bạn
-- **Không có network mặc định** — ngăn chặn data exfiltration (`--network=none`)
+- **Giới hạn egress bằng allowlist, không cắt mạng** — Claude Code phải gọi được Anthropic API,
+  nên chế độ no-network của Docker làm session hỏng. Hãy giới hạn outbound traffic bằng
+  allowlist (script [`init-firewall.sh`](https://github.com/anthropics/claude-code/blob/main/.devcontainer/init-firewall.sh) của reference devcontainer)
 - **Resource limits** — ngăn chặn resource exhaustion attacks
 - **Disposable** — hủy container sau session (`--rm`)
 - **Không persistence** — secrets trong container context biến mất khi thoát
@@ -93,14 +95,14 @@ Cloud sandboxes (GitHub Codespaces, Gitpod) cung cấp isolation không cần se
 | **0** | Không sandbox | Mọi thứ trên hệ thống của bạn | ❌ Không bao giờ khuyến nghị |
 | **1** | Chỉ dựa vào kỷ luật | Mọi thứ (dựa vào bạn nói "không") | ❌ Chỉ dùng cho tác vụ nhanh, rủi ro cao |
 | **2** | Docker + project mount | Chỉ project files | ✅ Development hàng ngày |
-| **3** | Docker + no network + project mount | Project files, không internet | ✅ Sensitive projects |
+| **3** | Docker + egress allowlist + project mount | Project files, chỉ domain trong allowlist | ✅ Sensitive projects |
 | **4** | Cloud sandbox | Không có gì trên máy bạn | ✅ Client work, untrusted code |
 
 ---
 
 ## 3. DEMO — Làm mẫu từng bước
 
-Hãy cùng xây dựng Docker sandbox cho Claude Code từ đầu. Sandbox này sẽ isolation Claude vào một project directory duy nhất không có network access.
+Hãy cùng xây dựng Docker sandbox cho Claude Code từ đầu. Sandbox này sẽ isolation Claude vào một project directory duy nhất; Bước 5 bàn về network.
 
 ### Bước 1: Tạo Dockerfile
 
@@ -164,7 +166,6 @@ Output mong đợi:
 ```bash
 docker run -it --rm \
   -v "$(pwd)":/workspace \
-  --network=none \
   --memory=4g \
   --cpus=2 \
   claude-sandbox
@@ -174,7 +175,8 @@ docker run -it --rm \
 - `-it` — interactive terminal
 - `--rm` — **QUAN TRỌNG** — hủy container khi thoát (không có secret persistence)
 - `-v "$(pwd)":/workspace` — mount CHỈ current directory, không phải home hoặc parent
-- `--network=none` — **QUAN TRỌNG** — không internet = không data exfiltration
+- Không có flag network — Claude Code cần Anthropic API nên network phải bật. Network mặc định
+  của Docker **đi được tới mọi host**; Bước 5 cho thấy vì sao điều này quan trọng
 - `--memory=4g` — giới hạn memory usage
 - `--cpus=2` — giới hạn CPU usage
 
@@ -226,20 +228,29 @@ drwxr-xr-x 1 root      root      4096 Feb  1 12:00 ..
 
 **Tại sao điều này quan trọng**: Không có `.aws`, không có `.ssh`, không có secrets. Container home directory trống ngoại trừ các shell configs mặc định. Host secrets hoàn toàn vô hình.
 
-### Bước 5: Xác minh Network Isolation
+### Bước 5: Kiểm tra mức độ lộ network
 
-Thử kết nối internet:
+Thử gọi tới một host bất kỳ:
 
 ```bash
-curl https://google.com
+curl -I https://example.com
 ```
 
 Output mong đợi:
 ```text
-curl: (6) Could not resolve host: google.com
+# Output may vary
+HTTP/2 200
 ```
 
-**Tại sao điều này quan trọng**: Ngay cả khi Claude thành công execute một command độc hại cố gắng exfiltrate data qua HTTP, nó vẫn thất bại. Không network = không data rời khỏi container.
+**Tại sao điều này quan trọng**: Filesystem đã được cô lập, nhưng egress thì **chưa**. Một command
+bị prompt injection vẫn có thể `curl` secrets của project tới server bất kỳ. Bạn không sửa được
+bằng cách cắt mạng — chính Claude Code cần Anthropic API. Cách đúng là **egress allowlist**:
+
+- **Có container**: [reference devcontainer](https://github.com/anthropics/claude-code/tree/main/.devcontainer) chạy `init-firewall.sh`, giới hạn
+  outbound traffic vào các domain mà script cho phép. Script cần capability `NET_ADMIN` và
+  `NET_RAW` (khai báo qua `runArgs` trong `devcontainer.json`).
+- **Không container**: Bash sandbox tích hợp (`/sandbox`) chỉ cho command đi tới các domain trong
+  `sandbox.network.allowedDomains` ([docs](https://code.claude.com/docs/en/sandboxing)).
 
 ### Bước 6: Xác minh Project Access
 
@@ -388,16 +399,19 @@ cat ~/.fake-secret
 
 ### Bài tập 3: Xác minh Network Isolation
 
-**Mục tiêu**: Xác nhận rằng `--network=none` thực sự ngăn chặn network access.
+**Mục tiêu**: Thấy tận mắt egress đang mở trong sandbox tự build, rồi so với sandbox có allowlist.
 
 **Hướng dẫn**:
-1. Chạy container CÓ network: `docker run -it --rm -v "$(pwd)":/workspace my-claude-sandbox`
-2. Trong container, test network: `curl -I https://google.com`
+1. Chạy sandbox của bạn: `docker run -it --rm -v "$(pwd)":/workspace my-claude-sandbox`
+2. Trong container, test egress: `curl -I https://example.com`
 3. Thoát container
-4. Chạy container KHÔNG CÓ network: `docker run -it --rm -v "$(pwd)":/workspace --network=none my-claude-sandbox`
-5. Trong container, test network lại: `curl -I https://google.com`
+4. Clone [`anthropics/claude-code`](https://github.com/anthropics/claude-code), mở bằng VS Code →
+   **Dev Containers: Reopen in Container** (reference devcontainer)
+5. Trong terminal của container, chạy lại `curl -I https://example.com`, rồi chạy `claude`
 
-**Kết quả mong đợi**: Bước 2 nên thành công (bạn sẽ thấy HTTP headers). Bước 5 nên thất bại với "Could not resolve host". Điều này chứng minh `--network=none` hoạt động.
+**Kết quả mong đợi**: Bước 2 thành công — sandbox của bạn gọi được mọi host. Ở bước 5, request tới
+`example.com` bị `init-firewall.sh` chặn, còn `claude` vẫn đăng nhập bình thường vì các endpoint
+của Anthropic nằm trong allowlist.
 
 <details>
 <summary>💡 Gợi ý</summary>
@@ -410,26 +424,22 @@ Flag `-I` khiến curl chỉ fetch HTTP headers (test nhanh hơn). Nếu curl ch
 <summary>✅ Giải pháp</summary>
 
 ```bash
-# CÓ network (mặc định)
+# Sandbox tự build — network mặc định của Docker
 docker run -it --rm -v "$(pwd)":/workspace my-claude-sandbox
-
-# Trong container
-curl -I https://google.com
-# Output: HTTP/2 200 (thành công - network hoạt động)
-
+curl -I https://example.com
+# Output may vary: HTTP/2 200  → egress đang mở
 exit
 
-# KHÔNG CÓ network
-docker run -it --rm -v "$(pwd)":/workspace --network=none my-claude-sandbox
-
-# Trong container
-curl -I https://google.com
-# Output: curl: (6) Could not resolve host: google.com (THẤT BẠI - network bị chặn)
-
-exit
+# Reference devcontainer (sau khi "Reopen in Container")
+curl -I https://example.com
+# Output may vary: connection refused / timed out → bị init-firewall.sh chặn
+claude
+# Đăng nhập bình thường → Anthropic API nằm trong allowlist
 ```
 
-**Điều này chứng minh gì**: `--network=none` thực sự chặn network access. Ngay cả khi Claude Code (hoặc malicious code) cố gắng exfiltrate data qua HTTP, nó thất bại im lặng.
+**Điều này chứng minh gì**: Chỉ cô lập mount thì không chặn được exfiltration. Egress allowlist chặn
+được, mà không làm hỏng Claude Code. ⚠️ Needs verification — allowlist nằm trong
+`init-firewall.sh` và thay đổi theo repo; hãy đọc script trước khi tin vào nó.
 
 </details>
 
@@ -444,7 +454,8 @@ exit
 | `docker build -t name .` | Build sandbox image | Setup một lần |
 | `docker run -it --rm` | Chạy interactive, tự động cleanup | `--rm` ngăn secret persistence |
 | `-v "$(pwd)":/workspace` | Mount current directory | ⚠️ CHỈ mount project, không bao giờ `~` |
-| `--network=none` | Tắt networking | Ngăn data exfiltration |
+| `init-firewall.sh` + `NET_ADMIN`/`NET_RAW` | Egress allowlist (reference devcontainer) | Chặn exfiltration, vẫn giữ Anthropic API |
+| `sandbox.network.allowedDomains` | Allowlist của Bash sandbox tích hợp (`/sandbox`) | OS enforce, không cần container |
 | `--memory=4g` | Giới hạn RAM 4GB | Ngăn resource exhaustion |
 | `--cpus=2` | Giới hạn 2 CPU cores | Ngăn resource exhaustion |
 | `-u $(id -u):$(id -g)` | Match host user UID/GID | Sửa file permission issues |
@@ -467,7 +478,7 @@ exit
 | Use Case | Lệnh |
 |----------|------|
 | **Dev hàng ngày** (Level 2) | `docker run -it --rm -v "$(pwd)":/workspace sandbox` |
-| **Sensitive project** (Level 3) | `docker run -it --rm -v "$(pwd)":/workspace --network=none sandbox` |
+| **Sensitive project** (Level 3) | Reference devcontainer với `init-firewall.sh` (egress allowlist) |
 | **Client work** (Level 4) | Dùng GitHub Codespaces hoặc Gitpod (không expose host) |
 
 ---
@@ -480,12 +491,13 @@ exit
 | Quên flag `--rm` | Luôn dùng `--rm` — ngăn containers có secrets persist trên disk |
 | Dùng flag `--privileged` | KHÔNG BAO GIỜ dùng `--privileged` — cho container quyền root trên host, phá hủy mọi isolation |
 | Mount Docker socket: `-v /var/run/docker.sock:/var/run/docker.sock` | KHÔNG BAO GIỜ mount Docker socket — tương đương root access trên host |
-| Quên `--network=none` cho sensitive work | Luôn dùng `--network=none` cho client work hoặc sensitive data — ngăn exfiltration |
+| Cắt mạng bằng chế độ no-network của Docker | Claude Code cần Anthropic API — cắt mạng là session hỏng. Dùng egress allowlist (`init-firewall.sh` hoặc `/sandbox`) |
+| Để network mặc định của Docker mở khi làm client work | Network mặc định đi được mọi host — thêm egress allowlist khi xử lý dữ liệu nhạy cảm |
 | Mount parent directory: `-v ~/projects:/workspace` | Mount chỉ project cụ thể: `-v ~/projects/client-a:/workspace` — siblings có thể có secrets |
 | Chạy với root user trong container | Tạo non-root user trong Dockerfile (xem DEMO) — giới hạn thiệt hại từ container escape |
 | Hardcode secrets trong Dockerfile | KHÔNG BAO GIỜ đặt secrets trong Dockerfile — chúng persist trong image layers mãi mãi |
 | Cho rằng `--rm` xóa image layers | `--rm` xóa container, không phải image — rebuild image nếu secrets leak trong build |
-| Developer Việt Nam với máy cấu hình thấp (8GB RAM) thấy Docker overhead quá nặng | Nếu máy không đủ mạnh cho Docker, dùng Level 1 (project directory discipline) làm minimum viable security. Tuy nhiên, nếu làm việc với client data, hãy cân nhắc nâng cấp RAM hoặc dùng cloud sandbox. Bảo mật không nên là thứ bạn cắt giảm vì thiếu tài nguyên. Nhớ Nam trong Module 2.1 mất $2,847 AWS? Sandbox sẽ ngăn Claude Code đọc ~/.aws/credentials. Nhớ Nam trong Module 2.2 bị force-push? Sandbox với --network=none sẽ ngăn mọi push. |
+| Developer Việt Nam với máy cấu hình thấp (8GB RAM) thấy Docker overhead quá nặng | Nếu máy không đủ mạnh cho Docker, dùng Level 1 (project directory discipline) làm minimum viable security. Tuy nhiên, nếu làm việc với client data, hãy cân nhắc nâng cấp RAM hoặc dùng cloud sandbox. Bảo mật không nên là thứ bạn cắt giảm vì thiếu tài nguyên. Nhớ Nam trong Module 2.1 mất $2,847 AWS? Sandbox sẽ ngăn Claude Code đọc ~/.aws/credentials. Nhớ Nam trong Module 2.2 bị force-push? Egress allowlist không có `github.com` sẽ chặn push đó. |
 
 ---
 
@@ -516,8 +528,8 @@ Nếu Nam dùng Docker sandbox:
 cd ~/projects/client-a
 docker run -it --rm \
   -v "$(pwd)":/workspace \
-  --network=none \
   claude-sandbox
+# Muốn kiểm soát egress thêm, dùng reference devcontainer (Bước 5)
 ```
 
 Từ trong container này:

@@ -11,6 +11,11 @@
 > đánh dấu ⚠️ cần verify lại một lần nữa trước khi đưa vào module (giá model, hook events
 > mở rộng, tên slash command ít phổ biến).
 
+> **Status 2026-09-27**: Wave 0 (v1.1.1) và Wave 1 (v1.2) đã merge — §4A dòng 11.3, 11.2,
+> 15.3/15.5/15.4, 11.5, 2.2, 6.1/6.2, VI 7.1 và §9 Tier 1 #1–7 đã đóng. Blacklist `--network=none`
+> trong 2.3 đã gỡ (thay bằng egress allowlist); phần rewrite còn lại của 2.3 vẫn thuộc W2-9.
+> Số dòng trích dẫn trong báo cáo này không còn khớp cho các module đã rewrite.
+
 ---
 
 ## Mục lục
