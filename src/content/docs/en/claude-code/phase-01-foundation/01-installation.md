@@ -11,8 +11,9 @@ claude_version: 2.1.283
 >
 > **Prerequisite**: None
 >
-> **Outcome**: Install Claude Code with the native installer (or Homebrew/WinGet/apt), sign in
-> with a subscription, Console key or cloud provider, and verify with `claude doctor`/`/status`
+> **Outcome**: After this module, you will be able to install Claude Code with the native
+> installer (or Homebrew/WinGet/apt), sign in with a subscription, Console key or cloud
+> provider, and verify the install with `claude doctor` and `/status`
 
 ---
 
@@ -105,8 +106,9 @@ curl -fsSL https://claude.ai/install.sh | bash
 
 Windows PowerShell: `irm https://claude.ai/install.ps1 | iex`. Windows CMD:
 `curl -fsSL https://claude.ai/install.cmd -o install.cmd && install.cmd && del install.cmd`.
-Re-running this on an already-installed machine is also the documented fix for a broken install
-(docs: `troubleshoot-install#raw-mode-is-not-supported-during-install`). Verify with **Step 1**'s
+This same command is also the documented fix for the `Raw mode is not supported` install error
+some organizations hit when installing from a pipe (docs:
+`troubleshoot-install#raw-mode-is-not-supported-during-install`). Verify with **Step 1**'s
 command:
 
 ```text
@@ -177,7 +179,7 @@ claude update
 
 ```text
 # Example from docs: https://code.claude.com/docs/en/setup#update-manually
-Successfully updated from 2.1.270 to version 2.1.283
+Successfully updated from <old version> to version <new version>
 ```
 
 Already current: `Claude Code is up to date (<version>)`. Homebrew/WinGet/apk report

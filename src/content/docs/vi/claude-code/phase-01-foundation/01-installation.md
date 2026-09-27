@@ -11,8 +11,9 @@ claude_version: 2.1.283
 >
 > **Yêu cầu trước**: Không có
 >
-> **Kết quả**: Cài được Claude Code bằng native installer (hoặc Homebrew/WinGet/apt), đăng nhập
-> bằng subscription, Console key hoặc cloud provider, và xác minh bằng `claude doctor`/`/status`
+> **Kết quả**: Sau module này, bạn cài được Claude Code bằng native installer (hoặc
+> Homebrew/WinGet/apt), đăng nhập bằng subscription, Console key hoặc cloud provider, và xác
+> minh bản cài bằng `claude doctor` và `/status`
 
 ---
 
@@ -105,8 +106,9 @@ curl -fsSL https://claude.ai/install.sh | bash
 
 Windows PowerShell: `irm https://claude.ai/install.ps1 | iex`. Windows CMD:
 `curl -fsSL https://claude.ai/install.cmd -o install.cmd && install.cmd && del install.cmd`.
-Chạy lại lệnh này trên máy đã cài native cũng là cách fix chính thức cho bản cài hỏng (docs:
-`troubleshoot-install#raw-mode-is-not-supported-during-install`). Xác minh bằng lệnh ở **Bước 1**:
+Đúng lệnh này cũng là cách fix chính thức cho lỗi `Raw mode is not supported` mà một số tổ chức
+gặp khi cài qua pipe (docs: `troubleshoot-install#raw-mode-is-not-supported-during-install`).
+Xác minh bằng lệnh ở **Bước 1**:
 
 ```text
 # Output may vary
@@ -176,7 +178,7 @@ claude update
 
 ```text
 # Example from docs: https://code.claude.com/docs/en/setup#update-manually
-Successfully updated from 2.1.270 to version 2.1.283
+Successfully updated from <old version> to version <new version>
 ```
 
 Đã mới nhất: `Claude Code is up to date (<version>)`. Bản Homebrew/WinGet/apk in
