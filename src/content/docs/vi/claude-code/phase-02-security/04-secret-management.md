@@ -117,6 +117,7 @@ MOMO_ACCESS_KEY=AKIAFAKEDONOTUSE12345
 DATABASE_URL=postgresql://user:FAKE-PASSWORD-DO-NOT-USE@localhost:5432/payment_db
 EOF
 ```
+Không Lớp 2, đọc Bash file secret này (`cat .env`) chạy im lặng, không hỏi (Module 2.1).
 
 **Bước 2: `.env.example`** (không secret, an toàn cho Claude)
 ```bash
@@ -338,18 +339,17 @@ VNPAY_HASH_SECRET=sk-FAKE-DO-NOT-USE-vnpay-production-hash-a8f9e2b1c4d5
 MOMO_ACCESS_KEY=AKIAFAKEDONOTUSE-momo-key-123456
 ```
 
-Cô nhờ Claude generate `PaymentConfigLoader.kt` từ environment variables. Claude đọc `.env` để hiểu
-cấu trúc rồi hardcode giá trị vào file sinh ra. Chi bắt được lỗi khi review — nếu không, secret đã
-vào git history, PR diff, tìm được nếu repo từng public.
+Cô nhờ Claude generate `PaymentConfigLoader.kt` từ environment variables. Claude đọc `.env` rồi
+hardcode giá trị vào file sinh ra. Chi bắt được lỗi khi review — nếu không, secret đã vào git
+history, tìm được nếu repo từng public.
 
 **Giải pháp**: bốn lớp phòng thủ — `.env.example` cho Claude đọc, `.gitignore` + `permissions.deny`
 chặn đọc trực tiếp, gitleaks pre-commit làm chốt cuối, prompt nói rõ "không đọc .env trực tiếp."
 `PaymentConfigLoader.kt` giờ gọi `System.getenv("VNPAY_HASH_SECRET")` và throw nếu thiếu — không giá
 trị nào từng vào context.
 
-Điều này khớp nguyên tắc của Anthropic cho agent có quyền truy cập thật: cho mỗi agent "a
-single-purpose identity with the minimum permissions for its job" (S4) — việc của Claude là viết
-loader, không phải giữ secret.
+Điều này khớp nguyên tắc của Anthropic: cho mỗi agent "a single-purpose identity with the minimum
+permissions for its job" (S4) — việc của Claude là viết loader, không phải giữ secret.
 
 ---
 

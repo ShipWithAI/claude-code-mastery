@@ -18,9 +18,9 @@ claude_version: 2.1.283
 
 ## 1. WHY — Why This Matters
 
-You ask Claude to "generate the payment module" and it reads your `.env` file — now your VNPay hash
-secret is in Claude's context, sent to your model provider regardless of the sandbox, one `git
-commit` from GitHub's public search. Sandboxes stop filesystem damage, not context leaks.
+You ask Claude to "generate the payment module" and it reads your `.env` — now your VNPay hash
+secret is in Claude's context, sent to your model provider regardless of sandbox, one `git commit`
+from GitHub's public search. Sandboxes stop filesystem damage, not context leaks.
 
 ---
 
@@ -117,6 +117,8 @@ MOMO_ACCESS_KEY=AKIAFAKEDONOTUSE12345
 DATABASE_URL=postgresql://user:FAKE-PASSWORD-DO-NOT-USE@localhost:5432/payment_db
 EOF
 ```
+Without Layer 2, a Bash read of this secrets file — `cat .env` — runs silently, no prompt (Module
+2.1).
 
 **Step 2: `.env.example`** (no secrets, safe for Claude)
 ```bash
@@ -332,26 +334,24 @@ A finding becomes a rotation task per the Layer 3 table; after rotating, strip i
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: Chi builds a fintech app in Saigon integrating VNPay and MoMo. Her `.env` holds
-credentials shaped like:
+**Scenario**: Chi's fintech app in Saigon integrates VNPay and MoMo. Her `.env` holds credentials
+shaped like:
 ```text
 VNPAY_HASH_SECRET=sk-FAKE-DO-NOT-USE-vnpay-production-hash-a8f9e2b1c4d5
 MOMO_ACCESS_KEY=AKIAFAKEDONOTUSE-momo-key-123456
 ```
 
 She asks Claude to generate `PaymentConfigLoader.kt` from environment variables. Claude reads `.env`
-"to understand structure" and hardcodes the values into the generated file. Chi catches it in
-review — otherwise the secrets would be in git history and a PR diff, searchable if the repo went
-public.
+and hardcodes the values into the file. Chi catches it in review — otherwise the secrets would be
+in git history, searchable if the repo went public.
 
 **Solution**: four-layer defense — `.env.example` for Claude to read, `.gitignore` +
 `permissions.deny` to block direct reads, gitleaks pre-commit as a last check, and a prompt saying
 "do NOT read .env directly." `PaymentConfigLoader.kt` now calls `System.getenv("VNPAY_HASH_SECRET")`
 and throws if missing — no value ever entered context.
 
-This mirrors Anthropic's principle for agents with real access: give every agent "a single-purpose
-identity with the minimum permissions for its job" (S4) — Claude's job is writing the loader, not
-holding secrets.
+This mirrors Anthropic's principle: give every agent "a single-purpose identity with the minimum
+permissions for its job" (S4) — Claude's job is writing the loader, not holding secrets.
 
 ---
 

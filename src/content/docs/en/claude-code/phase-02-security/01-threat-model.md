@@ -77,23 +77,30 @@ Two gates, two tools:
 - **Bash tool — VERIFIED, and this is the surprise**: "Claude Code recognizes a built-in set of
   Bash commands as read-only and runs them without a permission prompt **in every mode**" — `ls`,
   `cat`, `head`, `tail`, `grep`, `find`, read-only `git`, and more — "except for a path that
-  `permissions.blockReadsOutsideWorkingDirectories` fences." Even that setting treats Bash
-  differently from file tools: it makes Read/Grep/Glob/LSP **refuse** outside paths outright, but a
-  recognized Bash file command like `cat` only makes it **prompt** you — still runs if you say yes
-  — and it does nothing for `grep -r` or a script that opens the file itself.
+  `permissions.blockReadsOutsideWorkingDirectories` fences." That setting is unset by default, so
+  `cat ~/.ssh/id_rsa` via Bash is not fenced at all unless you turn it on yourself. Turning it on
+  still treats Bash differently from file tools: it makes Read/Grep/Glob/LSP **refuse** outside
+  paths outright, but a recognized Bash file command like `cat` only makes it **prompt** you —
+  still runs if you say yes — and it does nothing for commands that don't name the path (like
+  `grep -r pattern .`) or a script that opens the file itself, unless the sandbox is enforcing the
+  block for you.
 - Tested live: `cat sample.env` inside cwd ran silently, as documented. `ls -la ~/.ssh` outside cwd
-  was **also** refused outright, not just prompted — a stronger control than
-  `blockReadsOutsideWorkingDirectories` alone predicts is active here (possibly a local `deny` rule,
-  a sandbox `denyRead`, or the model itself declining). Verify your own install (Exercise 2).
+  was refused outright with no prompt at all — neither the silent default nor a prompting
+  `blockReadsOutsideWorkingDirectories` explains that by itself; something stronger is active in
+  this account (possibly a local `deny` rule, a sandbox `denyRead`, or the model itself declining).
+  Verify your own install (Exercise 2).
 - On v2.1.283+, the interactive starting mode is **auto** — a classifier reviews each action, so
   outcomes vary by judgment call, not just settings.json.
 - **Sandbox (Module 2.3)** only constrains Bash ("applies only to Bash, PowerShell, and Monitor
-  commands") — Read/Edit/Write stay governed by the permission system, not the sandbox. Sandbox
-  `denyRead` rules are the real OS-level fence for Bash reads, but apply only when sandboxing is on.
+  commands") — Read/Edit/Write stay governed by the permission system, not the sandbox. With the
+  sandbox on, `blockReadsOutsideWorkingDirectories` also blocks sandboxed reads of home directories
+  outright — the real OS-level fence for Bash reads.
 
-**RECOMMENDED**: `blockReadsOutsideWorkingDirectories` stops Read/Grep/Glob outright, makes Bash
-reads prompt, but not `grep -r`/scripts — pair it with sandbox `denyRead` (Module 2.3). Module 2.2
-covers the full rule system.
+**RECOMMENDED**: by default, `ls`/`cat`-style Bash reads run silently everywhere, in or out of your
+working directory. Turn on `permissions.blockReadsOutsideWorkingDirectories` to stop Read/Grep/Glob
+outright and make Bash reads prompt — commands that don't name the path, and scripts, still slip
+through unless the sandbox enforces the block. Pair it with sandbox `denyRead` (Module 2.3). Module
+2.2 covers the full rule system.
 
 ### Attack Vectors
 
@@ -149,9 +156,11 @@ directory (/Users/<you>/cc-lab) hasn't been granted. ... Add a rule or start
 with --add-dir ~.
 ```
 
-**Step 3**: `claude -p "Run: ls -la ~/.ssh"` — Bash, outside cwd. Per docs this should at most
-**prompt**, not refuse outright — refused here, meaning something stronger is active: a local
-`deny` rule, a sandbox `denyRead`, or the model declining (CONCEPT).
+**Step 3**: `claude -p "Run: ls -la ~/.ssh"` — Bash, outside cwd. By default this read-only command
+runs **silently**, no prompt, in or out of cwd; with
+`permissions.blockReadsOutsideWorkingDirectories` turned on it would **prompt** instead. It was
+refused outright here — neither behavior — meaning something stronger is active: a local `deny`
+rule, a sandbox `denyRead`, or the model declining (CONCEPT).
 
 **Step 4**: `git status --porcelain` and `cat .gitignore` — is `.env` present but **not** ignored?
 
@@ -220,8 +229,8 @@ Compare against CONCEPT: a match confirms the default; a mismatch means a local 
 ```json
 { "permissions": { "deny": ["Read(~/.ssh/**)", "Read(~/.aws/**)", "Read(./.env)", "Read(**/*.pem)"] } }
 ```
-2. Ask Claude to read a denied path — must be **blocked**.
-3. Never start Claude Code in `~`.
+2. Ask Claude to read a denied path — must be **blocked**, not just prompted.
+3. Never start Claude Code in `~`; use a devcontainer for untrusted work (Module 2.3).
 
 <details>
 <summary>💡 Hint</summary>
@@ -265,7 +274,8 @@ pattern .` or a script that opens the file. Blast radius of relying on it alone.
 | ❌ Mistake | ✅ Correct Approach |
 |-----------|-------------------|
 | Assuming Claude Code is sandboxed by default | Full access to anything your terminal reaches. |
-| Assuming `blockReadsOutsideWorkingDirectories` blocks Bash too | It only makes recognized Bash reads (`cat`, etc.) prompt — `grep -r`/scripts still slip through. |
+| Assuming the Read-tool cwd boundary also fences Bash | It doesn't by default — read-only Bash (`ls`, `cat`) runs silently outside cwd too. |
+| Assuming `blockReadsOutsideWorkingDirectories` blocks Bash reads | It only makes recognized Bash reads (`cat`, etc.) prompt — `grep -r`/scripts still slip through. |
 | Trusting Claude's judgment on what's "safe" | `cat config.json` looks innocent but can expose secrets. |
 | Thinking `.gitignore` protects you from Claude | It only affects git; Claude can still read and echo those files. |
 | Assuming `permissions.deny` blocks every read path | It misses `grep -r` and scripts that open files themselves — add the sandbox too. |
@@ -288,8 +298,8 @@ Claude hardcoded the values into the generated file. Lan pushed the "looked corr
 repo she thought was private — it wasn't. Scanners found the key in 8 minutes; miners in 20. By
 morning: **$2,847** in EC2 charges.
 
-**Prevention**: `.env` in `.gitignore`; never let Claude read it directly (Module 2.4); grep
-generated files for `sk-`/`AKIA` before commit; set billing alerts.
+**Prevention**: `.env` in `.gitignore`; never let Claude read it directly — describe variable names
+instead (Module 2.4); grep generated files for `sk-`/`AKIA` before commit; set billing alerts.
 
 Lan rotated every credential and now treats Module 2.4's workflow as non-negotiable.
 
