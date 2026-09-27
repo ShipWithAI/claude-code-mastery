@@ -1,6 +1,8 @@
 ---
 title: 'Công Cụ Điều Phối'
-description: 'Công cụ điều phối multi-agent trong Claude Code: Task tool, background agent và coordination patterns.'
+description: 'Leo thang điều phối: headless fan-out, subagent, agent team, background agent và Agent SDK — chọn bậc thấp nhất mà vẫn đủ dùng.'
+verified: 2026-09-22
+claude_version: 2.1.278
 ---
 
 # Module 7.5: Công Cụ Điều Phối
@@ -9,452 +11,303 @@ description: 'Công cụ điều phối multi-agent trong Claude Code: Task tool
 >
 > **Yêu cầu trước**: Module 7.4 (Các Mẫu Agentic Loop)
 >
-> **Kết quả**: Sau module này, bạn sẽ hiểu orchestration tool landscape, viết bash script cho multi-agent coordination, và biết khi nào graduate lên tool advanced.
+> **Kết quả**: Sau module này, bạn sẽ fan-out một task qua nhiều file bằng `claude -p`, quản lý
+> **background agent** (`--bg`, `claude agents`), và gọi tên được bậc thang của một công việc.
 
 ---
 
 ## 1. WHY — Tại Sao Cần Hiểu
 
-Bạn đã học multi-agent và agentic loop, nhưng vẫn làm mọi thứ manual — mở 3-4 terminal, copy-paste output qua lại, cố coordinate handoff giữa các agent. Pipeline 3-agent đơn giản mất 10 phút chỉ để orchestrate.
+Năm mươi file cần cùng một thay đổi máy móc. Bạn có thể dán năm mươi prompt vào một session rồi
+nhìn context mục ruỗng, hoặc viết một dòng bash. Rồi công việc lớn lên — chạy cả tiếng, trên ba
+repo, trong lúc bạn làm việc khác — và bash hết là câu trả lời.
 
-Orchestration tool cho phép bạn automate coordination này. Nghĩ như nhạc trưởng chỉ huy dàn nhạc — mỗi nhạc công (agent) chơi phần của mình xuất sắc, nhưng cần ai đó điều phối để ra bản nhạc hoàn chỉnh. Module này dạy bạn cách làm "nhạc trưởng" cho Claude Code.
+Ở đây có một cái thang, và phần lớn người dùng không nhìn quá bậc họ học đầu tiên. Biết đủ sáu bậc
+nghĩa là chọn được bậc rẻ nhất mà vẫn vừa.
 
 ---
 
 ## 2. CONCEPT — Ý Tưởng Cốt Lõi
 
-### Orchestration Spectrum
-
-Từ simple đến complex:
+### Cái thang
 
 ```mermaid
 graph LR
-    A[Bash Scripts] --> B[Claude Code SDK]
-    B --> C[Hooks System]
-    C --> D[External Orchestrators]
-
-    A1[Module này<br/>Phase 7] -.-> A
-    B1[Phase 11] -.-> B
-    C1[Phase 11] -.-> C
-    D1[Phase 12<br/>n8n] -.-> D
-
-    style A fill:#90EE90
+    A["1. -p fan-out<br/>(bash)"] --> B["2. Subagents"]
+    B --> C["3. Agent teams"]
+    C --> D["4. Background agents"]
+    D --> E["5. Dynamic Workflows"]
+    E --> F["6. Agent SDK"]
 ```
 
-### Level 1: Bash Scripts (Focus Module Này)
+1. **Headless fan-out** — `claude -p` trong shell loop: mỗi item một session nguội, không chia sẻ
+   state, exit code kiểm tra được. Cho item độc lập, thay đổi máy móc.
+2. **Subagent** — uỷ thác trong cùng một session; mỗi con trả về summary (Module 7.3).
+3. **Agent team** — teammate có tên, task list chung, nhắn tin cho nhau (Module 7.3).
+   ⚠️ Experimental, mặc định tắt. Cho research, review, module tách rời.
+4. **Background agent** — session tách khỏi terminal, quản lý bằng `claude agents`. Cho việc dài
+   mà bạn xem lại sau.
+5. **Dynamic Workflows** — script JavaScript điều phối nhiều subagent cùng lúc, do một runtime
+   chạy, khi job cần nhiều agent hơn mức một cuộc hội thoại điều phối nổi. Sẽ có module riêng.
+6. **[Agent SDK](../../phase-11-automation-headless/02-claude-agent-sdk/)** — chương trình của bạn
+   tự lái vòng lặp, khi việc điều phối *là* sản phẩm.
 
-`claude -p` là foundation của scripted orchestration:
-- **One-shot execution**: Chạy prompt, nhận result, exit
-- **File-based communication**: Agent A viết file, Agent B đọc file
-- **Combine với bash**: loop, variable, conditional, function
+### Chọn bậc nào (S15)
 
-**Good for**: Simple pipeline, CI/CD integration, quick automation
+| | Subagents | Agent teams | Workflows |
+|---|---|---|---|
+| Ai quyết định chạy gì tiếp | *"Claude, turn by turn"* | *"The lead agent, turn by turn"* | *"The script"* |
+| Kết quả trung gian nằm đâu | *"Claude's context window"* | *"A shared task list"* | *"Script variables"* |
+| Quy mô | *"A few delegated tasks per turn"* | *"A handful of long-running peers"* | *"Dozens to hundreds of agents per run"* |
 
-### Level 2: Claude Code SDK (Preview — Phase 11)
+Headless fan-out nằm dưới cả ba: shell quyết định, filesystem giữ kết quả, quy mô là số lần loop
+chạy. Không gì miễn phí — mỗi `claude -p` trả tiền cho một context nguội, và một teammate là
+nguyên một session nữa, mức mà trang costs ghi *"approximately 7x more tokens than standard
+sessions when teammates run in plan mode"* (S15). Leo thang khi công việc cần, không phải vì bậc
+đó mới hơn.
 
-Programmatic control từ Node.js/Python:
-- Structured response
-- Error handling sophisticated
-- State management
+### Fan-out mặc định bị deny
 
-**Good for**: Complex application, custom tool
-⚠️ SDK details xác minh trong Phase 11
+`claude -p` khởi động mà không pre-authorize gì, nên thân vòng lặp phải nói rõ nó được làm gì:
+`--allowedTools "Edit,Bash(git commit *)"` hoặc `--permission-mode acceptEdits`. Thiếu cái đó, mỗi
+lần chạy không sửa gì, còn loop vẫn vui vẻ báo thành công trên năm mươi lần no-op.
 
-### Level 3: Hooks System (Preview — Phase 11)
-
-Event-driven automation:
-- Pre/post hooks cho file write, command
-- Trigger script khi Claude action
-
-**Good for**: Reactive workflow, guardrail
-⚠️ Hooks details xác minh trong Phase 11
-
-### Level 4: External Orchestrators (Preview — Phase 12)
-
-Visual workflow engine (n8n, etc.):
-- Multi-system integration
-- Visual workflow design
-
-**Good for**: Enterprise, complex multi-system workflow
-
-### Chọn Đúng Level
-
-| Nhu Cầu | Tool | Lý Do |
-|---------|------|-------|
-| Quick automation | Bash script | Đơn giản, zero dependency |
-| CI/CD pipeline | Bash + `claude -p` | Integrate được mọi nơi |
-| Complex application | SDK (Phase 11) | Programmatic control |
-| Event-driven | Hooks (Phase 11) | React to action |
-| Enterprise | n8n (Phase 12) | Visual, maintainable |
-
-**Nguyên tắc**: Start simple. Graduate lên complex chỉ khi cần feature.
-
-### Luồng Dữ Liệu Trong Orchestration
-
-Hiểu cách dữ liệu di chuyển giữa ba tầng của một workflow orchestration:
-
-```mermaid
-graph TD
-    subgraph "Orchestration Layer"
-        Script[Bash Script / SDK / n8n]
-    end
-
-    subgraph "Agent Layer"
-        A1["claude -p 'design the API'"]
-        A2["claude -p 'implement from design.md'"]
-        A3["claude -p 'write tests from src/'"]
-    end
-
-    subgraph "Artifact Layer"
-        D1[design.md]
-        D2[src/api.ts]
-        D3[tests/api.test.ts]
-    end
-
-    Script -->|spawns| A1
-    Script -->|spawns after A1| A2
-    Script -->|spawns after A2| A3
-
-    A1 -->|writes| D1
-    D1 -->|read by| A2
-    A2 -->|writes| D2
-    D2 -->|read by| A3
-    A3 -->|writes| D3
-
-    style Script fill:#e8eaf6
-    style D1 fill:#fff9c4
-    style D2 fill:#fff9c4
-    style D3 fill:#fff9c4
-```
-
-**Ba tầng hoạt động**:
-
-1. **Orchestration Layer**: Điều khiển thứ tự thực thi, song song hóa, và xử lý lỗi. Đây là bash script, SDK code, hoặc n8n workflow. Tầng này không bao giờ chạm vào code trực tiếp — chỉ spawn agents và kiểm tra kết quả.
-
-2. **Agent Layer**: Mỗi lệnh `claude -p` chạy với context mới. Các agents không biết về nhau. Chúng nhận chỉ dẫn từ orchestrator và tạo ra artifacts.
-
-3. **Artifact Layer**: Các file trên đĩa mang dữ liệu giữa agents. Agent 1 viết `design.md`, Agent 2 đọc nó làm input. Đây là kênh giao tiếp — agents nói chuyện qua files, không qua shared memory.
-
-**Tại sao sự phân tách này quan trọng**: Orchestration layer dễ debug (chỉ là bash/code). Agent layer có thể thay thế được (đổi model, đổi prompt). Artifact layer có thể kiểm tra được (xem file trung gian). Khi có lỗi, bạn xác định chính xác tầng nào gây ra vấn đề.
+> `(S1)`, `(S15)`: `docs/references/anthropic-sources.md`.
 
 ---
 
 ## 3. DEMO — Từng Bước
 
-**Task**: Build code review pipeline với 3 agent chuyên biệt.
-
-### Step 1: Tạo Orchestration Script
+**Bước 1: Ba file cần cùng một thay đổi**
 
 ```bash
-#!/bin/bash
-# code-review-pipeline.sh
-
-FILE_TO_REVIEW=$1
-
-if [ -z "$FILE_TO_REVIEW" ]; then
-  echo "Usage: ./code-review-pipeline.sh <file>"
-  exit 1
-fi
-
-echo "=== Code Review Pipeline ==="
-echo "Target: $FILE_TO_REVIEW"
-
-# Agent 1: Security Review
-echo ""
-echo "[1/3] Security review..."
-claude -p "Review $FILE_TO_REVIEW for security issues.
-Focus on: SQL injection, XSS, auth bypass, secrets exposure.
-List issues with line numbers." > security-review.md
-
-# Agent 2: Performance Review
-echo "[2/3] Performance review..."
-claude -p "Review $FILE_TO_REVIEW for performance issues.
-Focus on: N+1 queries, memory leaks, blocking calls.
-List issues with line numbers." > performance-review.md
-
-# Agent 3: Style Review
-echo "[3/3] Style review..."
-claude -p "Review $FILE_TO_REVIEW for style issues.
-Focus on: naming, function length, documentation.
-List issues with line numbers." > style-review.md
-
-# Aggregator
-echo ""
-echo "Aggregating results..."
-claude -p "Read security-review.md, performance-review.md, style-review.md.
-Create unified REVIEW.md with sections:
-- Critical (security)
-- Important (performance)
-- Minor (style)
-Prioritize by severity." > /dev/null
-
-echo "✓ Review complete! See REVIEW.md"
+cat > src/strings.js << 'EOF'
+export function slugify(s) { return s.toLowerCase().trim().replace(/\s+/g, '-'); }
+EOF
+# …và src/arrays.js (chunk), src/dates.js (isoDay)
+git add src/*.js && git commit -q -m "add three helper modules"
 ```
 
-### Step 2: Chạy Pipeline
+**Bước 2: Fan-out bằng `-p` (S1)**
 
 ```bash
-$ chmod +x code-review-pipeline.sh
-$ ./code-review-pipeline.sh src/services/userService.ts
+# docs: headless#allowed-tools · best-practices#parallel-sessions
+for f in src/strings.js src/arrays.js src/dates.js; do
+  echo "=== $f ==="
+  claude -p "Add a one-line JSDoc comment above the exported function in $f, then commit just
+that file with the message 'docs: jsdoc for $f'. Reply with OK or FAIL and nothing else." \
+    --permission-mode default --allowedTools "Edit,Bash(git commit *)"
+done
 ```
 
-Output:
 ```text
-=== Code Review Pipeline ===
-Target: src/services/userService.ts
+# Output may vary
+=== src/strings.js ===
+OK
 
-[1/3] Security review...
-[2/3] Performance review...
-[3/3] Style review...
+=== src/arrays.js ===
+OK
 
-Aggregating results...
-✓ Review complete! See REVIEW.md
+=== src/dates.js ===
+OK
 ```
-
-### Step 3: Xem Output
 
 ```bash
-$ cat REVIEW.md
+git log --oneline -4
 ```
 
-Output:
-```markdown
-# Code Review: src/services/userService.ts
-
-## Critical (Security)
-- **Line 45**: SQL query dùng string concatenation — potential injection
-- **Line 78**: API key hardcode trong source
-
-## Important (Performance)
-- **Line 23**: N+1 query trong getUserOrders() loop
-
-## Minor (Style)
-- **Line 12**: Function fetchUser thiếu JSDoc
+```text
+# Output may vary
+27c7597 docs: jsdoc for src/dates.js
+f56e1ec docs: jsdoc for src/arrays.js
+ec31a8e docs: jsdoc for src/strings.js
+5c47bb5 add three helper modules
 ```
 
-**Quan sát**: 4 agent, file-based communication, CI/CD ready.
+Ba session nguội, ba commit, không chia sẻ context. Hai chi tiết làm nó chạy được: prompt kết thúc
+bằng một hợp đồng một từ (`OK`/`FAIL`), và `--allowedTools` nêu đúng những gì một lần chạy được
+làm — sửa file đó, commit. `--permission-mode default` ép về hành vi gốc; trên gói Pro, Max và
+Team, starting mode built-in là `auto`, và `permissions.defaultMode` ghi đè nó.
+
+**Bước 3: Bắn một background agent**
+
+```bash
+# docs: cli-reference#bg · agent-view
+claude --bg --name exports-audit --permission-mode default \
+  "List every exported function in src/ as a Markdown table with columns file and function."
+```
+
+```text
+# Output may vary
+Starting background service…
+backgrounded · 5db069a6 · exports-audit
+  claude agents             list sessions
+  claude attach 5db069a6    open in this terminal
+  claude logs 5db069a6      show recent output
+  claude stop 5db069a6      stop this session
+```
+
+Để ý cú pháp: `--bg` nhận prompt **positional**, từ chối `-p`, trả về ngay, in ra bốn lệnh bạn cần.
+
+**Bước 4: Theo dõi rồi dừng nó**
+
+```bash
+claude agents --json
+```
+
+```json
+[
+  {
+    "pid": 9102,
+    "id": "5db069a6",
+    "cwd": "/Users/luatnq/cc-lab",
+    "kind": "background",
+    "startedAt": 1790084514332,
+    "sessionId": "5db069a6-905f-44ab-98a5-e17e7dcb6e19",
+    "name": "exports-audit",
+    "status": "idle",
+    "state": "done"
+  }
+]
+```
+
+`# Output may vary` — chỉ hiện một entry; mảng này liệt kê mọi session trên máy, nên hãy lọc theo
+`cwd`. Poll `state`: `working`, `blocked`, `done`, `failed`, `stopped`. `claude agents` trần mở
+agent view tương tác và cần terminal thật; `claude logs <id>` in output gần nhất, `claude attach
+<id>` mở session ngay tại đây.
+
+```bash
+claude stop 5db069a6
+```
+
+```text
+# Output may vary
+stopped 5db069a6
+```
+
+Đã bắn thì phải dừng — background agent sống lâu hơn shell sinh ra nó.
+
+**Bước 5: Bậc 2 và 3 bạn đã có**
+
+Nguyên tắc: ở trong một session (subagent, team — Module 7.3) khi công việc dùng chung context,
+fan-out bằng `-p` khi các item độc lập, tách ra bằng `--bg` khi việc dài hơn sự chú ý của bạn. Với
+CI, xem Module 11.4.
 
 ---
 
 ## 4. PRACTICE — Tự Thực Hành
 
-### Bài 1: Parallel Execution
+### Bài 1: Thử ba file trước, rồi chạy cả bộ
 
-**Goal**: Làm pipeline nhanh hơn với parallel agent.
+**Mục tiêu**: Làm cho prompt fan-out an toàn trước khi nó đụng tới năm mươi file.
 
-**Instructions**:
-1. Sửa script để 3 review agent chạy parallel
-2. Dùng `&` để background mỗi agent
-3. Dùng `wait` để đợi tất cả complete
-4. Đo time difference
+**Hướng dẫn**: chọn một thay đổi máy móc trải trên nhiều file. Chạy loop trên **ba** file, đọc
+diff, sửa prompt, rồi chạy phần còn lại. Mỗi lần chạy trả lời `OK` hoặc `FAIL`.
 
-**Expected result**: ~3x nhanh hơn.
+**Kết quả mong đợi**: ba diff sạch — và một prompt tin được cho phần còn lại.
 
 <details>
-<summary>💡 Hint</summary>
+<summary>💡 Gợi ý</summary>
 
-```bash
-claude -p "security..." > security.md &
-claude -p "performance..." > perf.md &
-claude -p "style..." > style.md &
-wait
-```
+Anthropic nói về pattern này: *"Refine your prompt based on what goes wrong with the first 2-3
+files, then run on the full set."* (S1)
 </details>
 
 <details>
-<summary>✅ Solution</summary>
+<summary>✅ Lời giải</summary>
 
 ```bash
-#!/bin/bash
-FILE=$1
-echo "Running 3 agents in parallel..."
-START=$(date +%s)
-
-claude -p "Security review $FILE" > security.md &
-claude -p "Performance review $FILE" > perf.md &
-claude -p "Style review $FILE" > style.md &
-wait
-
-echo "Done in $(($(date +%s) - START)) seconds"
-claude -p "Combine security.md, perf.md, style.md into REVIEW.md"
+for f in $(cat files.txt); do
+  claude -p "Migrate $f … Return OK or FAIL." --allowedTools "Edit,Bash(git commit *)" \
+    || echo "$f" >> failed.txt
+done
 ```
 
-Timing: Sequential ~45s → Parallel ~18s (2.5x speedup)
+Commit từng file làm loop chạy lại được: file hỏng cách một lệnh `git revert`, `failed.txt` là
+danh sách chạy lại.
 </details>
 
-### Bài 2: Error Handling
+### Bài 2: Bắn, poll, dừng
 
-**Goal**: Pipeline robust với retry.
+**Mục tiêu**: Chạy một job dài ở chế độ tách rời và quản lý nó từ CLI.
 
-**Instructions**:
-1. Check exit code sau mỗi `claude -p`
-2. Nếu fail, retry 1 lần
-3. Log error vào error.log
+**Hướng dẫn**: bắn một audit read-only bằng `claude --bg --name <name>`, poll
+`claude agents --json` tới khi `state` là `done`, đọc bằng `claude logs <id>`, rồi
+`claude stop <id>`.
+
+**Kết quả mong đợi**: `state` đi từ `working` → `done`; entry biến mất sau khi dừng.
 
 <details>
-<summary>💡 Hint</summary>
+<summary>💡 Gợi ý</summary>
 
-```bash
-claude -p "task" > output.md
-if [ $? -ne 0 ]; then
-  echo "Retrying..."
-  claude -p "task" > output.md
-fi
-```
+Nhớ lọc mảng — nó liệt kê mọi session trên máy:
+`claude agents --json | jq '[.[] | select(.cwd == "'"$PWD"'")]'`
 </details>
 
 <details>
-<summary>✅ Solution</summary>
+<summary>✅ Lời giải</summary>
 
-```bash
-run_agent() {
-  local name=$1
-  local prompt=$2
-  local output=$3
-
-  claude -p "$prompt" > "$output"
-  if [ $? -ne 0 ]; then
-    echo "[$name] Retrying..." >&2
-    sleep 2
-    claude -p "$prompt" > "$output"
-    if [ $? -ne 0 ]; then
-      echo "$(date): $name failed" >> error.log
-      return 1
-    fi
-  fi
-  return 0
-}
-
-run_agent "Security" "Review $1 for security" security.md || exit 1
-run_agent "Performance" "Review $1 for performance" perf.md || exit 1
-```
+Background agent cần một quyền nó không có sẽ rơi vào `state: "blocked"` và **đợi**, chứ không
+fail. Vì vậy job `--bg` nên read-only hoặc mang sẵn `--permission-mode` / `--allowedTools`: không
+ai ngồi đó để bấm đồng ý.
 </details>
 
 ---
 
 ## 5. CHEAT SHEET
 
-### Bash + Claude One-Liner
-
-```bash
-# Basic
-claude -p "task" > output.md
-
-# Với file content
-claude -p "Review: $(cat file.ts)"
-
-# Sequential
-claude -p "design" > design.md && claude -p "implement design.md"
-
-# Parallel
-claude -p "task1" > out1.md &
-claude -p "task2" > out2.md &
-wait
-
-# Loop
-for f in src/*.ts; do
-  claude -p "Review $f" > "reviews/$(basename $f).md"
-done
-```
-
-### Error Handling
-
-```bash
-claude -p "task" > output.md
-if [ $? -ne 0 ]; then
-  echo "Failed!" >> error.log
-  exit 1
-fi
-```
-
-### Tool Selection
-
-| Nhu Cầu | Tool |
-|---------|------|
-| Quick script | Bash |
-| CI/CD | Bash + claude -p |
-| Application | SDK (Phase 11) |
-| Event-driven | Hooks (Phase 11) |
-| Enterprise | n8n (Phase 12) |
+| Lệnh / Tính năng | Mô tả | Ví dụ |
+|---|---|---|
+| `for f in …; do claude -p … done` | Fan-out, mỗi item một session | `--allowedTools "Edit,Bash(git commit *)"` |
+| `--allowedTools` · `--permission-mode` | Pre-authorize thân vòng lặp | bắt buộc khi `-p` ghi |
+| `--output-format json` | Kết quả máy đọc được | `\| jq` |
+| `claude --bg "<prompt>"` | Bắn một background session | `--name` đặt nhãn; từ chối `-p` |
+| `claude agents` | Agent view (tương tác) | `--json`, `--json --all`, `--cwd` |
+| `claude attach <id>` · `claude logs <id>` | Mở tại đây · in output gần nhất | — |
+| `claude stop <id>` | Dừng (alias `claude kill`) | nhớ dọn |
+| `state` | `working`, `blocked`, `done`, `failed`, `stopped` | poll giá trị này |
+| Subagent · agent team · Agent SDK | Bậc 2, 3 và 6 | Module 7.3, 11.2 |
 
 ---
 
 ## 6. PITFALLS — Lỗi Thường Gặp
 
-| ❌ Sai Lầm | ✅ Đúng Cách |
+| ❌ Sai | ✅ Đúng |
 |---|---|
-| Jump thẳng SDK cho task đơn giản | Start với bash. Graduate khi cần programmatic control. 90% team không cần beyond bash. |
-| Không error handling | Check `$?`. Add retry. Log error. Exit non-zero khi fail. |
-| Sequential khi parallel được | Dùng `&` và `wait` cho agent độc lập. 3x nhanh hơn. |
-| Unstructured output giữa agent | Request structured output (markdown section, JSON) để parse reliable. |
-| Hardcode file path và prompt | Dùng variable: `$1`, `$FILE`. Làm script reusable. |
-| Ignore token cost trong loop | Estimate trước: files × tokens × price. Set limit. |
-| Build complex trước master basic | Module này = foundation. Advanced ở Phase 11-12. |
+| "Bash là đủ cho mọi thứ" | Đủ cho item độc lập, máy móc; việc chung context cần subagent, việc dài tách rời cần `--bg` |
+| `claude -p "fix $f"` không có permission flag | `-p` không pre-authorize gì: lần chạy không sửa gì mà vẫn tính tiền |
+| Dùng agent team cho refactor cùng file | Team tốn hơn nhiều (S15) và ghi đè lên nhau; dùng một session |
+| Output tự do rồi `grep` để parse | Kết thúc prompt bằng hợp đồng `OK`/`FAIL`, hoặc `--output-format json` |
+| Chạy loop trên cả 50 file ngay từ đầu | Thử 2-3 file, đọc diff, rồi chạy cả bộ (S1) |
+| `claude --bg -p "…"` | `--bg` nhận prompt positional và từ chối `-p` |
+| Bỏ mặc background agent chạy | `claude agents --json`, `claude stop <id>` |
 
 ---
 
 ## 7. REAL CASE — Câu Chuyện Thực Tế
 
-**Scenario**: Team fintech Việt Nam cần nightly code review cho 200-file codebase. Manual mất 2+ giờ/ngày.
+**Bối cảnh**: Một team fintech Việt Nam chạy pass kiểm tra chất lượng hằng đêm trên repo
+microservices. Team offshore push lúc 18:00 giờ địa phương; một senior dev mất trọn tiếng đầu mỗi
+sáng đọc tay đống diff đó, nên fix luôn trễ một ngày.
 
-**Solution**: Bash orchestration trong CI.
+**Vấn đề**: Bản tự động đầu tiên là mỗi service một `claude -p` ghi ra file report — và report ra
+rỗng. Không có gì được pre-authorize, nên mọi lần chạy bị deny trước khi ghi được dòng nào, còn
+loop vẫn báo thành công vì `claude` thoát sạch.
 
-```bash
-#!/bin/bash
-# nightly-review.sh
+**Giải pháp**: Hai thay đổi. Thân vòng lặp được thêm `--allowedTools` nêu đúng các tool một
+reviewer cần, và mỗi lần chạy dùng `--output-format json` để wrapper kiểm tra kết quả thay vì tin
+vào đường thoát. Các lần chạy theo service fan-out bằng `&` và `wait`; bước tổng hợp vẫn là một
+session đọc các report, vì phần đó không độc lập. Tất cả chạy từ CI (Module 11.4).
 
-mkdir -p reports
+**Kết quả**: Feedback giờ chờ sẵn team offshore lúc họ bắt đầu ngày làm việc. Pipeline vẫn là một
+shell script — cái thang vốn đúng bậc, chỉ permission là sai.
 
-for dir in src/services/*/; do
-  service=$(basename "$dir")
-  claude -p "Review $dir for security, performance issues.
-  Format: CRITICAL / WARNING / NOTE with file:line." \
-    > "reports/${service}.md" &
-done
-wait
-
-claude -p "Read reports/. Create summary.md with critical issues first."
-
-if grep -q "CRITICAL" summary.md; then
-  curl -X POST "$SLACK_WEBHOOK" \
-    -d '{"text":"⚠️ Critical issues found in nightly review"}'
-fi
-```
-
-**GitHub Actions**:
-
-```yaml
-name: Nightly Review
-on:
-  schedule:
-    - cron: '0 14 * * *'  # 9 PM Vietnam
-
-jobs:
-  review:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - run: ./scripts/nightly-review.sh
-        env:
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-      - uses: actions/upload-artifact@v3
-        with:
-          name: reports
-          path: |
-            reports/
-            summary.md
-```
-
-**Kết quả**:
-- 2 giờ manual → 15 phút automated
-- 100% file review mỗi ngày
-- Critical issue → Slack alert → team thấy sáng
-- Cost: ~$3/đêm
-
-**Insight**: "Không cần fancy tool. Bash + claude -p là đủ. Key là làm nó chạy automatic."
+**Bài học**: khi một fan-out "chạy được" mà không ra gì, hãy nghi permission chứ không phải prompt.
 
 ---
 
-> **Phase 7 Hoàn Thành!** Bạn đã hiểu multi-agent architecture, agentic loop, và orchestration cơ bản.
+> **Hoàn thành Phase 7.** Bạn chọn được mức permission, chạy auto workflow có ranh giới, uỷ thác
+> cho subagent và team, đóng vòng lặp bằng verifier, điều phối qua nhiều session.
 >
-> **Phase Tiếp Theo**: [Phase 8: Meta-Debugging](../../phase-08-meta-debugging/01-hallucination-detection/) — Học cách debug chính Claude.
+> **Tiếp theo**:
+> [Phase 8: Meta-Debugging](../../phase-08-meta-debugging/01-hallucination-detection/) →

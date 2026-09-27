@@ -59,7 +59,9 @@ graph TD
 Docker containers provide excellent isolation for development work:
 
 - **Mount ONLY the project directory** — Claude sees only your project code
-- **No network by default** — prevents data exfiltration (`--network=none`)
+- **Egress allowlisted, not cut** — Claude Code must reach the Anthropic API, so Docker's
+  no-network mode breaks the session. Restrict outbound traffic to an allowlist instead
+  (the reference devcontainer's [`init-firewall.sh`](https://github.com/anthropics/claude-code/blob/main/.devcontainer/init-firewall.sh))
 - **Resource limits** — prevents resource exhaustion attacks
 - **Disposable** — destroy container after session (`--rm`)
 - **No persistence** — secrets in container context disappear on exit
@@ -93,14 +95,14 @@ Cloud sandboxes (GitHub Codespaces, Gitpod) offer zero-setup isolation:
 | **0** | No sandbox | Everything on your system | ❌ Never recommended |
 | **1** | Discipline only | Everything (relies on you saying "no") | ❌ Quick tasks only, high risk |
 | **2** | Docker + project mount | Project files only | ✅ Daily development |
-| **3** | Docker + no network + project mount | Project files, no internet | ✅ Sensitive projects |
+| **3** | Docker + egress allowlist + project mount | Project files, allowlisted domains only | ✅ Sensitive projects |
 | **4** | Cloud sandbox | Nothing on your machine | ✅ Client work, untrusted code |
 
 ---
 
 ## 3. DEMO — Step by Step
 
-Let's build a Docker sandbox for Claude Code from scratch. This sandbox will isolate Claude to a single project directory with no network access.
+Let's build a Docker sandbox for Claude Code from scratch. This sandbox will isolate Claude to a single project directory; Step 5 covers the network.
 
 ### Step 1: Create Dockerfile
 
@@ -164,7 +166,6 @@ This is the most security-critical step. The `-v` flag controls what Claude can 
 ```bash
 docker run -it --rm \
   -v "$(pwd)":/workspace \
-  --network=none \
   --memory=4g \
   --cpus=2 \
   claude-sandbox
@@ -174,7 +175,8 @@ docker run -it --rm \
 - `-it` — interactive terminal
 - `--rm` — **CRITICAL** — destroy container on exit (no secret persistence)
 - `-v "$(pwd)":/workspace` — mount current directory ONLY, not home or parent
-- `--network=none` — **CRITICAL** — no internet = no data exfiltration
+- No network flag — Claude Code needs the Anthropic API, so the network stays on. Docker's
+  default network is **open to every host**; Step 5 shows why that matters
 - `--memory=4g` — limit memory usage
 - `--cpus=2` — limit CPU usage
 
@@ -226,20 +228,29 @@ drwxr-xr-x 1 root      root      4096 Feb  1 12:00 ..
 
 **Why this matters**: No `.aws`, no `.ssh`, no secrets. The container home directory is empty except for default shell configs. Host secrets are invisible.
 
-### Step 5: Verify Network Isolation
+### Step 5: Check Network Exposure
 
-Attempt to reach the internet:
+Attempt to reach an arbitrary host:
 
 ```bash
-curl https://google.com
+curl -I https://example.com
 ```
 
 Expected output:
 ```text
-curl: (6) Could not resolve host: google.com
+# Output may vary
+HTTP/2 200
 ```
 
-**Why this matters**: Even if Claude manages to execute a malicious command that tries to exfiltrate data via HTTP, it fails. No network = no data leaves the container.
+**Why this matters**: The filesystem is contained, but egress is **not**. A prompt-injected command
+can still `curl` project secrets to any server. You cannot fix this by cutting the network —
+Claude Code itself needs the Anthropic API. The fix is an **egress allowlist**:
+
+- **Container**: the [reference devcontainer](https://github.com/anthropics/claude-code/tree/main/.devcontainer) runs `init-firewall.sh`, which
+  limits outbound traffic to the domains the script allows. It needs the `NET_ADMIN` and `NET_RAW`
+  capabilities (set via `runArgs` in `devcontainer.json`).
+- **No container**: the built-in Bash sandbox (`/sandbox`) confines commands to the domains in
+  `sandbox.network.allowedDomains` ([docs](https://code.claude.com/docs/en/sandboxing)).
 
 ### Step 6: Verify Project Access
 
@@ -388,16 +399,19 @@ cat ~/.fake-secret
 
 ### Exercise 3: Verify Network Isolation
 
-**Goal**: Confirm that `--network=none` actually prevents network access.
+**Goal**: See the open egress in your hand-built sandbox, then compare it with an allowlisted one.
 
 **Instructions**:
-1. Run container WITH network: `docker run -it --rm -v "$(pwd)":/workspace my-claude-sandbox`
-2. Inside container, test network: `curl -I https://google.com`
-3. Exit container
-4. Run container WITHOUT network: `docker run -it --rm -v "$(pwd)":/workspace --network=none my-claude-sandbox`
-5. Inside container, test network again: `curl -I https://google.com`
+1. Run your sandbox: `docker run -it --rm -v "$(pwd)":/workspace my-claude-sandbox`
+2. Inside the container, test egress: `curl -I https://example.com`
+3. Exit the container
+4. Clone [`anthropics/claude-code`](https://github.com/anthropics/claude-code) and open it in
+   VS Code → **Dev Containers: Reopen in Container** (the reference devcontainer)
+5. In the container terminal, run `curl -I https://example.com` again, then `claude`
 
-**Expected result**: Step 2 should succeed (you'll see HTTP headers). Step 5 should fail with "Could not resolve host". This proves `--network=none` works.
+**Expected result**: Step 2 succeeds — your sandbox can reach any host. In step 5 the request to
+`example.com` is blocked by `init-firewall.sh`, while `claude` still signs in because the
+Anthropic endpoints are on the allowlist.
 
 <details>
 <summary>💡 Hint</summary>
@@ -410,26 +424,22 @@ The `-I` flag makes curl fetch only HTTP headers (faster test). If curl isn't in
 <summary>✅ Solution</summary>
 
 ```bash
-# WITH network (default)
+# Your hand-built sandbox — default Docker network
 docker run -it --rm -v "$(pwd)":/workspace my-claude-sandbox
-
-# Inside container
-curl -I https://google.com
-# Output: HTTP/2 200 (success - network works)
-
+curl -I https://example.com
+# Output may vary: HTTP/2 200  → egress is open
 exit
 
-# WITHOUT network
-docker run -it --rm -v "$(pwd)":/workspace --network=none my-claude-sandbox
-
-# Inside container
-curl -I https://google.com
-# Output: curl: (6) Could not resolve host: google.com (FAIL - network blocked)
-
-exit
+# Reference devcontainer (after "Reopen in Container")
+curl -I https://example.com
+# Output may vary: connection refused / timed out → blocked by init-firewall.sh
+claude
+# Signs in normally → Anthropic API is on the allowlist
 ```
 
-**What this proves**: `--network=none` actually blocks network access. Even if Claude Code (or malicious code) tries to exfiltrate data via HTTP, it fails silently.
+**What this proves**: Mount isolation alone does not stop exfiltration. An egress allowlist does,
+without breaking Claude Code. ⚠️ Needs verification — the allowlist lives in `init-firewall.sh`
+and changes with the repo; read it before relying on it.
 
 </details>
 
@@ -444,7 +454,8 @@ exit
 | `docker build -t name .` | Build sandbox image | One-time setup |
 | `docker run -it --rm` | Run interactive, auto-cleanup | `--rm` prevents secret persistence |
 | `-v "$(pwd)":/workspace` | Mount current directory | ⚠️ ONLY mount project, never `~` |
-| `--network=none` | Disable networking | Prevents data exfiltration |
+| `init-firewall.sh` + `NET_ADMIN`/`NET_RAW` | Egress allowlist (reference devcontainer) | Blocks exfiltration, keeps Anthropic API |
+| `sandbox.network.allowedDomains` | Built-in Bash sandbox allowlist (`/sandbox`) | OS-enforced, no container needed |
 | `--memory=4g` | Limit RAM to 4GB | Prevents resource exhaustion |
 | `--cpus=2` | Limit to 2 CPU cores | Prevents resource exhaustion |
 | `-u $(id -u):$(id -g)` | Match host user UID/GID | Fixes file permission issues |
@@ -467,7 +478,7 @@ exit
 | Use Case | Command |
 |----------|---------|
 | **Daily dev** (Level 2) | `docker run -it --rm -v "$(pwd)":/workspace sandbox` |
-| **Sensitive project** (Level 3) | `docker run -it --rm -v "$(pwd)":/workspace --network=none sandbox` |
+| **Sensitive project** (Level 3) | Reference devcontainer with `init-firewall.sh` (egress allowlist) |
 | **Client work** (Level 4) | Use GitHub Codespaces or Gitpod (zero host exposure) |
 
 ---
@@ -480,7 +491,8 @@ exit
 | Forgetting `--rm` flag | Always use `--rm` — prevents containers with secrets from persisting on disk |
 | Using `--privileged` flag | NEVER use `--privileged` — gives container root on host, defeats all isolation |
 | Mounting Docker socket: `-v /var/run/docker.sock:/var/run/docker.sock` | NEVER mount Docker socket — equivalent to root access on host |
-| Forgetting `--network=none` for sensitive work | Always use `--network=none` for client work or sensitive data — prevents exfiltration |
+| Cutting the network with Docker's no-network mode | Claude Code needs the Anthropic API — that mode breaks the session. Allowlist egress (`init-firewall.sh` or `/sandbox`) |
+| Leaving Docker's default network open for client work | Default network reaches any host — add an egress allowlist for sensitive data |
 | Mounting parent directory: `-v ~/projects:/workspace` | Mount specific project only: `-v ~/projects/client-a:/workspace` — siblings might have secrets |
 | Running as root user in container | Create non-root user in Dockerfile (see DEMO) — limits damage from container escape |
 | Hardcoding secrets in Dockerfile | NEVER put secrets in Dockerfile — they persist in image layers forever |
@@ -511,8 +523,8 @@ If Susan had used Docker sandbox:
 cd ~/projects/client-a
 docker run -it --rm \
   -v "$(pwd)":/workspace \
-  --network=none \
   claude-sandbox
+# For egress control on top, use the reference devcontainer (Step 5)
 ```
 
 From inside this container:

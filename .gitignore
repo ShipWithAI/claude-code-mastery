@@ -28,3 +28,6 @@ Thumbs.db
 *.swp
 *.swo
 .gstack/
+
+# Wave 1 docs notes (local only)
+docs/superpowers/plans/wave1-notes/
