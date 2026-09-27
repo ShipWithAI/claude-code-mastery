@@ -60,10 +60,14 @@ graph LR
 | **Code** | either | Yes | JavaScript/Python glue between nodes |
 
 To re-enable Execute Command on a self-hosted instance, set the `NODES_EXCLUDE` environment
-variable to a JSON array that leaves it out — for example
-`NODES_EXCLUDE=["n8n-nodes-base.readWriteFile"]` (the docs' own default-blocked example pairs
-Execute Command with Read/Write Files from Disk; drop the one you want back). Docs: "Some nodes,
-like Execute Command, are blocked by default. Remove them from the exclude list to enable them."
+variable to a JSON array that leaves it out. The docs' own example, exactly as written in a
+compose/YAML value (the surrounding quotes are escaped because the whole array is one string):
+```yaml
+NODES_EXCLUDE: "[\"n8n-nodes-base.readWriteFile\"]"
+```
+That pairs Execute Command with Read/Write Files from Disk in the *default* blocked list; drop the
+one you want back out of the array. Docs: "Some nodes, like Execute Command, are blocked by
+default. Remove them from the exclude list to enable them."
 
 ---
 
@@ -101,6 +105,7 @@ const server = http.createServer(async (req, res) => {
       permissionMode: 'dontAsk',              // deny anything not in allowedTools
       maxTurns: 6,
       resume: session_id,                     // continue a prior session if the caller sends one
+      settingSources: [],                     // isolate from the host's user/project/.claude settings
     },
   })) {
     if (message.type === 'result') result = message;
@@ -117,7 +122,9 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => console.log(`agent-service listening on :${PORT}`));
 ```
 
-`npm install @anthropic-ai/claude-agent-sdk` installed `0.1.77` for this lab.
+`npm install @anthropic-ai/claude-agent-sdk` installed `0.1.77` for this lab. (Outputs below were
+captured before `settingSources: []` was added here; `~/cc-lab` has no `CLAUDE.md`, so nothing
+changed — without it, `query()` loads the host's user/project/local settings like the CLI does.)
 
 **Step 2: Run it on the host**
 
@@ -232,8 +239,9 @@ curl -s localhost:8787/run -H 'content-type: application/json' \
 **Goal**: Understand exactly what you're trading away before you flip this switch.
 
 **Instructions**:
-1. On a self-hosted n8n, set `NODES_EXCLUDE=["n8n-nodes-base.readWriteFile"]` (leaving Execute
-   Command out of the exclude list re-enables it).
+1. On a self-hosted n8n, set the compose/YAML value
+   `NODES_EXCLUDE: "[\"n8n-nodes-base.readWriteFile\"]"` (leaving Execute Command out of the
+   exclude list re-enables it).
 2. List, in your own words, what an attacker who can edit this workflow could now do that they
    couldn't with the HTTP Request approach.
 
@@ -260,7 +268,7 @@ path exposes, since that service only accepts a `prompt` field over HTTP.
 | Run service on host | `REPO_DIR=~/cc-lab PORT=8787 node server.mjs` |
 | Pull n8n image | `docker pull docker.n8n.io/n8nio/n8n` |
 | n8n → host service URL | `http://host.docker.internal:8787/run` |
-| Re-enable Execute Command | `NODES_EXCLUDE=["n8n-nodes-base.readWriteFile"]` |
+| Re-enable Execute Command (compose/YAML value) | `NODES_EXCLUDE: "[\"n8n-nodes-base.readWriteFile\"]"` |
 | Webhook → HTTP Request body | `{"prompt": "{{ $json.body.prompt }}"}` |
 
 | Node | Purpose |
@@ -282,6 +290,7 @@ path exposes, since that service only accepts a `prompt` field over HTTP.
 | `claude -p` with no permission flag in a node | Always pass `--permission-mode` or `--allowedTools`; a bare `-p` run defaults to Manual |
 | Baking `ANTHROPIC_API_KEY` into the n8n image | Pass it from the environment at container start; never a literal in `compose.yaml` |
 | Treating a natural-language refusal as a thrown error | The Agent SDK returns `result: "success"` even when Claude declines a request in text — check the text, don't assume HTTP status alone means success |
+| Shipping this demo's `/run` as-is | It has no auth and no input validation; put it behind an auth check and network isolation, and validate `prompt`/`session_id` before they reach `query()` |
 
 ---
 

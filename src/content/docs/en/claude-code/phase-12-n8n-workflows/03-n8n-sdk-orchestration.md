@@ -60,10 +60,11 @@ separate service, no repo checkout.
 | Needs the exact same permission model (`allowedTools`, hooks) across every call | Claude Code via `agent-service` |
 | A quick classification or chat reply with no filesystem involved | n8n **AI Agent** + **Anthropic Chat Model** — one fewer moving part |
 
-The Anthropic Chat Model node's **Model** field is populated live from your connected credential —
-there's no fixed list published in the node's docs, so this course doesn't hardcode a model ID
-here either. Pick whatever current Claude model your credential's dropdown shows, the same way you
-would pass a model *alias* (not a dated ID) to the Agent SDK's own `model` option.
+The Anthropic Chat Model node's docs do list model names, but the list they show is stale (it
+still names a long-retired "Claude Instant" model) — not a source to copy into a prompt or a
+prod config. Use whatever current Claude model your credential's own dropdown shows in the node
+itself, the same way you'd pass a model *alias* (not a dated ID) to the Agent SDK's own `model`
+option.
 
 ---
 
@@ -117,6 +118,7 @@ options: {
   allowedTools: ['Read', 'Grep', 'Glob'],
   permissionMode: 'dontAsk',
   resume: session_id,
+  settingSources: [], // see the note below — without this, query() loads the host's own settings
   hooks: {
     PreToolUse: [{
       hooks: [async (input) => {
@@ -127,10 +129,12 @@ options: {
   },
 }
 ```
-Because this service passes `hooks` directly to `query()`, it has no `.claude/settings.json` to
-read from — pass `settingSources: []` (the SDK default already excludes CLAUDE.md-style project
-settings unless you explicitly include `'project'`) if you want to guarantee nothing on the host's
-filesystem changes this service's behavior.
+By default `query()` loads settings from the filesystem it runs on — user, project, *and* local,
+the same three sources the CLI reads, CLAUDE.md included — even though this service passes its own
+`hooks` and tool list in code. That means an `agent-service` deployed onto a host with its own
+`~/.claude/settings.json` or a project `CLAUDE.md` inherits those, silently. Pass
+`settingSources: []` (as Module 12.1's `server.mjs` now does) to opt out and guarantee this
+service's behavior comes only from the code you can see here.
 
 ---
 

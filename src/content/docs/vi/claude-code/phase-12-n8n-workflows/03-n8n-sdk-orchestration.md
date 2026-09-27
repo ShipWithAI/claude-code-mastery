@@ -58,10 +58,10 @@ riêng, không cần checkout repo.
 | Cần đúng permission model (`allowedTools`, hooks) giống hệt mọi call | Claude Code qua `agent-service` |
 | Một câu classify hay chat reply nhanh, không đụng filesystem | n8n **AI Agent** + **Anthropic Chat Model** — ít một moving part hơn |
 
-Field **Model** của node Anthropic Chat Model được load động từ credential bạn kết nối — docs của
-node không công bố list cố định nào, nên course này cũng không hardcode model ID ở đây. Chọn bất
-kỳ model Claude hiện tại nào dropdown của credential hiện ra, giống cách bạn truyền một *alias*
-model (không phải ID có ngày tháng) vào option `model` của Agent SDK.
+Docs của node Anthropic Chat Model có liệt kê tên model, nhưng list đó cũ (vẫn ghi tên một model
+"Claude Instant" đã ngừng từ lâu) — không phải nguồn để copy vào prompt hay config production.
+Dùng bất kỳ model Claude hiện tại nào dropdown của chính credential bạn hiện ra trong node, giống
+cách bạn truyền một *alias* model (không phải ID có ngày tháng) vào option `model` của Agent SDK.
 
 ---
 
@@ -105,8 +105,7 @@ Với một workflow chỉ classify tin nhắn Slack đến theo intent — khô
 một tool database) nếu việc classify cần tra cứu gì đó — nhưng không cái nào đụng filesystem theo
 cách tool `Read`/`Grep`/`Bash` của Claude Code làm.
 
-**Bước 4: Thêm hooks trong code `agent-service` (không phải trong `.claude/settings.json` mà
-service này không bao giờ đọc)**
+**Bước 4: Thêm hooks trong code `agent-service`**
 
 ```javascript
 // docs: https://code.claude.com/docs/en/agent-sdk/typescript — options.hooks
@@ -115,6 +114,7 @@ options: {
   allowedTools: ['Read', 'Grep', 'Glob'],
   permissionMode: 'dontAsk',
   resume: session_id,
+  settingSources: [], // xem ghi chú bên dưới — thiếu nó, query() sẽ load settings của host
   hooks: {
     PreToolUse: [{
       hooks: [async (input) => {
@@ -125,10 +125,11 @@ options: {
   },
 }
 ```
-Vì service này truyền `hooks` thẳng vào `query()`, nó không có `.claude/settings.json` nào để đọc
-— truyền `settingSources: []` (mặc định SDK đã loại project settings kiểu CLAUDE.md trừ khi bạn
-chủ động thêm `'project'`) nếu bạn muốn đảm bảo không gì trên filesystem của host thay đổi hành vi
-service này.
+Mặc định `query()` load settings từ filesystem nơi nó chạy — user, project, *và* local, đúng ba
+nguồn CLI đọc, kể cả CLAUDE.md — dù service này đã tự truyền `hooks` và tool list bằng code. Nghĩa
+là một `agent-service` deploy lên host có sẵn `~/.claude/settings.json` hay một `CLAUDE.md` cấp
+project sẽ âm thầm kế thừa chúng. Truyền `settingSources: []` (như `server.mjs` ở Module 12.1 giờ
+đã làm) để opt-out và đảm bảo hành vi service này chỉ đến từ code bạn thấy ở đây.
 
 ---
 

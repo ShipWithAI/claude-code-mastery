@@ -58,10 +58,14 @@ graph LR
 | **Code** | cả hai | Có | Glue JavaScript/Python giữa các node |
 
 Để enable lại Execute Command trên instance self-host, set biến môi trường `NODES_EXCLUDE` thành
-một JSON array không có nó — ví dụ `NODES_EXCLUDE=["n8n-nodes-base.readWriteFile"]` (ví dụ mặc
-định trong docs ghép Execute Command với Read/Write Files from Disk; bỏ cái bạn muốn bật lại ra
-khỏi list). Docs: "Some nodes, like Execute Command, are blocked by default. Remove them from the
-exclude list to enable them."
+một JSON array không có nó. Đúng theo docs, viết trong compose/YAML (dấu ngoặc kép bên trong bị
+escape vì cả array là một string):
+```yaml
+NODES_EXCLUDE: "[\"n8n-nodes-base.readWriteFile\"]"
+```
+Đó là ví dụ mặc định trong docs, ghép Execute Command với Read/Write Files from Disk; bỏ cái bạn
+muốn bật lại ra khỏi array. Docs: "Some nodes, like Execute Command, are blocked by default.
+Remove them from the exclude list to enable them."
 
 ---
 
@@ -99,6 +103,7 @@ const server = http.createServer(async (req, res) => {
       permissionMode: 'dontAsk',              // từ chối bất cứ gì ngoài allowedTools
       maxTurns: 6,
       resume: session_id,                     // nối tiếp session cũ nếu caller gửi kèm
+      settingSources: [],                     // cô lập khỏi user/project/.claude settings của host
     },
   })) {
     if (message.type === 'result') result = message;
@@ -115,7 +120,9 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => console.log(`agent-service listening on :${PORT}`));
 ```
 
-`npm install @anthropic-ai/claude-agent-sdk` cài bản `0.1.77` cho lab này.
+`npm install @anthropic-ai/claude-agent-sdk` cài bản `0.1.77` cho lab này. (Output bên dưới chạy
+trước khi thêm `settingSources: []` vào đây; `~/cc-lab` không có `CLAUDE.md` nên không đổi gì —
+nếu không có nó, `query()` load user/project/local settings của host giống hệt CLI.)
 
 **Bước 2: Chạy trên host**
 
@@ -229,8 +236,9 @@ curl -s localhost:8787/run -H 'content-type: application/json' \
 **Mục tiêu**: Hiểu chính xác bạn đang đánh đổi gì trước khi bật công tắc này.
 
 **Hướng dẫn**:
-1. Trên n8n self-host, set `NODES_EXCLUDE=["n8n-nodes-base.readWriteFile"]` (bỏ Execute Command ra
-   khỏi exclude list = enable lại nó).
+1. Trên n8n self-host, set giá trị compose/YAML
+   `NODES_EXCLUDE: "[\"n8n-nodes-base.readWriteFile\"]"` (bỏ Execute Command ra khỏi exclude
+   list = enable lại nó).
 2. Liệt kê, bằng lời của bạn, attacker có thể làm gì thêm nếu edit được workflow này, so với cách
    HTTP Request.
 
@@ -257,7 +265,7 @@ workflow khác trên disk, reach tới host nội bộ, hoặc cài backdoor —
 | Chạy service trên host | `REPO_DIR=~/cc-lab PORT=8787 node server.mjs` |
 | Pull image n8n | `docker pull docker.n8n.io/n8nio/n8n` |
 | URL n8n → service trên host | `http://host.docker.internal:8787/run` |
-| Enable lại Execute Command | `NODES_EXCLUDE=["n8n-nodes-base.readWriteFile"]` |
+| Enable lại Execute Command (giá trị compose/YAML) | `NODES_EXCLUDE: "[\"n8n-nodes-base.readWriteFile\"]"` |
 | Body Webhook → HTTP Request | `{"prompt": "{{ $json.body.prompt }}"}` |
 
 | Node | Mục đích |
@@ -279,6 +287,7 @@ workflow khác trên disk, reach tới host nội bộ, hoặc cài backdoor —
 | `claude -p` không có permission flag trong node | Luôn kèm `--permission-mode` hoặc `--allowedTools`; `-p` trần mặc định Manual |
 | Bake `ANTHROPIC_API_KEY` vào image n8n | Truyền từ environment lúc start container; không bao giờ để giá trị thật trong `compose.yaml` |
 | Coi câu từ chối bằng ngôn ngữ tự nhiên là lỗi ném ra | Agent SDK vẫn trả `result: "success"` khi Claude từ chối bằng lời — check nội dung text, đừng chỉ tin HTTP status |
+| Ship demo `/run` này y nguyên vào production | Nó không có auth, không validate input; đặt sau auth check và cô lập network, validate `prompt`/`session_id` trước khi đưa vào `query()` |
 
 ---
 
