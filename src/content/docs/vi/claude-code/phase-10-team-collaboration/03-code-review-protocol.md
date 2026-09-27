@@ -1,282 +1,218 @@
 ---
-title: 'Quy trình Code Review'
-description: 'Quy trình code review với Claude Code: tự động review, checklist và tích hợp vào PR workflow.'
+title: 'Code Review Protocol'
+description: 'Dùng /code-review và /security-review như một reviewer fresh-context, và giữ human gate ở mọi lần merge.'
+verified: 2026-09-27
+claude_version: 2.1.283
 ---
 
-# Module 10.3: Quy trình Code Review
+# Module 10.3: Code Review Protocol
 
 > **Thời gian học**: ~30 phút
 >
 > **Yêu cầu trước**: Module 10.2 (Quy ước Git)
 >
-> **Kết quả**: Sau module này, bạn sẽ có code review protocol cho AI-generated code, biết dùng Claude assist review, và hiểu author và reviewer responsibility.
+> **Kết quả**: Sau module này, bạn hiểu tại sao agent viết code không thể tự duyệt code đó, biết
+> chạy `/code-review` và `/security-review` như một check độc lập, và biết con người còn phải xác
+> nhận gì trước khi merge.
 
 ---
 
-## 1. WHY — Tại Sao Cần Hiểu
+## 1. WHY — Tại Sao Cần Quan Tâm
 
-Dev submit PR 500 dòng Claude-generated. Reviewer skim — "looks clean, AI wrote, probably fine." Ship production. Bug phát hiện 1 tuần sau: AI miss edge case implied nhưng không explicit trong requirement. Không ai catch vì cả author và reviewer assume AI thorough.
-
-AI-generated code cần MORE scrutiny, không phải less. Module này thiết lập "trust but verify" protocol cho AI-assisted PR.
+Dev nộp PR với 400 dòng code Claude viết. Reviewer lướt qua — "clean, AI viết, chắc ổn" — rồi
+approve. Một tuần sau, bug lộ ra: một edge case ngầm hiểu trong requirement nhưng chưa bao giờ nói
+rõ trong prompt. Không ai bắt được, vì cả author lẫn reviewer đều tin rằng chính session viết code
+sẽ tự bắt được lỗi của mình. Anthropic nói thẳng vấn đề gốc: "the agent that wrote the code has no
+way to approve it" (S3). Module này xây một check thứ hai, độc lập, vào quy trình.
 
 ---
 
 ## 2. CONCEPT — Ý Tưởng Cốt Lõi
 
-### AI Code Review Paradox
+### Tại sao Claude của chính author không thể làm reviewer
 
-AI code thường LOOKS cleaner hơn human code. Nhưng có thể miss:
-- Implicit requirement không stated trong prompt
-- Context từ verbal discussion hoặc past decision
-- Edge case mà "ai cũng biết" nhưng không mention
-- Integration pattern từ phần khác của codebase
+Context đã viết code mang cùng giả định, cùng điểm mù, và thiên hướng tự khen mình làm tốt —
+nghiên cứu harness của Anthropic gọi đây là "confident praising": một
+generator tự chấm điểm mình có xu hướng báo cáo thành công quá mức (S12). Cách sửa mang tính cấu
+trúc, không phải prompt hay hơn: reviewer cần một **fresh context** chưa từng thấy plan, chỉ thấy
+diff.
 
-Reviewer guard down vì "looks professional." Đây là nguy hiểm.
+### `/code-review` và `/security-review`
 
-### AI-Specific Review Checklist
+| Command | Kiểm tra gì | Ghi chú |
+|---|---|---|
+| `/code-review` (alias `/review`) | Bug correctness trong diff hiện tại, một PR, một branch, hoặc một path | Truyền `ultra` (tức `/code-review ultra`) để chạy deep multi-agent review trong cloud sandbox — không có `claude ultrareview` như một CLI command riêng |
+| `/security-review` | Lỗ hổng bảo mật trong thay đổi trên branch hiện tại | Diff so với `origin/HEAD` — cần remote `origin` đã cấu hình, nếu không `git diff` bên dưới fail và toàn bộ review abort |
 
-| Check | Why | Example Issue |
-|-------|-----|---------------|
-| Requirement match | AI có thể misunderstand | Implement login thay vì SSO đã discuss |
-| Edge case covered | AI handle explicit, miss implicit | Không null check cho optional field |
-| Context awareness | AI không biết verbal decision | Dùng approach đã reject trong standup |
-| Integration fit | AI thấy file, không thấy system | Pattern mới inconsistent với existing |
-| Security considered | AI có thể không prioritize | SQL build với string concat |
+Cả hai command tự spawn reviewer subagent read-only riêng, không tái dùng context của session đã
+viết code — DEMO bên dưới cho thấy `/security-review` gọi thẳng hai background agent (một
+identifier và một false-positive filter) với finding và confidence score riêng.
 
-### Author Responsibility
+### Confidence threshold là lựa chọn thiết kế, không phải bug
 
-Khi submit AI-assisted PR:
-1. **HIỂU** mọi dòng — không explain được thì không submit
-2. **VERIFY** với requirement — không chỉ "nó compile"
-3. **DISCLOSE** AI assistance — dùng 🤖 marker
-4. **HIGHLIGHT** uncertainty — "Không chắc phần này match pattern"
-5. **TEST** kỹ — không trust "I added tests"
+`/security-review` không báo cáo mọi issue có thể có — nó filter theo confidence, và một
+vulnerability thật có thể rơi ngay dưới ngưỡng nếu chưa có gì trong repo gọi tới function nguy
+hiểm đó. Đó là trade-off có chủ đích để giảm noise, không phải bằng chứng tool đã bỏ sót gì — coi
+finding "dưới ngưỡng" là danh sách cần theo dõi, không phải giấy chứng nhận sạch.
 
-### Reviewer Responsibility
+### Human gate ở mọi lần chuyển giao artifact
 
-Với AI-assisted PR:
-1. **KHÔNG** assume correct — AI code có thể subtly wrong
-2. **CHECK** requirement — nó có solve đúng problem không?
-3. **VERIFY** pattern — có match existing codebase không?
-4. **QUESTION** author — họ có explain được phần phức tạp không?
-5. **TEST** edge case — AI thường miss implicit case
+Trách nhiệm author và reviewer không đổi chỉ vì máy viết diff:
 
-### Claude as Review Assistant
+- **Author**: hiểu từng dòng đủ để giải thích được; công khai Claude đã viết; nêu rõ phần chưa chắc
+  chắn.
+- **Reviewer**: đừng để "trông chuyên nghiệp" thay thế việc kiểm tra nó giải quyết đúng vấn đề,
+  khớp pattern hiện có, và xử lý edge case chưa ai viết ra.
 
-Dùng Claude hỗ trợ review, nhưng nhớ limit:
-- "Review diff này cho security issue"
-- "Edge case nào có thể miss?"
-- "Có match pattern trong [file] không?"
-
-NHƯNG: Claude review Claude có blind spot. Human judgment vẫn cần.
+`/code-review` và `/security-review` là input cho human judgment đó, không thay thế nó — và CI có
+thể chạy `claude-code-action` trên mọi PR để đảm bảo input luôn tồn tại kể cả khi con người quên
+yêu cầu (Module 11.4).
 
 ---
 
 ## 3. DEMO — Từng Bước
 
-**Scenario**: Review PR cho authentication feature, generated với Claude Code.
+**Kịch bản**: một diff nhỏ thêm `src/calc.js` với hai issue thật — chia cho 0 và một lệnh `eval()`
+— cả hai review command đều chạy trên diff đó.
 
-### Step 1: Author Self-Review Trước Submit
-
-```text
-Bạn: Trước khi submit PR, review authentication implementation này.
-Check:
-- Security issue
-- Missing edge case
-- Inconsistency với auth pattern trong src/auth/
-
-Claude: POTENTIAL ISSUES FOUND:
-1. Password comparison dùng == thay vì timing-safe comparison
-2. Không rate limiting cho login attempt
-3. JWT expiry là 30 ngày (existing code dùng 24 giờ)
-4. Missing test cho invalid token format
-```
-
-Author fix issue TRƯỚC khi submit.
-
-### Step 2: Author Submit với Disclosure
-
-```markdown
-## PR Description
-
-### What
-Implement user authentication với JWT
-
-### AI Assistance
-🤖 Generated with Claude Code
-
-### Areas for careful review
-- Token refresh logic (line 45-67) — không chắc match pattern
-- Error message format — Claude suggest, cần verify
-
-### Author Checklist
-- [x] Tôi hiểu tất cả code trong PR này
-- [x] Tested locally với edge case
-- [x] Verified với existing pattern
-```
-
-### Step 3: Reviewer Dùng Claude
+**Bước 1: `/code-review` trên diff chưa commit**
 
 ```text
-Bạn: Review auth PR diff này cho:
-- Security vulnerability
-- Missing edge case
-- Inconsistency với src/auth/
-
-[paste diff]
-
-Claude: OBSERVATIONS:
-- Line 34: Good - dùng bcrypt.compare
-- Line 56: Question - rate limit là 100/hour, existing dùng 10/minute
-- Line 78: Missing - không handle expired refresh token
+> /code-review
+```
+```text
+# Output may vary
+- src/calc.js:7 — Security: eval() runs user input, so a crafted expression can execute any code.
+- src/calc.js:2 — Correctness: percentOf returns Infinity or NaN when total is 0.
 ```
 
-### Step 4: Reviewer Hỏi Author
+**Bước 2: `/security-review` trên cùng branch**
 
 ```text
-Reviewer comment:
-"Rate limit là 100/hour nhưng existing code dùng 10/minute.
-Intentional không?"
+> /security-review
+```
+```text
+# Output may vary
+⏺ Agent(Identify vulns in calc.js)     ⎿ Backgrounded agent
+⏺ Agent "Identify vulns in calc.js" finished · 40s
+⏺ Agent(FP-filter eval finding)        ⎿ Backgrounded agent
+⏺ Agent "FP-filter eval finding" finished · 37s
 
-Author response:
-"Good catch! Đó là Claude suggest. Nên match existing. Fixed."
+Security Review: src/calc.js
+No findings reached the reporting threshold of confidence 8 or higher.
+
+Below the threshold
+eval code injection in src/calc.js:7 (runExpression)
+- Confidence: 7/10 — excluded because nothing in the repo calls runExpression yet, so there's
+  no confirmed path from untrusted input to this line.
+- Risk if a future caller passes untrusted input: full remote code execution.
+- Recommendation: replace eval with a restricted parser.
 ```
 
-### Step 5: Final Human Review
+Hai subagent độc lập, read-only (identify → filter false positives) tạo ra kết quả này, không phải
+session đáng lẽ sẽ viết fix.
 
-Reviewer:
-- Manually test edge case
-- Verify author explain được complex section
-- Approve sau human judgment, không chỉ AI review
+**Bước 3: Con người đọc cả hai, quyết định đáng để fix ngay**
+
+Finding `eval()` xuất hiện ở cả hai lần chạy — một lần vượt threshold ở `/code-review`, một lần
+dưới threshold ở `/security-review` kèm lý do rõ ràng. Reviewer coi cả hai cùng nhau là "fix trước
+khi merge," không phải "một tool nói ổn là xong."
+
+**Bước 4: Fix, theo đúng quy ước git ở Module 10.2**
+
+Chính fix và commit trailer của nó là DEMO ở Module 10.2 — cùng diff, cùng repo, tiếp nối đúng
+finding này.
 
 ---
 
 ## 4. PRACTICE — Tự Thực Hành
 
-### Bài 1: Pre-Submit Self-Review
+### Exercise 1: Chạy cả hai review trên branch của bạn
 
-**Goal**: Catch issue trước submit.
+**Goal**: Thấy finding thật trên code thật, không phải code lab.
 
 **Instructions**:
-1. Tạo small feature với Claude
-2. Trước submit, ask Claude review for issue
-3. Fix những gì Claude tìm được
-4. Document: Claude caught gì mà bạn miss?
+1. Trên một branch có diff thật, chạy `/code-review`.
+2. Chạy `/security-review`. Nếu lỗi ở `origin/HEAD`, thêm hoặc fetch remote trước — bản thân lỗi
+   đó cũng đáng biết trước khi bạn dựa vào command này trong CI.
+3. Với mỗi finding, quyết định: fix ngay, theo dõi, hay bỏ qua — và nói rõ lý do.
 
 <details>
 <summary>💡 Hint</summary>
 
-Prompt: "Review code này cho security issue, edge case, và consistency với [existing file]"
+`/security-review` cần `origin/HEAD` resolve được. Repo clone bình thường đã có sẵn; repo lab tạo
+từ đầu có thể cần `git remote add origin <url>` trước.
 </details>
 
-### Bài 2: AI-Aware Review
+### Exercise 2: Đọc đúng một finding dưới ngưỡng
 
-**Goal**: Practice enhanced review checklist.
-
-**Instructions**:
-1. Review PR của colleague (hoặc old PR của bạn)
-2. Apply AI-specific checklist
-3. Dùng Claude assist
-4. Compare: Claude catch gì vs. bạn catch gì?
-
-### Bài 3: Understanding Test
-
-**Goal**: Verify author comprehension.
+**Goal**: Luyện coi finding bị filter là "theo dõi," không phải "bỏ qua."
 
 **Instructions**:
-1. Với AI-generated code, ask author explain complex section
-2. Nếu không explain rõ được, flag for revision
-3. Document exchange
+1. Lấy ví dụ `eval()` từ DEMO (hoặc một finding confidence thấp tương tự của bạn).
+2. Viết một câu: điều gì sẽ nâng confidence của nó lên (vd "có caller mới truyền input từ user").
+3. Thêm code comment hoặc issue link điều kiện đó với finding gốc.
+
+### Exercise 3: Giải thích được hoặc đừng nộp
+
+**Goal**: Xác nhận author hiểu code, độc lập với mọi review tool.
+
+**Instructions**: Với một PR Claude viết, yêu cầu author giải thích miệng phần khó nhất. Nếu không
+giải thích được, đó là flag cần sửa lại bất kể `/code-review` báo gì.
 
 <details>
 <summary>✅ Solution</summary>
 
-Rule: "Không explain được thì không submit."
-
-Nếu author nói "Claude viết, tôi không chắc tại sao" — đó là red flag. Code cần revise cho đến khi author hiểu.
+"Claude viết, tôi không chắc sao nó chạy" tự nó đã là red flag — `/code-review` pass không thay thế
+được việc author hiểu code.
 </details>
 
 ---
 
 ## 5. CHEAT SHEET
 
-### AI-Specific Review Checklist
+| Command | Phạm vi | Ghi chú |
+|---|---|---|
+| `/code-review` (alias `/review`) | Diff hiện tại, một PR, một branch, hoặc một path | `/code-review ultra` = deep cloud multi-agent review |
+| `/security-review` | Diff so với `origin/HEAD` trên branch hiện tại | Cần remote `origin` resolve được |
+| `claude-code-action` trên PR | Review enforced bởi CI, mọi PR | Module 11.4 |
+| `/pr-comments` | ❌ Đã bị xoá ở v2.1.91 | Nhờ Claude xem PR comment trực tiếp thay vào |
+
+### Human gate checklist
 
 ```text
-[ ] Requirement actually match (không chỉ code quality)
-[ ] Edge case covered (implicit case too)
-[ ] Consistent với existing pattern
-[ ] Security considered
-[ ] Author explain được mọi dòng
-```
-
-### Author Responsibility
-
-1. Hiểu mọi dòng
-2. Verify vs. requirement
-3. Disclose AI assistance
-4. Highlight uncertainty
-5. Test thoroughly
-
-### Reviewer Prompt cho Claude
-
-```text
-"Review diff này cho security issue"
-"Edge case nào có thể miss?"
-"Có match pattern trong [existing file] không?"
-"Senior dev sẽ question gì ở đây?"
-```
-
-### PR Template Addition
-
-```markdown
-### AI Assistance
-🤖 Generated with Claude Code: Yes/No
-
-### Areas for careful review
-- [List uncertain part]
+[ ] Author giải thích được từng dòng
+[ ] Requirement thật sự khớp, không chỉ "compile được"
+[ ] Finding /code-review và /security-review đã triage (fix / theo dõi / bỏ qua + lý do)
+[ ] Edge case ngầm hiểu nhưng chưa nói rõ trong prompt đã được xử lý
+[ ] Khớp pattern hiện có trong codebase
 ```
 
 ---
 
-## 6. PITFALLS — Lỗi Thường Gặp
+## 6. PITFALLS — Sai Lầm Thường Gặp
 
-| ❌ Sai Lầm | ✅ Đúng Cách |
-|-----------|-------------|
-| "AI viết chắc đúng" | AI code cần MORE scrutiny, không phải less |
-| Review chỉ code quality | Check: nó có solve đúng PROBLEM không? |
-| Submit code không hiểu | Rule: explain được hoặc không submit |
-| Chỉ Claude review Claude | Human judgment required. AI assist, không replace. |
-| Không disclose AI | Always flag AI-assisted PR với 🤖 |
-| Skip edge case test | AI miss implicit edge case. Test chúng. |
-| Same rigor như human code | AI code có different failure mode. Adapt review. |
+| ❌ Sai | ✅ Đúng |
+|-----------|---------------------|
+| Cùng session vừa viết vừa duyệt code | Reviewer cần fresh context — `/code-review`/`/security-review` hoặc con người, không bao giờ là session đã viết |
+| "AI viết, chắc ổn" | Code AI cần soi KỸ hơn, không phải ít hơn — trông sạch vẫn có thể thiếu requirement ngầm |
+| Coi finding dưới ngưỡng là "không có vấn đề" | Đó là confidence filter, không phải giấy chứng nhận sạch — theo dõi nó |
+| Tưởng `/security-review` luôn chạy được | Nó fail hẳn nếu `origin/HEAD` không resolve — kiểm tra remote trước |
+| Tưởng `claude ultrareview` là một CLI command | Đó là `/code-review ultra`, không phải subcommand riêng |
+| Dựa vào `/pr-comments` | Đã bị xoá ở v2.1.91 — nhờ Claude trực tiếp, hoặc dùng `--from-pr` |
 
 ---
 
 ## 7. REAL CASE — Câu Chuyện Thực Tế
 
-**Scenario**: E-commerce Việt Nam, major production incident.
-
-**Chuyện xảy ra**:
-- Dev dùng Claude implement payment retry logic
-- Code clean, test pass
-- Reviewer approve nhanh — "looks professional"
-- Production: race condition gây double charge
-- Cost: ₫200M refund + customer trust damage
-
-**Root cause**: Test không cover concurrent request. AI-generated code có race condition subtle mà trông đúng.
-
-**Protocol change sau đó**:
-1. AI-assisted PR cần explicit 🤖 label
-2. Thêm AI-specific review checklist vào PR template
-3. Author phải document "area of uncertainty"
-4. Reviewer phải ask "explain lines X-Y được không?"
-5. Critical path (payment, auth) cần 2 reviewer + manual edge case test
-
-**Result**: 0 AI-related incident trong 6 tháng sau khi adopt protocol.
-
-**Quote**: "AI làm code trông đúng. Job của chúng ta là verify nó THẬT SỰ đúng."
+Logic retry thanh toán do Claude viết ở một công ty e-commerce pass test và được approve nhanh
+"trông chuyên nghiệp." Trên production, race condition khi nhiều request đồng thời gây double
+charge — test chưa bao giờ mô phỏng request đồng thời, và lần approve nhanh của reviewer chưa bao
+giờ hỏi "nếu cái này chạy hai lần cùng lúc thì sao?" Cách team sửa không phải prompt thông minh
+hơn: mà là bắt buộc output của `/code-review` và `/security-review` phải đính kèm mọi PR đụng
+payment, cộng một reviewer thứ hai riêng cho thư mục đó, để việc lướt nhanh không còn là check duy
+nhất trước khi merge.
 
 ---
 
-> **Tiếp theo**: [Module 10.4: Chia sẻ kiến thức](../04-knowledge-sharing/) →
+> **Next**: [Module 10.4: Knowledge Sharing](../04-knowledge-sharing/) →
