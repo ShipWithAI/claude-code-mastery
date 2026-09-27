@@ -6,6 +6,7 @@
     "src/content/docs/en/claude-code/tips-tricks.mdx",
     "src/content/docs/vi/claude-code/tips-tricks.mdx",
     "templates/claude-md-security-example.md",
+    "templates/claude-md-project-example.md",
     "templates/security-checklists.md",
     "templates/onboarding-security.md"
   ],
