@@ -301,10 +301,10 @@ Start fresh với understanding này.
 
 | Symptom | Action |
 |---------|--------|
-| Reference OLD decision | `/compact` |
-| Mixed pattern từ discussion khác | `/compact` + re-ground |
-| Inconsistent naming | Correct một lần; nếu lặp → `/compact` |
-| "Mình đã decide..." (khi chưa) | Confusion confirmed → `/compact` |
+| Reference OLD decision | `/compact <focus>` |
+| Mixed pattern từ discussion khác | `/compact <focus>` + re-ground |
+| Inconsistent naming | Correct một lần; nếu lặp → `/compact <focus>` |
+| "Mình đã decide..." (khi chưa) | Confusion confirmed → `/compact <focus>` |
 
 ### /compact Timing
 
@@ -340,12 +340,12 @@ Key constraint: [most important requirement]."
 
 | ❌ Sai Lầm | ✅ Đúng Cách |
 |-----------|--------------|
-| Session dài không `/compact` | Proactive `/compact` mỗi giờ hoặc khi topic switch |
-| `/clear` là first response cho confusion | Try `/compact` trước. `/clear` mất progress. |
+| Session dài không `/compact` | Proactive `/compact <focus>` mỗi giờ hoặc khi topic switch |
+| `/clear` là first response cho confusion | Try `/compact <focus>` trước. `/clear` mất progress. |
 | `/compact` không re-grounding | LUÔN re-state current context sau `/compact` |
 | Assume Claude "nhớ" recent stuff tốt hơn | Recency không guarantee priority. Be explicit. |
 | Không recognize confusion (blame Claude) | Mixed reference = confusion, không phải incompetence |
-| Quá nhiều correction không reset | 3 correction cùng confusion? `/compact` time. |
+| Quá nhiều correction không reset | 3 correction cùng confusion? `/compact <focus>` time. |
 | Switch topic không notice | Explicit: "Done với X. Giờ làm Y." |
 | Chạy một session "kitchen-sink" cả ngày (auth, rồi payment, rồi fix doc, rồi refactor) | (S1) gọi đây là failure pattern đã biết — `/clear` giữa các task không liên quan, đừng để chúng tích lũy trong cùng context. |
 

@@ -300,10 +300,10 @@ Start fresh with this understanding.
 
 | Symptom | Action |
 |---------|--------|
-| References to OLD decisions | `/compact` |
-| Mixed patterns from different discussions | `/compact` + re-ground |
-| Inconsistent naming | Correct once; if repeats → `/compact` |
-| "Didn't we already..." (when you didn't) | Confusion confirmed → `/compact` |
+| References to OLD decisions | `/compact <focus>` |
+| Mixed patterns from different discussions | `/compact <focus>` + re-ground |
+| Inconsistent naming | Correct once; if repeats → `/compact <focus>` |
+| "Didn't we already..." (when you didn't) | Confusion confirmed → `/compact <focus>` |
 
 ### /compact Timing
 
@@ -339,12 +339,12 @@ Key constraint: [most important requirement]."
 
 | ❌ Mistake | ✅ Correct Approach |
 |-----------|---------------------|
-| Long sessions without `/compact` | Proactive `/compact` every hour or at topic switches |
-| `/clear` as first response to confusion | Try `/compact` first. `/clear` loses progress. |
+| Long sessions without `/compact` | Proactive `/compact <focus>` every hour or at topic switches |
+| `/clear` as first response to confusion | Try `/compact <focus>` first. `/clear` loses progress. |
 | `/compact` without re-grounding | Always re-state current context after `/compact` |
 | Assuming Claude "remembers" recent stuff better | Recency doesn't guarantee priority. Be explicit. |
 | Not recognizing confusion (blaming Claude) | Mixed references = confusion, not incompetence |
-| Too many corrections without reset | 3 corrections for same confusion? `/compact` time. |
+| Too many corrections without reset | 3 corrections for same confusion? `/compact <focus>` time. |
 | Switching topics without notice | Explicit: "We're done with X. Now doing Y." |
 | Running one "kitchen-sink" session for the whole day (auth, then payments, then a doc fix, then a refactor) | (S1) names this as a known failure pattern — `/clear` between unrelated tasks, don't let them accumulate in one context. |
 
