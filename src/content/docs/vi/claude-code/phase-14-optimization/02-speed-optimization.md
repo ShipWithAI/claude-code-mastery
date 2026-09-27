@@ -1,6 +1,8 @@
 ---
 title: 'Tối ưu Tốc độ'
-description: 'Tăng tốc độ làm việc với Claude Code: parallel execution, caching context và giảm latency.'
+description: 'Giảm wall-clock time với /fast, /effort và parallelism thật — subagent, worktree, backgrounded command — thay vì bảng so sánh tốc độ model bịa.'
+verified: 2026-09-27
+claude_version: 2.1.283
 ---
 
 # Module 14.2: Tối ưu Tốc độ
@@ -9,258 +11,244 @@ description: 'Tăng tốc độ làm việc với Claude Code: parallel executio
 >
 > **Yêu cầu trước**: Module 14.1 (Tối ưu Task)
 >
-> **Kết quả**: Sau module này, bạn sẽ biết kỹ thuật reduce response time, hiểu speed/quality tradeoff, và optimize cho different scenario.
+> **Kết quả**: Sau module này, bạn dùng `/fast`, `/effort`, subagent, worktree, và backgrounded
+> command — những thứ thực sự đổi wall-clock time — thay vì tin vào truyền miệng "Opus chậm, đổi
+> model nhanh hơn".
 
 ---
 
 ## 1. WHY — Tại sao cần học
 
-Bạn đang chờ. Claude "thinking" 2 phút cho một simple task. Hoặc tệ hơn, 5 phút rồi không biết nó stuck hay đang working. Time cộng dồn — 10 slow task/ngày × 3 phút extra = 30 phút wasted mỗi ngày.
-
-Speed optimization trả lại thời gian đó. Clear prompt, clean context, right model choice — những thứ này compound thành significant productivity gain.
+Bạn hỏi một câu về một file và ngồi chờ model "thinking" mười giây cho việc tầm thường. Hoặc bạn
+chạy ba migration không liên quan lần lượt trong cùng session, dù chẳng có gì ngăn chúng chạy song
+song. Cả hai đều không phải vấn đề "model nào nhanh nhất" — Opus đã có chế độ nhanh hơn 2.5x được
+document, và phần lớn thời gian chờ thực tế đến từ việc serialize việc vốn không cần tuần tự.
 
 ---
 
 ## 2. CONCEPT — Khái niệm cốt lõi
 
-### Speed Factor
+Bốn đòn bẩy thực sự thay đổi wall-clock time. Mọi thứ khác — "Haiku là model tốc độ," bảng
+Speed/Quality/Cost với điểm số bịa ra — không có trong docs.
 
-| Factor | Chậm | Nhanh |
-|--------|------|-------|
-| **Prompt** | Vague, mơ hồ | Clear, specific |
-| **Context** | 100K token | 10K token |
-| **Task** | Complex, multi-step | Focused, single |
-| **Model** | Opus (smartest) | Haiku (fastest) |
-| **Output** | Long explanation | Just code |
-
-### Speed Formula
-
-```text
-Response Time = f(Context Size, Task Complexity, Output Length, Model)
-
-Optimize từng factor:
-- Context: /clear thường xuyên, loại file không liên quan
-- Complexity: Break thành task đơn giản hơn (Module 14.1)
-- Output: "Code only, no explanation"
-- Model: Dùng model nhanh nhất mà vẫn work
+```mermaid
+graph LR
+    A[Session chậm] --> B["/fast<br/>(Opus, research preview)"]
+    A --> C["/effort low…max"]
+    A --> D["Parallelism<br/>subagent · -w worktree · Ctrl+B"]
+    A --> E["Ít context hơn<br/>/clear, /compact (Module 5.2)"]
 ```
 
-### Context Management cho Speed
+**`/fast`** là research preview: "a high-speed configuration for Claude Opus, making the model up
+to 2.5x faster at a higher cost per token." Chỉ tồn tại cho **Opus 5.5, Opus 5, và Opus 4.8** —
+Sonnet, Haiku, và Opus 4.7 không support. Toggle bằng `/fast` (Space để đổi, Enter để confirm)
+hoặc `Option+O` / `Alt+O`. Lần đầu bật trong một conversation, bạn trả full uncached input price
+cho toàn bộ context, một lần duy nhất — nên bật/tắt qua lại trong cùng session rất tốn.
+`CLAUDE_CODE_DISABLE_FAST_MODE=1` tắt hẳn cho máy dùng chung hoặc script.
 
-```text
-Heavy context:                 Light context:
-─────────────────────────────────────────────────
-50 file loaded                3 file liên quan
-Full conversation history     Fresh session
-All project documentation     Chỉ những gì cần
-                    ↓                    ↓
-Result: 60 sec response       Result: 10 sec response
-```
+**`/effort`** đánh đổi độ sâu reasoning lấy tốc độ trên mọi model: `low`, `medium`, `high`,
+`xhigh`, `max` (thêm `auto` để clear override, `ultracode` cho `xhigh` kèm ultracode). Thấp hơn =
+nhanh hơn; default khác nhau theo model — Opus 5.5 mặc định `medium` ("một bậc dưới model khác"),
+hầu hết model khác mặc định `high`. Flag `--effort` chỉ áp dụng một session, không lưu lại.
 
-### Model Selection Strategy
+**Parallelism thật** đánh bại mọi cách tăng tốc trong một session: một subagent (natural
+language — "use a subagent to…") chạy context window riêng song song với bạn, tối đa 20 cái
+(`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`); `claude -w <name>` (`--worktree`) mở Claude thứ hai
+trong git worktree riêng tại `<repo>/.claude/worktrees/<name>` — repo cần ít nhất một commit
+trước; và `Ctrl+B` đẩy lệnh Bash đang chặn session ra chạy nền (tmux: bấm hai lần), dùng `/tasks`
+để kiểm tra hoặc dừng.
 
-```text
-Task Complexity → Model Choice
-────────────────────────────────────────────────
-Simple (format, small edit)   → Haiku (fastest)
-Medium (implement feature)    → Sonnet (balanced)
-Complex (architecture, debug) → Opus (smartest)
-```
-
-### Output Optimization
-
-- **"Code only, no explanation"** — tiết kiệm output generation time
-- **"One file at a time"** — nhanh hơn multiple file
-- **"Diff format"** — nhanh hơn full file rewrite
-
-### So Sánh Model Chi Tiết Theo Loại Tác Vụ
-
-Ngoài tốc độ chung, mỗi model có thế mạnh ở các loại tác vụ khác nhau:
-
-| Loại Tác Vụ | Haiku | Sonnet | Opus | Khuyến Nghị |
-|-------------|-------|--------|------|-------------|
-| **Formatting/Linting** | Xuất sắc | Quá mức | Quá mức | Haiku — tốc độ quan trọng nhất, chất lượng đủ |
-| **Simple CRUD** | Tốt | Xuất sắc | Quá mức | Sonnet — cần hiểu pattern |
-| **Tính năng phức tạp** | Kém | Tốt | Xuất sắc | Opus — cần suy luận kiến trúc |
-| **Sửa Bug** | Bug đơn giản | Hầu hết bug | Bug phức tạp | Khớp model với độ phức tạp bug |
-| **Code Review** | Vấn đề style | Vấn đề logic | Vấn đề kiến trúc | Khớp model với độ sâu review |
-| **Viết Test** | Test cơ bản | Test kỹ lưỡng | Test edge case | Sonnet cho hầu hết, Opus cho critical paths |
-| **Documentation** | Tốt | Xuất sắc | Quá mức | Sonnet — cần hiểu context |
-| **Refactoring** | Đổi tên/di chuyển | Tái cấu trúc | Kiến trúc | Khớp model với phạm vi refactoring |
-
-### Tốc Độ vs Chất Lượng vs Chi Phí
-
-```text
-         Tốc độ               Chất lượng           Chi phí
-Haiku:   ██████████  10/10    ████░░░░░░  4/10     █░░░░░░░░░  1/10
-Sonnet:  ██████░░░░   6/10    ████████░░  8/10     ████░░░░░░  4/10
-Opus:    ███░░░░░░░   3/10    ██████████ 10/10     ████████░░  8/10
-```
-
-**Quy tắc**: Mặc định dùng **Sonnet** cho công việc hàng ngày. Chuyển sang **Haiku** cho batch operations và tác vụ đơn giản. Nâng lên **Opus** chỉ khi chất lượng output của Sonnet không đủ cho tác vụ cụ thể. Một startup Việt Nam đã giảm chi phí Claude từ $1,200 xuống $380/tháng bằng cách áp dụng cách tiếp cận này.
+**Ít context hơn** thuộc Module 5.2 (`/clear`, `/compact`) — prompt nhỏ hơn xử lý nhanh hơn bất
+kể model hay effort level.
 
 ---
 
 ## 3. DEMO — Từng bước cụ thể
 
-**Scenario**: Implement utility function (string helper).
-
-### Slow Approach
+**Bước 1: Mở `/fast` mà không bật nó**
 
 ```text
-[Session với 50K context từ work trước]
-
-Bạn: Tạo utility function cho app. Cần string helper,
-date formatter, và validator. Explain mỗi function và
-thêm comprehensive documentation.
-
-Claude: [Thinking... 90 giây]
-[Response dài với explanation, 200+ dòng]
-
-Total time: ~3 phút
-```
-
-### Fast Approach
-
-```bash
-$ claude
-# Fresh session, clean context
+# docs: en/fast-mode
+/fast
 ```
 
 ```text
-Bạn: Tạo src/utils/strings.ts với các function:
-- capitalize(str): Viết hoa chữ đầu
-- slugify(str): Convert thành URL slug
-- truncate(str, len): Cắt ngắn với ellipsis
+# Output may vary — chụp từ TUI, chưa confirm (Space/Enter chưa bấm)
+  ↯ Fast mode (research preview)
+  High-speed mode for Opus 5.5. Draws from usage credits at a higher rate. Separate rate limits
+  apply.
 
-Code only, no explanation.
+    Fast mode  OFF  $8/$40 per Mtok
 
-Claude: [Thinking... 15 giây]
+  Learn more: https://code.claude.com/docs/en/fast-mode
+
+  Space to toggle · Enter to confirm · Esc to cancel
 ```
 
-```typescript
-export function capitalize(str: string): string {
-  return str.charAt(0).toUpperCase() + str.slice(1);
-}
+`$8/$40` là rate fast-mode của Opus 5.5; Opus 5 và Opus 4.8 là `$10/$50`. Bấm `Esc` ở đây không
+tốn gì — chỉ khi thực sự confirm bật thì mới trả giá reset cache một lần.
 
-export function slugify(str: string): string {
-  return str.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
-}
-
-export function truncate(str: string, len: number): string {
-  return str.length > len ? str.slice(0, len) + '...' : str;
-}
-```
-
-**Total time: ~20 giây**
-
-### So sánh Tốc độ
-
-| Metric | Slow | Fast |
-|--------|------|------|
-| Time | 3 phút | 20 giây |
-| Speedup | - | **9x nhanh hơn** |
-
-**Thay đổi gì**:
-- Fresh context (không 50K baggage)
-- Specific scope (một file, ba function)
-- "Code only" (không explanation overhead)
-- Clear requirement (exact function signature)
-
-### Parallel Execution
+**Bước 2: So sánh `/effort low` và `/effort high` trên cùng một prompt**
 
 ```bash
-# Chạy 3 task độc lập cùng lúc
-claude -p "Tạo src/utils/strings.ts: capitalize, slugify" &
-claude -p "Tạo src/utils/dates.ts: formatDate, parseDate" &
-claude -p "Tạo src/utils/validators.ts: isEmail, isURL" &
+# docs: en/model-config — --effort chỉ override một session, không lưu lại
+time claude -p "Read src/math.js and describe what it exports in one sentence." \
+  --effort low --allowedTools Read --output-format json
+```
+
+```text
+# Output may vary
+duration_api_ms: 5629   (wall: 9.2s total)
+```
+
+```bash
+time claude -p "Read src/math.js and describe what it exports in one sentence." \
+  --effort high --allowedTools Read --output-format json
+```
+
+```text
+# Output may vary
+duration_api_ms: 3647   (wall: 7.2s total)
+```
+
+Ở đây `high` lại nhanh hơn `low` — nhiễu, không phải mâu thuẫn. Đọc một file quá đơn giản để
+effort level tạo khác biệt; đòn bẩy này phát huy trên tải reasoning thật, không phải một câu tóm
+tắt.
+
+**Bước 3: Chạy hai session Claude trong hai worktree khác nhau cùng lúc**
+
+```bash
+# docs: en/worktrees, en/cli-reference — -w / --worktree
+claude -w speed-a -p "Read src/math.js and reply with just the word done." \
+  --allowedTools Read --output-format json &
+claude -w speed-b -p "Read tests/math.test.mjs and reply with just the word done." \
+  --allowedTools Read --output-format json &
 wait
-
-# Total: ~25 giây (thay vì 75 giây sequential)
+git worktree list
 ```
+
+```text
+# Output may vary
+/Users/you/cc-lab                            90c242f [main]
+/Users/you/cc-lab/.claude/worktrees/speed-a  90c242f [worktree-speed-a] locked
+/Users/you/cc-lab/.claude/worktrees/speed-b  90c242f [worktree-speed-b] locked
+```
+
+Cả hai xong mà không chờ nhau, cũng không đụng chung working directory — điều ba lệnh
+`claude -p … &` trong *cùng* checkout không đảm bảo được (xem Pitfall bên dưới).
+
+**Bước 4: Đẩy một lệnh ra chạy nền thay vì để nó chặn session**
+
+Ở chế độ interactive, yêu cầu Claude chạy `npm test -- --watch` (lệnh không tự thoát). Claude
+nhận ra điều đó và tự đẩy nó ra background, cùng cơ chế `Ctrl+B` dùng khi bạn tự quyết định đẩy
+nền:
+
+```text
+# Output may vary
+⏺ Bash(npm test -- --watch)
+  ⎿  Running in the background (↓ to manage)
+```
+
+`/tasks` hiện nó đang chạy và cho bạn xem output mới nhất hoặc dừng nó:
+
+```text
+# Output may vary
+  Shell details
+
+  Status:   running
+  Runtime:  5s
+  Command:  npm test -- --watch
+
+  Output:
+  ╭──────────────────────────────────╮
+  │ # tests 1                        │
+  │ # pass 1                         │
+  │ # fail 0                         │
+  ╰──────────────────────────────────╯
+  ← to go back · Esc/Enter/Space to close · x to stop
+```
+
+Với `--permission-mode default`, đúng lệnh này bình thường sẽ dừng lại hỏi yes/no trước — trả
+lời câu đó trước khi lệnh bắt đầu chạy.
 
 ---
 
 ## 4. PRACTICE — Luyện tập
 
-### Bài 1: Context Diet
+### Bài 1: Đo thời gian `/fast` trên một edit thật
 
-**Mục tiêu**: Trải nghiệm impact của context size.
+**Mục tiêu**: Tự thấy tradeoff của fast mode, mà không phải trả tiền để giữ nó bật.
 
 **Hướng dẫn**:
-1. Note context size hiện tại
-2. Dùng `/clear` và reload chỉ file essential
-3. Chạy cùng task
-4. So sánh response time
+1. Chọn một task mà Opus bình thường mất kha khá thời gian (refactor nhiều file).
+2. Đo thời gian một lần khi fast mode tắt.
+3. Mở `/fast`, confirm bật, chạy cùng loại task, đo lại.
+4. So sánh wall time và check `/usage` xem chênh lệch cost.
 
 <details>
 <summary>💡 Gợi ý</summary>
 
-Lệnh `/cost` hiện token usage. So sánh trước và sau `/clear`.
+Turn đầu tiên sau khi confirm `/fast` tính lại giá toàn bộ context ở rate fast-mode — đo turn
+fast-mode *thứ hai* nếu muốn so sánh sạch theo từng turn.
 
 </details>
 
 <details>
 <summary>✅ Giải pháp</summary>
 
-Kết quả typical:
-- Heavy context (50K token): 45-90 giây response
-- Light context (5K token): 10-20 giây response
-- Speedup: 3-5x nhanh hơn với clean context
+Fast mode chỉ có trên Opus và là research preview: kỳ vọng chênh lệch tốc độ thật, và chênh lệch
+cost thật (`$8/$40` so với `$4/$20` per MTok trên Opus 5.5). Có đáng hay không tùy thời gian của
+bạn đáng giá bao nhiêu mỗi turn.
 
 </details>
 
-### Bài 2: Output Trimming
+### Bài 2: Chia một task tuần tự thành nhiều worktree
 
-**Mục tiêu**: Đo impact của output length.
+**Mục tiêu**: Biến ba lệnh `claude -p` tuần tự thành ba lệnh thực sự chạy song song.
 
 **Hướng dẫn**:
-1. Yêu cầu Claude implement với full explanation
-2. Bấm giờ
-3. Yêu cầu cùng thứ với "code only, no explanation"
-4. So sánh time
+1. Tìm ba task nhỏ độc lập trong repo có ít nhất một commit.
+2. Chạy chúng bằng `claude -w a`, `claude -w b`, `claude -w c` chạy nền, rồi `wait`.
+3. Xác nhận bằng `git worktree list` rằng mỗi cái chạy trong checkout riêng.
 
 <details>
 <summary>💡 Gợi ý</summary>
 
-Output generation tốn time. Less output = faster response.
+`-w` cần một commit có sẵn; repo hoàn toàn mới sẽ fail với
+`Failed to resolve base branch "HEAD": git rev-parse failed`.
 
 </details>
 
 <details>
 <summary>✅ Giải pháp</summary>
 
-Kết quả typical:
-- Với explanation: 30-60 giây, 100+ dòng output
-- Code only: 10-20 giây, 20 dòng output
-- Speedup: 2-3x nhanh hơn
+Ba worktree xong trong khoảng thời gian của cái chậm nhất, không phải tổng cả ba — cái lợi là
+chạy song song, không phải một session nào đó nhanh hơn.
 
 </details>
 
-### Bài 3: Model Comparison
+### Bài 3: Tìm ngưỡng background của riêng bạn
 
-**Mục tiêu**: Hiểu model speed/quality tradeoff.
+**Mục tiêu**: Nhận ra khi nào Claude Code tự đẩy một lệnh ra chạy nền cho bạn.
 
 **Hướng dẫn**:
-1. Pick một medium-complexity task
-2. Thử với different model nếu available
-3. So sánh: time, quality, appropriateness
+1. Yêu cầu Claude chạy thứ gì đó xong nhanh (`ls`).
+2. Yêu cầu Claude chạy thứ gì đó không tự thoát (`npm test -- --watch` hoặc dev server).
+3. So sánh: cái nào xuất hiện trong `/tasks`?
 
 <details>
 <summary>💡 Gợi ý</summary>
 
-Haiku nhanh nhất nhưng có thể miss nuance. Opus smart nhất nhưng chậm. Sonnet balance cả hai.
+Một lệnh chạm timeout (mặc định 120s) mà chưa xong cũng tự động bị đẩy ra nền — không cần bạn
+bấm `Ctrl+B` cho trường hợp đó.
 
 </details>
 
 <details>
 <summary>✅ Giải pháp</summary>
 
-Cho simple formatting: Haiku (fast, sufficient quality)
-Cho feature implementation: Sonnet (balanced)
-Cho complex debugging: Opus (worth the wait)
-
-Match model với task complexity.
+Lệnh nhanh không bao giờ xuất hiện trong `/tasks`. Bất cứ thứ gì có thể chặn session — watch
+mode, dev server, timeout dài — đều bị đẩy ra nền, dù do bạn `Ctrl+B` hay do timeout.
 
 </details>
 
@@ -268,85 +256,47 @@ Match model với task complexity.
 
 ## 5. CHEAT SHEET
 
-### Speed Technique
-
-```text
-# Fresh context
-/clear
-
-# Minimal output
-"Code only, no explanation"
-"Just the function, no tests"
-"Diff format only"
-
-# Focused scope
-"Only modify [file]"
-"Just the [component]"
-```
-
-### Model Selection
-
-| Task Type | Model | Vì sao |
-|-----------|-------|--------|
-| Simple edit | Haiku | Fastest |
-| Feature | Sonnet | Balanced |
-| Complex debug | Opus | Smartest |
-
-### Parallel Execution
-
-```bash
-claude -p "task 1" &
-claude -p "task 2" &
-wait
-```
-
-### Context Management
-
-- `/clear` giữa các task không liên quan
-- Load chỉ file đang work
-- Exclude node_modules, build artifact
+| Lệnh / Phím | Tác dụng |
+|---|---|
+| `/fast` | ⚠️ Research preview. Chỉ Opus 5.5/5/4.8, nhanh tới 2.5x, $/token cao hơn |
+| `Option+O` / `Alt+O` | Toggle fast mode không cần mở menu |
+| `/effort low\|medium\|high\|xhigh\|max` | Thấp hơn = nhanh hơn, ít reasoning hơn |
+| `--effort <level>` | Tương tự, chỉ một session, không lưu lại |
+| `claude -w <name>` / `--worktree` | Claude thứ hai, git worktree riêng, cần commit có sẵn |
+| `Ctrl+B` | Đẩy lệnh Bash đang chạy ra nền (tmux: bấm hai lần) |
+| `/tasks` | List, xem, hoặc dừng lệnh chạy nền |
+| `CLAUDE_CODE_DISABLE_FAST_MODE=1` | Tắt hẳn fast mode |
+| `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` | Giới hạn subagent chạy đồng thời (default 20) |
 
 ---
 
 ## 6. PITFALLS — Sai lầm thường gặp
 
 | ❌ Sai | ✅ Đúng |
-|--------|---------|
-| Never clear context | `/clear` cho fresh start |
-| Always dùng Opus | Match model với task complexity |
-| Ask explanation không đọc | "Code only" cho speed |
-| Load entire codebase | Load chỉ relevant file |
-| Sequential khi có thể parallel | Use multiple session |
-| Optimize quá sớm | Working first, speed sau |
-| Sacrifice quality cho speed | Speed maintain quality |
+|---|---|
+| `claude -p "task 1" & claude -p "task 2" &` trong cùng checkout | Cùng working directory, cùng git index — race và bị deny write. Dùng `claude -w a`, `claude -w b` |
+| Coi `/cost` là thước đo tốc độ | `/cost` là alias của `/usage` — hiện spend, không phải latency. Đo wall-clock time thay vào đó |
+| Để fast mode bật cả ngày làm việc | Chỉ dành cho Opus, research preview, giá per-token cao hơn; tắt nó giữa các task đáng dùng fast mode |
+| Bật/tắt `/fast` qua lại giữa conversation để "test" | Turn đầu sau khi bật tính lại toàn bộ context ở rate fast-mode — không miễn phí |
+| Cho rằng effort thấp hơn luôn xong nhanh hơn | Trên task tầm thường chênh lệch chỉ là nhiễu; effort phát huy trên task có tải reasoning thật |
 
 ---
 
 ## 7. REAL CASE — Câu chuyện thực tế
 
-**Scenario**: Agency Việt Nam, developer complain Claude "quá chậm" — 2-3 phút response time làm unusable cho quick task.
+**Scenario**: Một team ở Đà Nẵng chạy ba migration Sonnet không liên quan lần lượt trong một
+session — xong migration này tới migration kia, tuần tự trong một conversation với context tích
+lũy dần.
 
-**Audit Finding**:
-- Average context: 80K token (tích lũy nhiều ngày)
-- Ask explanation mọi task
-- Dùng Opus cho simple formatting
-- Never dùng `/clear`
+**Vấn đề**: Không migration nào riêng lẻ chậm cả. Thời gian chờ đến từ việc làm việc độc lập theo
+kiểu tuần tự trong một session ngày càng phình to.
 
-**Speed Optimization Protocol**:
+**Giải pháp**: Cùng ba migration đó, ba worktree `claude -w` khởi động cùng lúc, mỗi cái với
+context sạch và checkout riêng của repo. Không `/fast`, không chỉnh effort — cách sửa chỉ đơn
+giản là chạy việc độc lập một cách độc lập.
 
-| Thay đổi | Trước | Sau |
-|----------|-------|-----|
-| Daily fresh session | Never | Mỗi sáng |
-| Context clearing | Never | Giữa project |
-| Output style | Với explanation | Code only (default) |
-| Model matching | Always Opus | Task-appropriate |
-
-**Kết quả**:
-- Average response: 2.5 phút → 30 giây (5x nhanh hơn)
-- Developer satisfaction: "Claude feels snappy now"
-- No quality reduction
-
-**Quote**: "Chúng tôi bắt Claude mang ba lô 80K token đi khắp nơi. Không lạ nó chậm. Đi nhẹ thay đổi mọi thứ."
+**Kết quả**: Team giờ mặc định dùng worktree cho việc không phụ thuộc output bước trước, và chỉ
+dùng `/effort` với `/fast` cho task thực sự nặng reasoning thay vì coi đó là lựa chọn đầu tiên.
 
 ---
 
