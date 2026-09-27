@@ -1,6 +1,8 @@
 ---
 title: 'Phát hiện & Phá vòng lặp'
 description: 'Phát hiện khi Claude Code bị kẹt vòng lặp vô hạn và kỹ thuật phá loop để tiếp tục làm việc.'
+verified: 2026-09-28
+claude_version: 2.1.283
 ---
 
 # Module 8.2: Phát hiện & Phá vòng lặp
@@ -60,7 +62,7 @@ Note: A' ≈ A ≈ A'' — variation nhỏ của cùng approach, đều fail cù
 | Same error 3+ lần | Very High | "TypeError: X is not a function" lặp |
 | Same file edit lặp | High | `userService.ts` modified 4 lần |
 | "Try another approach" nhưng code giống | High | Variation nhỏ của cùng fix |
-| Token spike | Medium | `/cost` tăng nhanh |
+| Token spike | Medium | `/usage` tăng nhanh |
 | Thời gian không progress | Medium | 5+ phút, cùng problem |
 | Claude xin lỗi liên tục | Medium | "Sorry, let me try again" |
 
@@ -73,18 +75,23 @@ Note: A' ≈ A ≈ A'' — variation nhỏ của cùng approach, đều fail cù
 
 ### 3-Strike Rule
 
-**Nếu cùng approach fail 3 lần với kết quả similar → intervene ngay.** Đừng đợi 5 hay 10. Ba là pattern — sau đó thêm attempt hiếm khi giúp.
+**Nếu cùng approach fail 3 lần với kết quả similar → intervene ngay.** Đừng đợi 5 hay 10. Ba là
+pattern — sau đó thêm attempt hiếm khi giúp. Best-practices guide chính thức nói thẳng: (S1)
+*"If you've corrected Claude more than twice on the same issue… `/clear` and start fresh."*
 
 ### Loop Breaking Strategy (Escalation Ladder)
 
 | Level | Strategy | Khi Nào Dùng |
 |-------|----------|--------------|
-| 1 | **Redirect** | "Stop. Thử approach hoàn toàn khác." |
-| 2 | **Information inject** | "Context bạn có thể đang thiếu: ..." |
-| 3 | **Decompose** | "Quá phức tạp. Giải quyết [phần nhỏ] trước." |
-| 4 | **Context refresh** | `/compact` để clean up |
-| 5 | **Nuclear reset** | `/clear` và bắt đầu lại với lesson learned |
+| 1 | **Interrupt** — `Esc` | Ngắt turn hiện tại ngay; session và context vẫn giữ nguyên |
+| 2 | **Rewind** — `Esc Esc` (hoặc `/rewind`) | Undo vài edit fail gần nhất, giữ conversation, retry với redirect |
+| 3 | **Redirect + decompose** (prompt) | "Stop. Giải thích nguyên nhân trước khi thử tiếp" / "Giải quyết [phần nhỏ] trước" |
+| 4 | **Context refresh** — `/compact <focus>` | Compress noise từ attempt fail, giữ key decision |
+| 5 | **Nuclear reset** — `/clear` | Bắt đầu session mới, tự mang lesson theo |
 | 6 | **Human takeover** | Một số thứ cần human debug |
+
+Rewind (level 2) chỉ undo change do tool Edit/Write làm — **không** undo file change qua Bash
+(`rm`, `mv`, script). Xem Module 8.5 để hiểu rõ giới hạn này.
 
 ---
 
@@ -225,13 +232,13 @@ Key: Yêu cầu Claude ANALYZE trước khi attempt lại.
 
 ### Bài 3: Context Refresh
 
-**Goal**: Practice dùng `/compact` để break loop.
+**Goal**: Practice dùng `/compact <focus>` để break loop.
 
 **Instructions**:
 1. Vào stuck loop intentionally
-2. Run `/compact`
+2. Run `/compact Focus vào requirement thật, bỏ qua các attempt fail`
 3. Reframe problem với wording mới
-4. Compare behavior trước/sau refresh
+4. Compare behavior trước/sau
 
 **Expected result**: Sau `/compact`, Claude thường approach khác vì old failed attempt bị compress khỏi active context.
 
@@ -246,14 +253,14 @@ Key: Yêu cầu Claude ANALYZE trước khi attempt lại.
 | Same error 3+ lần | 🚨 Intervene NGAY |
 | Same file edit 3+ lần | 🚨 Intervene NGAY |
 | "Let me try again" với code giống | ⚠️ Watch closely |
-| Token burn không progress | ⚠️ Check `/cost` |
+| Token burn không progress | ⚠️ Check `/usage` |
 
 ### Intervention Escalation Ladder
 
-1. **Redirect**: "Stop. Approach khác."
-2. **Information**: "Bạn có thể đang thiếu: ..."
-3. **Decompose**: "Giải quyết [phần nhỏ] trước."
-4. **Refresh**: `/compact`
+1. **Interrupt**: `Esc`
+2. **Rewind**: `Esc Esc` hoặc `/rewind`
+3. **Redirect/decompose**: "Stop. Giải thích tại sao fail." / "Giải quyết [phần nhỏ] trước."
+4. **Refresh**: `/compact <focus>`
 5. **Reset**: `/clear`
 6. **Human**: Bạn take over
 
@@ -274,8 +281,9 @@ Key: Yêu cầu Claude ANALYZE trước khi attempt lại.
 | Command | Effect |
 |---------|--------|
 | `Esc` | Ngắt turn hiện tại ngay lập tức (session và context vẫn giữ nguyên) |
-| `/cost` | Check token burn |
-| `/compact` | Compress context, giữ decision |
+| `Esc Esc` / `/rewind` | Mở rewind menu — restore code và/hoặc conversation về checkpoint |
+| `/compact <focus>` | Compress context với focus rõ ràng, giữ key decision |
+| `/usage` (alias `/cost`) | Check token/cost burn của session |
 | `/clear` | Nuclear reset (mất progress) |
 
 ---
@@ -287,8 +295,8 @@ Key: Yêu cầu Claude ANALYZE trước khi attempt lại.
 | Để loop chạy hy vọng "lần sau được" | 3-strike rule. Intervene sau 3 similar failure. |
 | Intervene quá sớm (sau 1 retry) | Iteration có healthy. Đợi pattern, không phải single failure. |
 | "Try harder" intervention ("Fix đi!") | Đổi APPROACH, không phải intensity. Hỏi analysis. |
-| `/clear` là phản ứng đầu tiên | Escalate: redirect → refresh → reset. `/clear` mất progress. |
-| Không check `/cost` trong session dài | Monitor `/cost`. Stuck loop burn token nhanh. |
+| `/clear` là phản ứng đầu tiên | Escalate: `Esc` → `/rewind` → `/compact <focus>` → `/clear`. `/clear` mất progress. |
+| Không check `/usage` trong session dài | Monitor `/usage` (alias `/cost`). Stuck loop burn token nhanh. |
 | Blame Claude ("Sao không fix được?") | Loop = misalignment. Provide info, change angle. |
 | Ignore confusion của chính bạn | Bạn không hiểu tại sao fail → Claude cũng không. |
 
