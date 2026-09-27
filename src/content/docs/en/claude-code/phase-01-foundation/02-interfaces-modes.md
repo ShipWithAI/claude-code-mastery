@@ -1,6 +1,8 @@
 ---
 title: 'Interfaces & Modes'
 description: 'Master Claude Code interactive, one-shot, and pipe modes to choose the right interface for any task.'
+verified: 2026-09-28
+claude_version: 2.1.283
 ---
 
 # Module 1.2: Interfaces & Modes
@@ -9,28 +11,22 @@ description: 'Master Claude Code interactive, one-shot, and pipe modes to choose
 >
 > **Prerequisite**: Module 1.1 (Installation & Configuration)
 >
-> **Outcome**: After this module, you will be able to choose the right
-> interaction mode for any task and combine modes for powerful workflows
+> **Outcome**: Choose the right interaction mode for any task and combine modes in workflows
 
 ---
 
 ## 1. WHY — Why This Matters
 
-You've installed Claude Code and run your first query. But you're using it
-like a chatbot — typing questions one at a time. Meanwhile, your colleague
-pipes entire git diffs through Claude and gets instant PR summaries. Another
-team member has Claude integrated into their CI pipeline, catching bugs before
-code even gets merged. The difference? They understand the three interaction
-modes. Knowing when to use interactive sessions versus one-shot commands versus
-piped input transforms Claude Code from a chat window into a powerful
-development automation tool.
+You've installed Claude Code and run your first query — but you're using it
+like a chatbot, one question at a time. Meanwhile a colleague pipes entire git
+diffs through Claude for instant PR summaries, and another has it wired into
+CI, catching bugs before merge. The difference is knowing the three
+interaction modes: interactive, one-shot, and pipe. Pick the right one and
+Claude Code stops being a chat window and becomes part of your automation.
 
 ---
 
 ## 2. CONCEPT — Core Ideas
-
-Claude Code offers three distinct ways to interact, each optimized for
-different workflows:
 
 ### The Three Modes
 
@@ -42,39 +38,45 @@ different workflows:
 
 ### Key Differences
 
-**REPL Mode** maintains conversation context across multiple turns. You can
-refine your questions, reference previous answers, and use slash commands.
-Think of it as a working session with a collaborator.
+**REPL Mode** keeps conversation context across turns — refine questions,
+reference earlier answers, use slash commands. Think working session, not
+one-off query.
 
-**One-shot Mode** executes a single prompt and exits immediately. There's no
-conversation history — each command is independent. Perfect for scripts and
-automation where you need predictable, stateless behavior.
+**One-shot Mode** runs one prompt and exits — no history, each call
+independent. Built for scripts and automation that need stateless,
+predictable behavior.
 
-**Pipe Mode** feeds external data (files, command output) directly to Claude
-as context. Combined with one-shot mode, it enables powerful Unix-style
-workflows where Claude becomes just another tool in your pipeline.
+**Pipe Mode** feeds external data — files, command output — to Claude as
+context. Paired with `-p`, Claude becomes just another tool in a Unix
+pipeline.
 
 ### Session Continuation
 
 Claude Code saves your conversations. You can resume any previous session:
 
-- **`claude --continue`** / **`claude -c`** — resumes the most recent conversation instantly
-- **`claude --resume`** / **`claude -r`** — shows a session picker or resumes by ID/name
-- **`claude --resume "auth-refactor"`** — resume a specific named session directly
-- **`claude -c -p "follow-up"`** — continue the last session in headless mode (great for scripts)
+- **`claude --continue`** / **`claude -c`** — resume the most recent conversation
+- **`claude --resume`** / **`claude -r`** — session picker, or resume by ID/name
+- **`claude --resume "auth-refactor"`** — resume a specific named session
+- **`claude -c -p "follow-up"`** — continue the last session headless (great for scripts)
 
-This means you never lose context when you close your terminal or switch tasks. Sessions persist across restarts.
+### Starting Permission Mode
+
+REPL and one-shot start in different permission modes. On v2.1.283+, **auto mode** (a classifier
+reviews actions instead of you) is the built-in starting mode for interactive REPL sessions.
+`claude -p` always starts in Manual mode "on every plan" — pass `--permission-mode
+acceptEdits|auto|dontAsk` or `--allowedTools "Edit,Write"`, or a script that edits files will hang
+or get denied.
 
 ### REPL Keyboard Shortcuts
 
-When inside an interactive REPL session, these shortcuts speed up your workflow:
-
 - **Multi-line input**: `\` + Enter, or `Shift+Enter` (run `/terminal-setup` first)
-- **Cancel generation**: `Escape`
-- **Exit**: `Ctrl+C` twice (or `Ctrl+D`), or `/exit`
-- **Paste image**: `Ctrl+V` (NOT `Cmd+V` on macOS)
+- **Interrupt current turn**: `Esc` — stops the response or tool call, keeps the session
+- **Clear input / rewind**: `Esc Esc` — clears your draft, or (empty input) opens the rewind menu
+- **Exit**: `/exit`, or `Ctrl+D` twice. `Ctrl+C` twice also exits, but the first press only clears
+  your input — use `Esc` to interrupt a running turn, not `Ctrl+C`
+- **Paste image**: `Ctrl+V` (`Cmd+V` on iTerm2, `Alt+V` on Windows/WSL)
 - **Switch model**: `Option+P` / `Alt+P`
-- **Toggle thinking**: `Option+T` / `Alt+T`
+- **Toggle thinking**: `Option+T` / `Alt+T` — no effect on always-on-thinking models
 
 ### Decision Flowchart
 
@@ -106,40 +108,47 @@ graph TD
 $ claude
 ```
 
-You enter the Claude Code REPL. The prompt changes to indicate you're in a
-session.
+You enter the Claude Code REPL.
 
 **Step 2: Have a multi-turn conversation**
 
 ```text
 > What's the best way to handle errors in TypeScript?
-
-Claude explains try/catch, Result types, error boundaries, etc.
+# Claude explains try/catch, Result types, error boundaries
 
 > Can you show me a concrete example with async/await?
-
-Claude builds on the previous answer with specific code.
+# Builds on the previous answer with specific code
 
 > Now refactor that to use a Result type instead
-
-Claude refactors the previous example, maintaining context.
+# Refactors the previous example, keeping full context
 ```
 
-**Step 3: Use slash commands**
+**Step 3: Check context and usage**
 
-```text
-/help
+Inside the REPL, `/context` renders a colored grid. Checked headless here (`claude -p` prints a
+table instead):
+
+```bash
+$ claude -p "/context"
 ```
 
-Output shows available commands:
+```markdown
+# Output may vary — depends on your installed plugins/skills
+## Context Usage
+**Model:** claude-opus-5-5 · **Tokens:** 26.7k / 1m (3%)
+| Category | Tokens | Percentage |
+|----------|--------|------------|
+| System prompt | 2.2k | 0.2% |
+| Memory files | 7.1k | 0.7% |
+| Free space | 940.3k | 94.0% |
+```
+
+For spend, run `claude -p "/usage"` (`/cost` is an alias, works inside the REPL too):
+
 ```text
-# Output may vary
-Available commands:
-  /help     - Show this help
-  /clear    - Clear conversation
-  /compact  - Compress context
-  /cost     - Show token usage
-  /init     - Initialize CLAUDE.md
+# Output may vary — subscriber-plan view; an API-key account sees a Session cost block instead
+You are currently using your subscription to power your Claude Code usage
+Current session: 4% used · resets Sep 28 at 8am (Asia/Saigon)
   ...
 ```
 
@@ -155,14 +164,6 @@ $ claude --resume
 # Resume a specific named session
 $ claude --resume "auth-refactor"
 ```
-
-This is powerful when you close your terminal mid-task — your entire conversation is preserved. No need to re-explain context.
-
-**When to use REPL mode:**
-- Exploring a new codebase
-- Debugging complex issues
-- Iterative development where you refine your approach
-- Learning sessions where you want to ask follow-up questions
 
 ---
 
@@ -185,11 +186,7 @@ In JavaScript, `let` and `const` both declare block-scoped variables, but:
 Use `const` by default, `let` when you need to reassign.
 ```
 
-The command exits immediately after the response.
-
 **Step 2: Use in a script**
-
-Create a simple script that uses Claude:
 
 ```bash
 #!/bin/bash
@@ -197,7 +194,6 @@ Create a simple script that uses Claude:
 claude -p "Explain this error in one sentence: $1"
 ```
 
-Usage:
 ```bash
 $ ./quick-explain.sh "TypeError: Cannot read property 'map' of undefined"
 ```
@@ -209,17 +205,9 @@ $ ./quick-explain.sh "TypeError: Cannot read property 'map' of undefined"
 $ claude -p "Write a README template for a TypeScript project" > README.md
 ```
 
-**When to use one-shot mode:**
-- Quick questions that don't need follow-up
-- Shell scripts and automation
-- CI/CD pipelines
-- Generating files or snippets programmatically
-
 ---
 
 ### Mode 3: Pipe Mode
-
-Pipe mode feeds stdin to Claude as context. Combined with `-p`, it enables powerful Unix-style workflows.
 
 **Step 1: Pipe file contents**
 
@@ -248,12 +236,6 @@ This diff shows:
 $ git log --oneline -10 | claude -p "Which of these commits are bug fixes?"
 ```
 
-**When to use pipe mode:**
-- Code reviews (pipe diffs or files)
-- Log analysis (pipe error logs)
-- Batch processing multiple files
-- Integrating Claude into Unix pipelines
-
 ---
 
 ## 4. PRACTICE — Try It Yourself
@@ -268,11 +250,11 @@ $ git log --oneline -10 | claude -p "Which of these commits are bug fixes?"
    but it returns NaN for empty arrays"
 3. Ask Claude for a fix
 4. Ask a follow-up: "How would I add TypeScript types to this?"
-5. Run `/cost` to see your token usage
-6. Exit with `/exit`, or Ctrl+C twice (or Ctrl+D)
+5. Run `/usage` to see your token/cost usage
+6. Exit with `/exit`, or `Ctrl+D` twice
 
-**Expected result**: You have a multi-turn conversation where each response
-builds on previous context, and you see the accumulated token cost.
+**Expected result**: A multi-turn conversation that builds on prior context, plus a visible
+token/cost total.
 
 <details>
 <summary>💡 Hint</summary>
@@ -287,19 +269,14 @@ messages. You can say "the function" without re-explaining what function.
 
 ```bash
 $ claude
-
 > I have a function that should return the sum of an array, but it returns
 > NaN for empty arrays
-
 # Claude explains the issue (likely reduce without initial value)
 
 > How would I add TypeScript types to this?
-
 # Claude adds proper typing to the previous solution
 
-/cost
-# Shows tokens used across the entire conversation
-
+/usage   # tokens/cost for the whole conversation
 /exit
 ```
 
@@ -318,14 +295,12 @@ $ claude
    `alias explain='claude -p "Explain this command:"'`
 4. Test it: `explain "tar -xzf archive.tar.gz"`
 
-**Expected result**: Each command returns a response and exits. The alias
-makes it easy to get quick explanations.
+**Expected result**: Each command returns a response and exits immediately.
 
 <details>
 <summary>💡 Hint</summary>
 
-The alias works because one-shot mode exits after each response. If it opened
-an interactive session, the alias would leave you stuck in a Claude session.
+One-shot mode exits after each response — an interactive session would leave the alias stuck.
 
 </details>
 
@@ -334,19 +309,17 @@ an interactive session, the alias would leave you stuck in a Claude session.
 
 ```bash
 $ claude -p "What does the -r flag do in rm command?"
-# Output explains recursive deletion
-# You're immediately back at your shell prompt
+# Explains recursive deletion, then returns to the shell prompt immediately
 
 $ alias explain='claude -p "Explain this command:"'
 $ explain "tar -xzf archive.tar.gz"
-# Output explains: extract, gzip, file flags
 ```
 
 </details>
 
 ---
 
-### Exercise 3: Master Pipe Mode ⚠️
+### Exercise 3: Master Pipe Mode
 
 **Goal**: Use pipe mode to analyze code or diffs.
 
@@ -357,16 +330,12 @@ $ explain "tar -xzf archive.tar.gz"
    this project use?"`
 4. Experiment with other combinations
 
-**Expected result**: Claude analyzes the piped content and responds based on
-that context.
-
-⚠️ If the pipe syntax doesn't work, check `claude --help` for correct usage.
+**Expected result**: Claude responds using the piped content as context.
 
 <details>
 <summary>💡 Hint</summary>
 
-The piped content becomes the context for your prompt. You don't need to
-paste the file contents — the pipe operator handles it.
+The piped content becomes the prompt's context — no need to paste file contents yourself.
 
 </details>
 
@@ -376,16 +345,11 @@ paste the file contents — the pipe operator handles it.
 ```bash
 $ cd my-project
 $ git diff HEAD~1 | claude -p "What changed in this commit?"
-# Claude summarizes the diff
-
 $ cat package.json | claude -p "What dependencies does this project use?"
-# Claude lists and briefly explains each dependency
 ```
 
-⚠️ Syntax may vary by version. If this doesn't work, try:
-```bash
-$ claude -p "What changed?" < <(git diff HEAD~1)
-```
+Piped stdin is capped at 10MB — for larger diffs, filter first:
+`git diff HEAD~1 -- src/ | claude -p ...`
 
 </details>
 
@@ -397,14 +361,14 @@ $ claude -p "What changed?" < <(git diff HEAD~1)
 |------|---------|-------|
 | **Start interactive session** | `claude` | Multi-turn, has slash commands |
 | **One-shot query** | `claude -p "prompt"` | Single response, exits |
-| **Pipe file to Claude** | `cat file \| claude -p "prompt"` | ⚠️ Verify syntax |
-| **Pipe command output** | `cmd \| claude -p "prompt"` | ⚠️ Verify syntax |
-| **Save output to file** | `claude -p "..." > file.md` | ⚠️ Verify behavior |
-| **Show help in session** | `/help` | Lists available commands |
+| **Pipe file to Claude** | `cat file \| claude -p "prompt"` | stdin capped at 10MB |
+| **Pipe command output** | `cmd \| claude -p "prompt"` | Core, documented behavior |
+| **Save output to file** | `claude -p "..." > file.md` | Shell redirects the printed response |
 | **Clear conversation** | `/clear` | Resets context in REPL |
-| **Compress context** | `/compact` | Reduces token usage |
-| **Show token usage** | `/cost` | Shows usage for session |
-| **Exit REPL** | `/exit`, or Ctrl+C twice (or Ctrl+D) | Ends interactive session |
+| **Compress context** | `/compact` | Summarizes and reduces context |
+| **Show context usage** | `/context` | Colored grid of what fills the window |
+| **Show token/cost usage** | `/usage` (`/cost` alias) | Session spend and limits |
+| **Exit REPL** | `/exit`, or `Ctrl+D` twice | Ends interactive session |
 
 ### Mode Selection Quick Reference
 
@@ -416,9 +380,6 @@ $ claude -p "What changed?" < <(git diff HEAD~1)
 | "Explain these logs" | Pipe | External content as input |
 | CI/CD integration | One-shot | Stateless, scriptable |
 | Learning/exploring | REPL | Iterative conversation |
-| Resume last session | `claude -c` | Continue where you left off |
-| Resume specific session | `claude -r "name"` | Pick a named session |
-| Resume + headless | `claude -c -p "query"` | Follow-up in script mode |
 
 ---
 
@@ -426,26 +387,25 @@ $ claude -p "What changed?" < <(git diff HEAD~1)
 
 | ❌ Mistake | ✅ Correct Approach |
 |-----------|-------------------|
-| Using REPL for simple one-off questions | Use `claude -p "question"` for quick answers — faster and doesn't require exiting a session. |
-| Forgetting `-p` flag in scripts | Without `-p`, `claude` enters interactive mode and your script hangs waiting for input. Always use `-p` in automation. |
-| Piping huge files without considering token limits | Large files consume many tokens. Pipe only relevant sections: `head -100 file \| claude -p "..."` or use specific line ranges. |
-| Not checking `/cost` in long sessions | REPL sessions accumulate tokens. Run `/cost` periodically to avoid surprise bills. |
-| Expecting pipe mode to maintain state | Each piped command is independent. For multi-step analysis, use REPL mode instead. |
+| Using REPL for one-off questions | Use `claude -p "question"` — faster, no session to exit. |
+| Forgetting `-p` in scripts | Without it, `claude` enters interactive mode and the script hangs waiting for input. |
+| Piping huge files | Pipe only relevant sections: `head -100 file \| claude -p "..."` — large files burn tokens. |
+| Not checking `/usage` in long sessions | Tokens accumulate. Run `/usage` periodically; `/context` shows what's filling the window. |
+| Assuming `-p` inherits your REPL permission mode | `-p` always starts in Manual mode — pass `--permission-mode acceptEdits` or `--allowedTools` to edit/write files. |
+| Expecting pipe mode to keep state | Each piped command is independent — use REPL for multi-step analysis. |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: Huy, a mobile developer at a Vietnamese e-commerce company, works
-on a Kotlin Multiplatform (KMP) project. The team shares business logic between
-Android and iOS apps through a shared module. Before submitting PRs, Huy needs
-quick code reviews, but the senior reviewer is often in meetings.
+**Scenario**: Huy, a mobile developer at a Vietnamese e-commerce company, works on a Kotlin
+Multiplatform (KMP) project sharing business logic between Android and iOS. The senior reviewer is
+often in meetings, so PRs sit.
 
-**Problem**: Huy finished a significant refactoring of the shared networking
-module. He wanted a preliminary review before the formal PR review to catch
-obvious issues early. The diff was 400+ lines across multiple files.
+**Problem**: Huy refactored the shared networking module — a 400+ line diff — and wanted a
+preliminary review before the formal one, to catch obvious issues early.
 
-**Solution**: Huy used pipe mode to get instant feedback on his changes:
+**Solution**: Pipe mode for instant feedback:
 
 ```bash
 # Review the entire diff
@@ -462,16 +422,12 @@ $ git diff main -- shared/src/commonMain/kotlin/network/ | claude -p \
   "Check this Kotlin networking code for coroutine scope issues"
 ```
 
-**Result**: Claude identified three issues before the PR was even created:
-1. A missing `supervisorScope` that could crash the iOS app if a child
-   coroutine failed
-2. A non-idiomatic `if-else` chain that should be a `when` expression
-3. A potential memory leak from an unclosed `HttpClient`
+**Result**: Claude found three issues before the PR existed: a missing `supervisorScope` that could
+crash iOS on a child-coroutine failure, a non-idiomatic `if-else` that should be a `when`
+expression, and a memory leak from an unclosed `HttpClient`.
 
-Huy fixed these issues in 10 minutes. When the senior reviewer looked at the
-PR, it was already clean. The formal review took 5 minutes instead of the
-usual 30. Huy now runs `git diff | claude -p "review"` before every PR
-submission — it's become part of his workflow, like running tests.
+Huy fixed all three in 10 minutes. The formal review then took 5 minutes instead of the usual 30.
+`git diff | claude -p "review"` is now part of his workflow, like running tests.
 
 ---
 

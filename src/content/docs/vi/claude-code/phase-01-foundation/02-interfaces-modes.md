@@ -1,6 +1,8 @@
 ---
 title: 'Giao diện & Các chế độ'
 description: 'Tìm hiểu các giao diện và chế độ hoạt động của Claude Code: interactive, one-shot và pipe mode.'
+verified: 2026-09-28
+claude_version: 2.1.283
 ---
 
 # Module 1.2: Giao diện & Các chế độ
@@ -9,27 +11,20 @@ description: 'Tìm hiểu các giao diện và chế độ hoạt động của 
 >
 > **Yêu cầu trước**: Module 1.1 (Cài đặt & Cấu hình)
 >
-> **Kết quả**: Sau module này, bạn sẽ biết chọn đúng chế độ tương tác cho mỗi
-> tác vụ và kết hợp các chế độ để tạo workflow mạnh mẽ
+> **Kết quả**: Chọn đúng chế độ tương tác cho mỗi tác vụ và kết hợp các chế độ trong workflow
 
 ---
 
 ## 1. WHY — Tại sao cần học cái này?
 
-Bạn đã cài Claude Code và chạy query đầu tiên. Nhưng bạn đang dùng nó như một
-chatbot — gõ từng câu hỏi một. Trong khi đó, đồng nghiệp của bạn pipe cả git
-diff qua Claude và nhận tóm tắt PR tức thì. Một người khác trong team đã tích
-hợp Claude vào CI pipeline, bắt bug trước khi code được merge. Sự khác biệt?
-Họ hiểu ba chế độ tương tác. Biết khi nào dùng interactive session, khi nào
-dùng one-shot command, khi nào dùng pipe input sẽ biến Claude Code từ một cửa
-sổ chat thành công cụ tự động hóa phát triển mạnh mẽ.
+Bạn đã cài Claude Code và chạy query đầu tiên — nhưng đang dùng nó như chatbot, gõ từng câu hỏi
+một. Đồng nghiệp thì pipe cả git diff qua Claude để nhận tóm tắt PR tức thì, người khác đã tích hợp
+Claude vào CI, bắt bug trước khi merge. Khác biệt nằm ở việc hiểu ba chế độ: interactive, one-shot,
+pipe. Chọn đúng, Claude Code không còn là cửa sổ chat mà thành một phần automation.
 
 ---
 
 ## 2. CONCEPT — Khái niệm cốt lõi
-
-Claude Code cung cấp ba cách tương tác khác nhau, mỗi cách được tối ưu cho
-workflow khác nhau:
 
 ### Ba chế độ chính
 
@@ -41,39 +36,41 @@ workflow khác nhau:
 
 ### Khác biệt chính
 
-**REPL Mode** duy trì context conversation qua nhiều lượt. Bạn có thể tinh
-chỉnh câu hỏi, tham chiếu câu trả lời trước, và dùng slash commands. Hãy nghĩ
-về nó như một phiên làm việc với đồng nghiệp.
+**REPL Mode** giữ context qua nhiều lượt — tinh chỉnh câu hỏi, tham chiếu câu trả lời trước, dùng
+slash command. Nghĩ như một phiên làm việc, không phải câu hỏi rời rạc.
 
-**One-shot Mode** thực thi một prompt duy nhất và thoát ngay lập tức. Không có
-conversation history — mỗi lệnh độc lập. Hoàn hảo cho script và automation khi
-bạn cần behavior có thể dự đoán được, không có state.
+**One-shot Mode** chạy một prompt rồi thoát — không lịch sử, mỗi lệnh độc lập. Dành cho script và
+automation cần behavior ổn định, không giữ state.
 
-**Pipe Mode** đưa dữ liệu bên ngoài (file, output của lệnh khác) trực tiếp vào
-Claude làm context. Kết hợp với one-shot mode, nó cho phép workflow kiểu Unix
-mạnh mẽ — Claude trở thành một công cụ nữa trong pipeline của bạn.
+**Pipe Mode** đưa dữ liệu bên ngoài — file, output lệnh khác — vào Claude làm context. Kết hợp với
+`-p`, Claude trở thành một công cụ nữa trong pipeline Unix.
 
-### Tiếp tục Session (Session Continuation)
+### Tiếp tục Session
 
-Claude Code lưu lại conversation của bạn. Bạn có thể resume bất kỳ session nào trước đó:
+Claude Code lưu lại conversation. Resume bất kỳ session nào trước đó:
 
-- **`claude --continue`** / **`claude -c`** — tiếp tục conversation gần nhất ngay lập tức
-- **`claude --resume`** / **`claude -r`** — hiển thị danh sách session hoặc resume theo ID/tên
-- **`claude --resume "auth-refactor"`** — resume session cụ thể theo tên
+- **`claude --continue`** / **`claude -c`** — tiếp tục conversation gần nhất
+- **`claude --resume`** / **`claude -r`** — danh sách session, hoặc resume theo ID/tên
+- **`claude --resume "auth-refactor"`** — resume một session cụ thể theo tên
 - **`claude -c -p "follow-up"`** — tiếp tục session cuối ở chế độ headless (tiện cho script)
 
-Bạn không bao giờ mất context khi đóng terminal hoặc chuyển task. Session được lưu trữ liên tục qua các lần khởi động lại.
+### Chế độ permission khi bắt đầu
+
+REPL và one-shot khởi động khác permission mode. Từ v2.1.283+, **auto mode** (classifier xét duyệt
+hành động thay bạn) là mặc định cho session REPL. `claude -p` luôn bắt đầu ở Manual mode — truyền
+`--permission-mode acceptEdits|auto|dontAsk` hoặc `--allowedTools "Edit,Write"`, không thì script
+sửa file sẽ treo hoặc bị từ chối.
 
 ### Phím tắt REPL
 
-Khi ở trong REPL interactive session, các phím tắt sau giúp bạn làm việc nhanh hơn:
-
 - **Input nhiều dòng**: `\` + Enter, hoặc `Shift+Enter` (chạy `/terminal-setup` trước)
-- **Huỷ generation**: `Escape`
-- **Thoát**: `Ctrl+C` hai lần (hoặc `Ctrl+D`), hoặc `/exit`
-- **Dán ảnh**: `Ctrl+V` (KHÔNG PHẢI `Cmd+V` trên macOS)
+- **Ngắt lượt hiện tại**: `Esc` — dừng response/tool call, giữ nguyên session
+- **Xóa input / rewind**: `Esc Esc` — xóa draft, hoặc (input rỗng) mở menu rewind
+- **Thoát**: `/exit`, hoặc `Ctrl+D` hai lần. `Ctrl+C` hai lần cũng thoát được, nhưng lần đầu chỉ
+  xóa input — dùng `Esc` để ngắt lượt đang chạy, không phải `Ctrl+C`
+- **Dán ảnh**: `Ctrl+V` (`Cmd+V` trên iTerm2, `Alt+V` trên Windows/WSL)
 - **Đổi model**: `Option+P` / `Alt+P`
-- **Bật/tắt thinking**: `Option+T` / `Alt+T`
+- **Bật/tắt thinking**: `Option+T` / `Alt+T` — không có tác dụng trên model luôn bật thinking
 
 ### Sơ đồ quyết định
 
@@ -105,40 +102,46 @@ graph TD
 $ claude
 ```
 
-Bạn vào REPL của Claude Code. Prompt thay đổi để cho biết bạn đang trong
-session.
+Bạn vào REPL của Claude Code.
 
 **Bước 2: Có conversation nhiều lượt**
 
 ```text
 > Cách tốt nhất để handle error trong TypeScript là gì?
-
-Claude giải thích try/catch, Result type, error boundary, v.v.
+# Claude giải thích try/catch, Result type, error boundary
 
 > Cho mình ví dụ cụ thể với async/await được không?
-
-Claude xây dựng trên câu trả lời trước với code cụ thể.
+# Xây dựng trên câu trả lời trước với code cụ thể
 
 > Giờ refactor cái đó sang dùng Result type
-
-Claude refactor ví dụ trước, duy trì context.
+# Refactor ví dụ trước, giữ nguyên context
 ```
 
-**Bước 3: Dùng slash commands**
+**Bước 3: Kiểm tra context và usage**
 
-```text
-/help
+Trong REPL, `/context` hiển thị lưới màu. Kiểm tra headless (`claude -p` in bảng thay vì lưới):
+
+```bash
+$ claude -p "/context"
 ```
 
-Output hiển thị các lệnh có sẵn:
+```markdown
+# Output có thể khác — phụ thuộc plugin/skill đã cài
+## Context Usage
+**Model:** claude-opus-5-5 · **Tokens:** 26.7k / 1m (3%)
+| Category | Tokens | Percentage |
+|----------|--------|------------|
+| System prompt | 2.2k | 0.2% |
+| Memory files | 7.1k | 0.7% |
+| Free space | 940.3k | 94.0% |
+```
+
+Xem chi tiêu: `claude -p "/usage"` (`/cost` là alias):
+
 ```text
-# Output có thể khác
-Available commands:
-  /help     - Show this help
-  /clear    - Clear conversation
-  /compact  - Compress context
-  /cost     - Show token usage
-  /init     - Initialize CLAUDE.md
+# Output có thể khác — dạng subscriber; tài khoản API key thấy khối Session cost thay vào đó
+You are currently using your subscription to power your Claude Code usage
+Current session: 4% used · resets Sep 28 at 8am (Asia/Saigon)
   ...
 ```
 
@@ -154,14 +157,6 @@ $ claude --resume
 # Resume session cụ thể theo tên
 $ claude --resume "auth-refactor"
 ```
-
-Khi bạn đóng terminal giữa chừng, toàn bộ conversation được lưu lại. Không cần giải thích lại context.
-
-**Khi nào dùng REPL mode:**
-- Khám phá codebase mới
-- Debug issue phức tạp
-- Phát triển iterative khi bạn cần tinh chỉnh approach
-- Learning session khi bạn muốn hỏi follow-up
 
 ---
 
@@ -184,11 +179,7 @@ Trong JavaScript, `let` và `const` đều khai báo biến block-scoped, nhưng
 Dùng `const` mặc định, `let` khi cần reassign.
 ```
 
-Lệnh thoát ngay sau response.
-
 **Bước 2: Dùng trong script**
-
-Tạo script đơn giản sử dụng Claude:
 
 ```bash
 #!/bin/bash
@@ -196,7 +187,6 @@ Tạo script đơn giản sử dụng Claude:
 claude -p "Giải thích error này trong một câu: $1"
 ```
 
-Cách dùng:
 ```bash
 $ ./quick-explain.sh "TypeError: Cannot read property 'map' of undefined"
 ```
@@ -208,17 +198,9 @@ $ ./quick-explain.sh "TypeError: Cannot read property 'map' of undefined"
 $ claude -p "Viết README template cho TypeScript project" > README.md
 ```
 
-**Khi nào dùng one-shot mode:**
-- Câu hỏi nhanh không cần follow-up
-- Shell script và automation
-- CI/CD pipeline
-- Generate file hoặc code snippet programmatically
-
 ---
 
 ### Chế độ 3: Pipe Mode
-
-Pipe mode đưa stdin vào Claude làm context. Kết hợp với `-p`, nó tạo ra workflow kiểu Unix mạnh mẽ.
 
 **Bước 1: Pipe nội dung file**
 
@@ -247,12 +229,6 @@ Diff này cho thấy:
 $ git log --oneline -10 | claude -p "Commit nào trong số này là bug fix?"
 ```
 
-**Khi nào dùng pipe mode:**
-- Code review (pipe diff hoặc file)
-- Log analysis (pipe error log)
-- Batch processing nhiều file
-- Tích hợp Claude vào Unix pipeline
-
 ---
 
 ## 4. PRACTICE — Tự thực hành
@@ -267,11 +243,11 @@ $ git log --oneline -10 | claude -p "Commit nào trong số này là bug fix?"
    với empty array"
 3. Hỏi Claude cách fix
 4. Hỏi follow-up: "Làm sao thêm TypeScript type vào cái này?"
-5. Chạy `/cost` để xem token usage
-6. Thoát với `/exit`, hoặc Ctrl+C hai lần (hoặc Ctrl+D)
+5. Chạy `/usage` để xem token/cost usage
+6. Thoát với `/exit`, hoặc `Ctrl+D` hai lần
 
-**Kết quả mong đợi**: Bạn có conversation nhiều lượt mà mỗi response xây dựng
-trên context trước, và thấy tổng token cost.
+**Kết quả mong đợi**: Conversation nhiều lượt xây dựng trên context trước, cùng tổng token/cost
+hiện rõ.
 
 <details>
 <summary>💡 Gợi ý</summary>
@@ -286,18 +262,13 @@ thể nói "cái function đó" mà không cần giải thích lại function n�
 
 ```bash
 $ claude
-
 > Mình có function trả về tổng của array, nhưng nó trả về NaN với empty array
-
 # Claude giải thích issue (có thể là reduce không có initial value)
 
 > Làm sao thêm TypeScript type vào cái này?
-
 # Claude thêm typing đúng vào solution trước
 
-/cost
-# Hiển thị token dùng trong toàn bộ conversation
-
+/usage   # token/cost cho toàn bộ conversation
 /exit
 ```
 
@@ -316,14 +287,12 @@ $ claude
    `alias explain='claude -p "Giải thích lệnh này:"'`
 4. Test: `explain "tar -xzf archive.tar.gz"`
 
-**Kết quả mong đợi**: Mỗi lệnh trả về response và thoát. Alias giúp bạn dễ
-dàng lấy giải thích nhanh.
+**Kết quả mong đợi**: Mỗi lệnh trả về response rồi thoát ngay lập tức.
 
 <details>
 <summary>💡 Gợi ý</summary>
 
-Alias hoạt động vì one-shot mode thoát sau mỗi response. Nếu nó mở interactive
-session, alias sẽ để bạn kẹt trong Claude session.
+One-shot mode thoát sau mỗi response — một interactive session sẽ để alias kẹt lại.
 
 </details>
 
@@ -332,19 +301,17 @@ session, alias sẽ để bạn kẹt trong Claude session.
 
 ```bash
 $ claude -p "Flag -r trong lệnh rm làm gì?"
-# Output giải thích recursive deletion
-# Bạn ngay lập tức quay lại shell prompt
+# Giải thích recursive deletion, rồi quay lại shell prompt ngay
 
 $ alias explain='claude -p "Giải thích lệnh này:"'
 $ explain "tar -xzf archive.tar.gz"
-# Output giải thích: extract, gzip, file flag
 ```
 
 </details>
 
 ---
 
-### Bài tập 3: Thành thạo Pipe Mode ⚠️
+### Bài tập 3: Thành thạo Pipe Mode
 
 **Mục tiêu**: Dùng pipe mode để phân tích code hoặc diff.
 
@@ -355,17 +322,12 @@ $ explain "tar -xzf archive.tar.gz"
    nào?"`
 4. Thử nghiệm các combination khác
 
-**Kết quả mong đợi**: Claude phân tích nội dung được pipe và response dựa trên
-context đó.
-
-⚠️ Nếu syntax pipe không hoạt động, kiểm tra `claude --help` để biết cách dùng
-đúng.
+**Kết quả mong đợi**: Claude trả lời dựa trên nội dung được pipe làm context.
 
 <details>
 <summary>💡 Gợi ý</summary>
 
-Nội dung pipe trở thành context cho prompt của bạn. Bạn không cần paste nội
-dung file — pipe operator xử lý việc đó.
+Nội dung pipe trở thành context cho prompt — không cần tự paste nội dung file.
 
 </details>
 
@@ -375,16 +337,11 @@ dung file — pipe operator xử lý việc đó.
 ```bash
 $ cd my-project
 $ git diff HEAD~1 | claude -p "Commit này thay đổi gì?"
-# Claude tóm tắt diff
-
 $ cat package.json | claude -p "Project này dùng dependency nào?"
-# Claude liệt kê và giải thích ngắn gọn mỗi dependency
 ```
 
-⚠️ Syntax có thể khác theo version. Nếu không hoạt động, thử:
-```bash
-$ claude -p "Thay đổi gì?" < <(git diff HEAD~1)
-```
+Piped stdin giới hạn 10MB — với diff lớn, lọc trước:
+`git diff HEAD~1 -- src/ | claude -p ...`
 
 </details>
 
@@ -396,14 +353,14 @@ $ claude -p "Thay đổi gì?" < <(git diff HEAD~1)
 |--------|------|---------|
 | **Bắt đầu interactive session** | `claude` | Multi-turn, có slash commands |
 | **One-shot query** | `claude -p "prompt"` | Single response, thoát ngay |
-| **Pipe file vào Claude** | `cat file \| claude -p "prompt"` | ⚠️ Xác minh syntax |
-| **Pipe output lệnh** | `cmd \| claude -p "prompt"` | ⚠️ Xác minh syntax |
-| **Lưu output ra file** | `claude -p "..." > file.md` | ⚠️ Xác minh behavior |
-| **Xem help trong session** | `/help` | Liệt kê lệnh có sẵn |
+| **Pipe file vào Claude** | `cat file \| claude -p "prompt"` | stdin giới hạn 10MB |
+| **Pipe output lệnh** | `cmd \| claude -p "prompt"` | Hành vi core, có tài liệu |
+| **Lưu output ra file** | `claude -p "..." > file.md` | Shell redirect response được in |
 | **Xóa conversation** | `/clear` | Reset context trong REPL |
-| **Nén context** | `/compact` | Giảm token usage |
-| **Xem token usage** | `/cost` | Hiển thị usage cho session |
-| **Thoát REPL** | `/exit`, hoặc Ctrl+C hai lần (hoặc Ctrl+D) | Kết thúc interactive session |
+| **Nén context** | `/compact` | Tóm tắt và giảm context |
+| **Xem context usage** | `/context` | Lưới màu thể hiện thứ chiếm context |
+| **Xem token/cost usage** | `/usage` (alias `/cost`) | Chi tiêu và hạn mức session |
+| **Thoát REPL** | `/exit`, hoặc `Ctrl+D` hai lần | Kết thúc interactive session |
 
 ### Tham chiếu nhanh chọn chế độ
 
@@ -415,9 +372,6 @@ $ claude -p "Thay đổi gì?" < <(git diff HEAD~1)
 | "Giải thích log này" | Pipe | Nội dung external làm input |
 | Tích hợp CI/CD | One-shot | Stateless, scriptable |
 | Học/khám phá | REPL | Conversation iterative |
-| Resume session cuối | `claude -c` | Tiếp tục từ nơi dừng lại |
-| Resume session cụ thể | `claude -r "name"` | Chọn session theo tên |
-| Resume + headless | `claude -c -p "query"` | Follow-up ở chế độ script |
 
 ---
 
@@ -425,27 +379,25 @@ $ claude -p "Thay đổi gì?" < <(git diff HEAD~1)
 
 | ❌ Sai lầm | ✅ Cách đúng |
 |-----------|-------------|
-| Dùng REPL cho câu hỏi one-off đơn giản | Dùng `claude -p "câu hỏi"` cho câu trả lời nhanh — nhanh hơn và không cần thoát session. |
-| Quên flag `-p` trong script | Không có `-p`, `claude` vào interactive mode và script treo chờ input. Luôn dùng `-p` trong automation. |
-| Pipe file khổng lồ không nghĩ đến token limit | File lớn tiêu tốn nhiều token. Chỉ pipe phần liên quan: `head -100 file \| claude -p "..."` hoặc dùng range dòng cụ thể. |
-| Không check `/cost` trong session dài | REPL session tích lũy token. Chạy `/cost` định kỳ để tránh bill bất ngờ. |
-| Mong đợi pipe mode duy trì state | Mỗi lệnh pipe là độc lập. Cho phân tích nhiều bước, dùng REPL mode thay thế. |
+| Dùng REPL cho câu hỏi one-off | Dùng `claude -p "câu hỏi"` — nhanh hơn, không cần thoát session. |
+| Quên `-p` trong script | Không có `-p`, `claude` vào interactive mode, script treo chờ input. |
+| Pipe file khổng lồ | Chỉ pipe phần liên quan: `head -100 file \| claude -p "..."`. |
+| Không check `/usage` trong session dài | Token tích lũy dần; `/context` cho biết thứ gì đang chiếm context. |
+| Tưởng `-p` kế thừa permission mode của REPL | `-p` luôn Manual mode — truyền `--permission-mode acceptEdits` hoặc `--allowedTools` để sửa/ghi file. |
+| Mong pipe mode giữ state | Mỗi lệnh pipe độc lập — dùng REPL cho phân tích nhiều bước. |
 
 ---
 
 ## 7. REAL CASE — Tình huống thực tế
 
-**Bối cảnh**: Huy, mobile developer tại một công ty e-commerce Việt Nam, làm
-việc trên dự án Kotlin Multiplatform (KMP). Team chia sẻ business logic giữa
-app Android và iOS qua shared module. Trước khi submit PR, Huy cần code review
-nhanh, nhưng senior reviewer thường bận họp — đặc biệt là khi reviewer làm việc
-remote từ Singapore, lệch múi giờ 1 tiếng.
+**Bối cảnh**: Huy, mobile developer tại một công ty e-commerce Việt Nam, làm việc trên dự án Kotlin
+Multiplatform (KMP) chia sẻ business logic giữa Android và iOS. Senior reviewer thường bận họp nên
+PR hay bị đọng lại.
 
-**Vấn đề**: Huy vừa hoàn thành refactoring lớn cho shared networking module.
-Anh ấy muốn review sơ bộ trước khi review chính thức để bắt issue rõ ràng sớm.
-Diff có hơn 400 dòng trải qua nhiều file.
+**Vấn đề**: Huy vừa refactor xong shared networking module — diff hơn 400 dòng — và muốn review sơ
+bộ trước khi review chính thức, để bắt lỗi rõ ràng sớm.
 
-**Giải pháp**: Huy dùng pipe mode để nhận feedback tức thì:
+**Giải pháp**: Pipe mode để nhận feedback tức thì:
 
 ```bash
 # Review toàn bộ diff
@@ -454,7 +406,7 @@ code này. Focus vào: 1) Kotlin idiom 2) Coroutine usage 3) Error handling
 4) Vấn đề tương thích iOS/Android"
 ```
 
-Với file cụ thể, anh ấy dùng review có target:
+Với file cụ thể, anh dùng review có target:
 
 ```bash
 # Review chỉ shared module
@@ -462,15 +414,12 @@ $ git diff main -- shared/src/commonMain/kotlin/network/ | claude -p \
   "Check Kotlin networking code này tìm coroutine scope issue"
 ```
 
-**Kết quả**: Claude phát hiện ba issue trước khi PR được tạo:
-1. Thiếu `supervisorScope` có thể crash iOS app nếu child coroutine fail
-2. Chuỗi `if-else` không idiomatic nên là `when` expression
-3. Memory leak tiềm ẩn từ `HttpClient` không được đóng
+**Kết quả**: Claude phát hiện ba issue trước khi PR được tạo: thiếu `supervisorScope` (crash iOS
+nếu child coroutine fail), chuỗi `if-else` đáng lẽ là `when` expression, và memory leak từ
+`HttpClient` không đóng.
 
-Huy fix các issue này trong 10 phút. Khi senior reviewer (đang ở Singapore)
-online vào sáng hôm sau và xem PR, code đã sạch. Review chính thức mất 5 phút
-thay vì 30 phút như thường lệ. Giờ Huy chạy `git diff | claude -p "review"`
-trước mỗi PR — nó đã thành một phần workflow của anh ấy, như chạy test vậy.
+Huy fix cả ba trong 10 phút. Review chính thức sau đó chỉ mất 5 phút thay vì 30 phút như thường lệ.
+`git diff | claude -p "review"` giờ là một phần workflow của anh, như chạy test vậy.
 
 ---
 
