@@ -1,6 +1,8 @@
 ---
 title: 'Tối ưu Chi phí'
-description: 'Giảm chi phí sử dụng Claude Code: tiết kiệm token, chọn model phù hợp và theo dõi usage hiệu quả.'
+description: 'Giá thật của Claude Code, prompt caching tự động, --max-budget-usd, và cost ladder từ CLAUDE.md gọn tới chọn đúng model.'
+verified: 2026-09-27
+claude_version: 2.1.283
 ---
 
 # Module 14.4: Tối ưu Chi phí
@@ -9,229 +11,238 @@ description: 'Giảm chi phí sử dụng Claude Code: tiết kiệm token, ch�
 >
 > **Yêu cầu trước**: Module 14.3 (Tối ưu Chất lượng)
 >
-> **Kết quả**: Sau module này, bạn sẽ hiểu Claude Code pricing, biết track và reduce cost, và make informed model/usage decision.
+> **Kết quả**: Sau module này, bạn đọc được `/usage`, giới hạn spend bằng `--max-budget-usd`, giữ
+> prompt caching hoạt động thay vì vô tình reset nó, và áp dụng cost ladder thật thay vì "cứ đổi
+> model rẻ hơn".
 
 ---
 
 ## 1. WHY — Tại sao cần học
 
-Cuối tháng, API bill gấp 3 lần expected. Tiền đi đâu? Hóa ra developer dùng Opus cho mọi thứ, một người khác để session chạy với huge context. Cost add up nhanh.
-
-Cost optimization cho bạn control. Biết token đi đâu. Chọn đúng model. Tránh waste. Make Claude Code sustainable — không phải budget crisis đợi xảy ra.
+Hóa đơn cao hơn dự kiến và không ai biết chính xác vì sao. Đoán mò không sửa được — đọc xem token
+thực sự đi đâu mới sửa được. Claude Code cache prompt tự động, có flag budget cap thật, và
+Anthropic công bố số cost enterprise thật — không cần bịa ra hệ số nhân nào để chứng minh luận
+điểm.
 
 ---
 
 ## 2. CONCEPT — Khái niệm cốt lõi
 
-### Cost Formula
+Số của chính Anthropic, không phải ước tính: "Across enterprise deployments, the average cost is
+around $13 per developer per active day and $150-250 per developer per month, with costs
+remaining below $30 per active day for 90% of users" (S15). Agent team tốn hơn theo thiết kế —
+"approximately 7x more tokens than standard sessions when teammates run in plan mode, because each
+teammate maintains its own context window and runs as a separate Claude instance" (S15); một agent
+đơn (không phải team) đã chạy "~4×" token của một chat turn, multi-agent "~15×" (S10).
 
-```text
-Cost = (Input Token × Input Price) + (Output Token × Output Price)
+**Giá** (per MTok, ⚠️ verify tại <https://platform.claude.com/docs/en/about-claude/pricing>, kiểm
+tra ngày 2026-09-27):
 
-Price vary theo model:
-- Opus: Đắt nhất (complex reasoning)
-- Sonnet: Trung bình (general coding)
-- Haiku: Rẻ nhất (simple task)
-```
+| Model | Base input | 1h cache write | Cache hit | Output |
+|---|---|---|---|---|
+| Claude Opus 5.5 | $4 | $8 | $0.20 (0.05x) | $20 |
+| Claude Opus 5 | $5 | $10 | $0.50 | $25 |
+| Claude Sonnet 5 | $2 | $4 | $0.20 | $10 |
+| Claude Haiku 4.5 | $1 | $2 | $0.10 | $5 |
+| Claude Fable 5.1 | $10 | $20 | $0.25 (0.025x) | $50 |
 
-### Token Economics
+Không phụ phí riêng cho context window 1M: "Claude 4.6 and later models… include the full 1M
+token context window at standard pricing. (A 900k-token request is billed at the same per-token
+rate as a 9k-token request.)"
 
-⚠️ Pricing thay đổi — verify rate hiện tại tại anthropic.com
+**Prompt caching tự động** — "Claude Code handles prompt caching for you, unless you disable it."
+Cache mặc định sống **1 giờ** trong plan usage của Claude subscription, **5 phút** trên usage
+credits, API key, hoặc cloud provider; một hit tốn 0.1x base input trên hầu hết model (0.05x trên
+Opus 5.5, 0.025x trên Fable 5.1). Cái làm reset: đổi model hoặc effort level (trừ Opus 5.5/Fable
+5.1 trên API key hoặc subscription), lần đầu bật fast mode trong conversation, thêm/bỏ MCP server,
+compact, upgrade Claude Code. Cái không làm reset: sửa file, đổi permission mode, đổi output
+style, chạy skill hoặc command.
 
-| Model | Input (per 1M) | Output (per 1M) | Best For |
-|-------|----------------|-----------------|----------|
-| Opus | ~$15 | ~$75 | Complex architecture |
-| Sonnet | ~$3 | ~$15 | Daily coding |
-| Haiku | ~$0.25 | ~$1.25 | Quick task |
+**Góc nhìn subscription vs API.** `/usage` (alias `/cost` và `/stats`) hiện view plan-usage cho
+seat subscription, hoặc Session block với `Total cost` bằng đô trên usage credits / API key.
+`/insights` viết report HTML vào `~/.claude/usage-data/report.html` từ tối đa 200 session gần
+nhất trên máy. `--max-budget-usd` (chỉ print mode) dừng chi tiêu qua một mốc đô, và "spend from
+subagents counts toward the cap." `opusplan` dùng Opus để plan, đổi sang Sonnet để thực thi — mỗi
+lần đổi là một model switch, nên cũng tốn một lần reset cache.
 
-### Cost Driver
-
-```text
-High Cost:                    Low Cost:
-─────────────────────────────────────────────────
-Large context (80K+)          Fresh context
-Opus cho mọi thứ              Model matching
-Long output                   Concise request
-Repeated similar query        Caching/reuse
-Debug loop                    Get it right first time
-```
-
-### Quy tắc 80/20
-
-80% cost thường đến từ 20% usage. Identify expensive pattern trước:
-- Big context session
-- Opus overuse
-- Debug loop
-
-### Cost vs Value Matrix
-
-```text
-High Value + Low Cost   → Maximize (Haiku cho simple task)
-High Value + High Cost  → Justify (Opus cho architecture)
-Low Value + Low Cost    → Ignore (minimal impact)
-Low Value + High Cost   → Eliminate (wasteful pattern)
-```
+**Cost ladder** (S15), thói quen rẻ nhất trước: `/clear` giữa các task không liên quan · chọn
+model theo việc, không mặc định · ít MCP server hơn, ưu tiên CLI tool như `gh`/`aws`/`gcloud` ·
+đẩy việc verbose sang hook và skill · giữ CLAUDE.md dưới 200 dòng · giao việc verbose (chạy test,
+xử lý log) cho subagent để chỉ tóm tắt của nó quay lại context bạn.
 
 ---
 
 ## 3. DEMO — Từng bước cụ thể
 
-**Scenario**: Team đang spend $500/month muốn reduce xuống $300 mà không mất productivity.
-
-### Bước 1: Audit Usage Hiện tại
+**Bước 1: Đọc `/usage`**
 
 ```text
-Cost Breakdown (sample month):
-
-By Model:
-- Opus:   $350 (70%) ← Red flag: overuse
-- Sonnet: $120 (24%)
-- Haiku:  $30 (6%)
-
-By Activity:
-- Code generation: $250
-- Debugging: $150 ← Red flag: loop
-- Code review: $70
-- Documentation: $30
+# docs: en/commands — /usage (alias: /cost, /stats)
+/usage
 ```
-
-### Bước 2: Xác định Target Optimization
-
-| Vấn đề | Hiện tại | Target | Action |
-|--------|----------|--------|--------|
-| Opus overuse | $350 | $150 | 60% task → Sonnet |
-| Debug loop | $150 | $50 | Better context, ít attempt |
-| Large context | - | -50% | Regular `/clear` |
-
-### Bước 3: Thêm Cost Guideline vào CLAUDE.md
-
-```markdown
-## Cost Guideline
-
-**Default model**: Sonnet
-**Dùng Haiku cho**: formatting, simple edit, quick question
-**Chỉ dùng Opus cho**: architecture decision, complex debugging
-
-**Trước khi dùng Opus, hỏi**:
-1. Đây có thực sự là complex reasoning?
-2. Đã thử Sonnet chưa?
-3. Value có đáng 5x cost không?
-
-**Thói quen**:
-- `/clear` giữa các task không liên quan
-- "Code only" cho implementation task
-```
-
-### Bước 4: Model Selection Thực tế
 
 ```text
-Task: "Fix typo trong README"
-Trước: Opus ($0.50) → Sau: Haiku ($0.02)
-Tiết kiệm: 96%
+# Output may vary — view plan-usage của subscription (account này dùng Claude subscription,
+# không phải usage credits, nên không hiện số đô mỗi call ở đây). Tên skill/subagent/plugin
+# bên dưới đã redact — của bạn sẽ liệt kê thứ bạn cài.
+  Last 24h · these are independent characteristics of your usage, not a breakdown
 
-Task: "Implement CRUD endpoint"
-Trước: Opus ($2.00) → Sau: Sonnet ($0.40)
-Tiết kiệm: 80%
+  …% of your usage came from subagent-heavy sessions
+   Each subagent runs its own requests. Be deliberate about spawning them.
 
-Task: "Design microservices architecture"
-Trước: Opus ($3.00) → Sau: Opus ($3.00)
-Tiết kiệm: 0% (nhưng justified — appropriate use)
+  …% of your usage was at >150k context
+   Longer sessions are more expensive even when cached.
+
+  Usage credits
+  Usage credits are off · /usage-credits to turn them on
 ```
 
-### Bước 5: Kết quả Sau 1 Tháng
+Trên usage credits hoặc API key, đúng lệnh này hiện Session block với `total_cost_usd` thật mỗi
+call thay vào đó — đó là cái Bước 2 dùng.
 
-| Model | Trước | Sau | Thay đổi |
-|-------|-------|-----|----------|
-| Opus | $350 | $120 | -66% |
-| Sonnet | $120 | $150 | +25% (shifted) |
-| Haiku | $30 | $50 | +67% (shifted) |
-| **Total** | **$500** | **$320** | **-36%** |
+**Bước 2: Prompt caching, đo thật — chạy cùng prompt hai lần**
 
-Productivity: Maintained. Quality: Maintained.
+```bash
+# docs: en/prompt-caching
+claude -p "Read src/math.js and list its exported function names, comma separated." \
+  --allowedTools Read --output-format json
+```
+
+```text
+# Output may vary
+total_cost_usd: 0.2662546   cache_read_input_tokens: 53533   cache_creation_input_tokens: 31759
+```
+
+```bash
+# cùng lệnh, chạy lại ngay
+claude -p "Read src/math.js and list its exported function names, comma separated." \
+  --allowedTools Read --output-format json
+```
+
+```text
+# Output may vary
+total_cost_usd: 0.0185344   cache_read_input_tokens: 85292   cache_creation_input_tokens: 0
+```
+
+Lần thứ hai rẻ hơn khoảng 14 lần — `cache_creation_input_tokens` về 0 vì toàn bộ prefix đã được
+ghi vào cache từ lần gọi đầu.
+
+**Bước 3: `--max-budget-usd` thực sự dừng một run**
+
+```bash
+# docs: en/cli-reference — --max-budget-usd (chỉ print mode)
+claude -p "Read src/math.js and tests/math.test.mjs. Then write a detailed 400-word code review." \
+  --allowedTools Read --max-budget-usd 0.05 --output-format json
+```
+
+```text
+# Output may vary
+"terminal_reason":"budget_exhausted","subtype":"error_max_budget_usd",
+"errors":["Reached maximum budget ($0.05)"],"total_cost_usd":0.2527206
+```
+
+Call đang chạy hoàn tất trước khi cap có hiệu lực, nên spend thật vượt cap —
+`--max-budget-usd` dừng call *tiếp theo*, không phải call đang chạy. Đặt nó thấp hơn hẳn mức bạn
+chịu được, không đặt đúng bằng giới hạn.
+
+**Bước 4: `opusplan` và `/insights`**
+
+```text
+/model opusplan
+```
+
+```text
+# Output may vary
+⎿  Set model to Opus in plan mode, else Sonnet and saved as your default for new sessions
+```
+
+```text
+# docs: en/costs — /insights
+/insights
+```
+
+```text
+# Output may vary
+⏺ Your shareable insights report is ready:
+```
+
+Xác nhận thật trên đĩa tại `~/.claude/usage-data/report.html` — bản thân report là dữ liệu usage
+cá nhân, nên module này không dán nội dung của nó.
 
 ---
 
 ## 4. PRACTICE — Luyện tập
 
-### Bài 1: Cost Audit
+### Bài 1: Tự bắt lỗi reset cache của bạn
 
-**Mục tiêu**: Hiểu spending pattern hiện tại.
+**Mục tiêu**: Nhận ra khi nào bạn vô tình reset cache.
 
 **Hướng dẫn**:
-1. Estimate Claude Code usage tuần này
-2. Breakdown theo: model, task type, outcome
-3. Identify: Cái gì có thể dùng model rẻ hơn?
-4. Tính potential saving
+1. Chạy cùng prompt hai lần liên tiếp, ghi lại cost giảm (Bước 2).
+2. Đổi model bằng `/model`, rồi chạy lần thứ ba.
+3. So sánh `cache_creation_input_tokens` lần ba với lần hai.
 
 <details>
 <summary>💡 Gợi ý</summary>
 
-Track 3 ngày: mỗi lần dùng Claude, note model và task type. Pattern emerge nhanh.
+Đổi effort level cũng reset cache, trừ Opus 5.5 hoặc Fable 5.1 trên API key hoặc subscription.
 
 </details>
 
 <details>
 <summary>✅ Giải pháp</summary>
 
-Finding phổ biến:
-- 50%+ Opus usage có thể là Sonnet
-- Simple question thường gửi model đắt
-- Debug session tích lũy hidden cost
-
-Potential saving typical: 30-50% chỉ với model matching.
+Đổi model làm `cache_creation_input_tokens` quay lại gần giá trị lần đầu — toàn bộ prefix phải
+viết lại, ở giá 2x base input cho cache 1 giờ.
 
 </details>
 
-### Bài 2: Model Matching Guide
+### Bài 2: Đặt budget cap vừa vặn
 
-**Mục tiêu**: Tạo quick-reference cho model selection.
+**Mục tiêu**: Dùng `--max-budget-usd` mà không bị bất ngờ vì vượt mức.
 
 **Hướng dẫn**:
-1. List 10 task phổ biến bạn làm với Claude
-2. Assign optimal model cho mỗi task
-3. Tạo quick reference
-4. Follow 1 tuần
+1. Ước lượng cost của task từ `total_cost_usd` của một run tương tự trước đó.
+2. Đặt `--max-budget-usd` ở khoảng nửa ước lượng đó.
+3. Chạy và đọc `errors` nếu nó dừng sớm.
 
 <details>
 <summary>💡 Gợi ý</summary>
 
-Hầu hết coding task work fine với Sonnet. Reserve Opus cho true complexity.
+Cap không thể ngắt một call đang chạy — hãy tính theo kích thước một turn, không chỉ tổng.
 
 </details>
 
 <details>
 <summary>✅ Giải pháp</summary>
 
-Ví dụ guide:
-- Haiku: typo, formatting, boilerplate, simple question
-- Sonnet: feature, debugging, review, doc
-- Opus: architecture, security audit, novel problem
-
-Dán gần monitor để reference nhanh.
+Cap đặt quá sát tổng dự kiến dễ bị nhiễu bình thường kích hoạt. Nửa ước lượng để lại chỗ cho một
+turn đắt trước khi cap can thiệp.
 
 </details>
 
-### Bài 3: Cost Policy
+### Bài 3: Đi qua cost ladder trên project của bạn
 
-**Mục tiêu**: Viết cost guideline cho team.
+**Mục tiêu**: Áp dụng ladder S15 vào một project thật.
 
 **Hướng dẫn**:
-1. Draft cost guideline cho CLAUDE.md
-2. Define khi nào dùng model nào
-3. Thêm `/clear` policy và output preference
-4. Share với team nếu applicable
+1. Đếm số dòng CLAUDE.md. Trên 200? Chuyển chi tiết sang skill.
+2. Liệt kê MCP server đang kết nối. Cái nào thay được bằng CLI tool?
+3. Tìm một task verbose (chạy test, tail log) có thể giao cho subagent.
 
 <details>
 <summary>💡 Gợi ý</summary>
 
-Giữ simple — 5-10 bullet max. Policy phức tạp bị ignore.
+`/context` hiện thứ thực sự đang load — gồm cả định nghĩa MCP server — trước khi bạn đoán mò cái
+cần cắt.
 
 </details>
 
 <details>
 <summary>✅ Giải pháp</summary>
 
-Xem CLAUDE.md addition ở Bước 3 trong DEMO — đó là production-ready template.
+Ladder xếp theo tỉ lệ công sức/hiệu quả: `/clear` và chọn model không tốn gì để thử trước; tái
+cấu trúc CLAUDE.md và MCP server tốn thời gian hơn nhưng cộng dồn qua mọi session sau.
 
 </details>
 
@@ -239,74 +250,51 @@ Xem CLAUDE.md addition ở Bước 3 trong DEMO — đó là production-ready te
 
 ## 5. CHEAT SHEET
 
-### Model Selection Guide
+| Lệnh / Flag | Tác dụng |
+|---|---|
+| `/usage` (alias `/cost`, `/stats`) | View plan-usage (subscription) hoặc Session block $ (credits/API) |
+| `/insights` | Report HTML tại `~/.claude/usage-data/report.html`, tối đa 200 session |
+| `--max-budget-usd <n>` | Dừng call *tiếp theo* khi spend vượt `<n>` (print mode) |
+| `--output-format json` → `.total_cost_usd` | Cost thật bằng đô mỗi call |
+| `/model opusplan` | Opus để plan, Sonnet để thực thi — mỗi lần đổi reset cache |
+| `DISABLE_PROMPT_CACHING` / `_HAIKU` / `_SONNET` / `_OPUS` / `_FABLE` | Tắt caching theo từng model |
+| `CLAUDE_CODE_PROMPT_CACHE_TTL` (`5m`\|`1h`) | Override thời gian sống mặc định của cache |
 
-| Model | Cost | Dùng cho |
-|-------|------|----------|
-| **Haiku** | $ | Formatting, typo, simple edit, quick question |
-| **Sonnet** | $$ | Feature, debugging, code review, documentation |
-| **Opus** | $$$ | Architecture, complex debugging, security, novel problem |
-
-### Cost Reduction Tactic
-
-```text
-✓ Default Sonnet, không Opus
-✓ Dùng Haiku cho simple task
-✓ /clear giữa project
-✓ "Code only" cho implementation
-✓ Fix root cause (avoid debug loop)
-```
-
-### Tracking
-
-- Review weekly usage
-- Alert khi spike bất thường
-- Budget per project/developer
+⚠️ Bảng giá trên: verify tại URL pricing trước khi trích số vào proposal hay hóa đơn.
 
 ---
 
 ## 6. PITFALLS — Sai lầm thường gặp
 
 | ❌ Sai | ✅ Đúng |
-|--------|---------|
-| Opus cho mọi thứ | Match model với task complexity |
-| Never dùng Haiku | Haiku cho simple task (huge saving) |
-| Không track cost | Regular audit và monitoring |
-| Optimize trước khi hiểu | Audit trước, optimize sau |
-| Sacrifice quality cho cost | Optimize waste, không value |
-| Debug loop (5+ attempt) | Better prompt, better context |
-| Ignore context size | `/clear` reduce token cost |
+|---|---|
+| Trích giá thời 2024 ("Opus $15/$75", "Haiku $0.25/$1.25") | Giá hiện tại thấp hơn và thay đổi — luôn trích bảng ⚠️ trên với ngày kiểm tra |
+| "Context window 1M tốn thêm phí" | Model 4.6+ tính cả cửa sổ đó theo giá per-token chuẩn — không phụ phí |
+| Đổi model hoặc effort giữa session để "thử" | Cả hai reset prompt caching (trừ ngoại lệ hẹp Opus 5.5/Fable 5.1) — viết lại full giá, không miễn phí |
+| Đặt `--max-budget-usd` đúng bằng giới hạn | Call đang chạy có thể xong vượt cap — đặt dưới mức trần thật |
+| Bảo Claude reason từng bước để Opus suy luận kỹ hơn trước khi tốn thêm | Extended thinking đã bật mặc định (Module 6.1); câu đó không thêm ngân sách hay giảm cost |
 
 ---
 
 ## 7. REAL CASE — Câu chuyện thực tế
 
-**Scenario**: Startup Việt Nam, 8 developer. Claude Code bill nhảy từ $400 lên $1,200 trong 1 tháng. CEO hỏi: "Chuyện gì xảy ra?"
+**Scenario**: Một team remote Việt Nam chạy Claude Code trong CI cho các check PR thường xuyên,
+không có cách nào biết một run điển hình tốn bao nhiêu cho tới khi hóa đơn tháng về.
 
-**Điều tra**:
-- 2 developer discover Opus, dùng cho mọi thứ
-- 1 developer có session chạy cả tuần (150K context)
-- Debug loop trung bình 8 attempt per bug
+**Vấn đề**: Không ai biết, ngay trong một run CI đang chạy, liệu nó có đang đi đúng hướng hay đã
+vượt mức thường thấy của loại job đó.
 
-**Kế hoạch Cost Optimization**:
+**Giải pháp**: `--max-budget-usd` trên mọi lần gọi CI, đặt từ lịch sử `total_cost_usd` gần nhất
+của loại job đó, cộng một report `/insights` hàng tuần do người phụ trách pipeline CI tháng đó
+xem lại.
 
-| Tuần | Focus | Action |
-|------|-------|--------|
-| 1 | Awareness | Share pricing: "Opus gấp 5x Sonnet cost" |
-| 2 | Guidelines | Model selection guide trong CLAUDE.md |
-| 3 | Monitoring | Weekly cost review, breakdown per-developer |
-
-**Kết quả (tháng sau)**:
-- Cost: $1,200 → $380 (giảm 68%)
-- Productivity: Unchanged
-- Quality: Unchanged
-
-**Developer quote**: "Tôi không biết Haiku có thể làm 80% việc tôi đang dùng Opus."
-
-**CEO quote**: "Cost optimization không phải về restriction. Mà về awareness. Developer thấy số liệu, tự nhiên chọn tốt hơn."
+**Kết quả**: Một run đắt bất thường giờ tự dừng và báo lý do, thay vì lộ ra ba tuần sau trên hóa
+đơn không kèm ngữ cảnh nào.
 
 ---
 
-> **Phase 14 Hoàn Thành!** Bạn đã học optimize Claude Code cho task efficiency, speed, quality, và cost.
+> **Hoàn thành Phase 14!** Bạn đã học tối ưu Claude Code cho hiệu quả task, tốc độ, chất lượng,
+> và chi phí.
 >
-> **Phase Tiếp Theo**: [Phase 15: Templates, Skills & Ecosystem](../../phase-15-templates-skills/01-claude-md-templates/) →
+> **Phase Tiếp Theo**:
+> [Phase 15: Templates, Skills & Ecosystem](../../phase-15-templates-skills/01-claude-md-templates/) →
