@@ -17,10 +17,10 @@ claude_version: 2.1.283
 
 ## 1. WHY — Tại sao cần học cái này?
 
-Bạn đã cài Claude Code và chạy query đầu tiên — nhưng đang dùng nó như chatbot, gõ từng câu hỏi
-một. Đồng nghiệp thì pipe cả git diff qua Claude để nhận tóm tắt PR tức thì, người khác đã tích hợp
-Claude vào CI, bắt bug trước khi merge. Khác biệt nằm ở việc hiểu ba chế độ: interactive, one-shot,
-pipe. Chọn đúng, Claude Code không còn là cửa sổ chat mà thành một phần automation.
+Bạn đã cài Claude Code — nhưng đang dùng nó như chatbot, gõ từng câu hỏi một. Đồng nghiệp pipe git
+diff qua Claude để nhận tóm tắt PR tức thì, người khác đã tích hợp Claude vào CI, bắt bug trước khi
+merge. Khác biệt nằm ở việc hiểu ba chế độ: interactive, one-shot, pipe. Chọn đúng, Claude Code
+không còn là cửa sổ chat mà thành một phần automation.
 
 ---
 
@@ -37,13 +37,13 @@ pipe. Chọn đúng, Claude Code không còn là cửa sổ chat mà thành mộ
 ### Khác biệt chính
 
 **REPL Mode** giữ context qua nhiều lượt — tinh chỉnh câu hỏi, tham chiếu câu trả lời trước, dùng
-slash command. Nghĩ như một phiên làm việc, không phải câu hỏi rời rạc.
+slash command. Một phiên làm việc, không phải câu hỏi rời rạc.
 
-**One-shot Mode** chạy một prompt rồi thoát — không lịch sử, mỗi lệnh độc lập. Dành cho script và
-automation cần behavior ổn định, không giữ state.
+**One-shot Mode** chạy một prompt rồi thoát — không lịch sử, mỗi lệnh độc lập. Dành cho script cần
+behavior ổn định, không giữ state.
 
-**Pipe Mode** đưa dữ liệu bên ngoài — file, output lệnh khác — vào Claude làm context. Kết hợp với
-`-p`, Claude trở thành một công cụ nữa trong pipeline Unix.
+**Pipe Mode** đưa dữ liệu bên ngoài — file, output lệnh khác — vào Claude làm context. Kết hợp
+`-p`, Claude trở thành một công cụ trong pipeline Unix.
 
 ### Tiếp tục Session
 
@@ -58,16 +58,18 @@ Claude Code lưu lại conversation. Resume bất kỳ session nào trước đ�
 
 REPL và one-shot khởi động khác permission mode. Từ v2.1.283+, **auto mode** (classifier xét duyệt
 hành động thay bạn) là mặc định cho session REPL. `claude -p` luôn bắt đầu ở Manual mode — truyền
-`--permission-mode acceptEdits|auto|dontAsk` hoặc `--allowedTools "Edit,Write"`, không thì script
-sửa file sẽ treo hoặc bị từ chối.
+`--permission-mode acceptEdits` (hoặc `auto`) hoặc `--allowedTools "Edit,Write"` để cho phép sửa
+file. `dontAsk` một mình không đủ: nó auto-deny mọi thứ còn cần approval, không tự cấp quyền. Không
+có một trong hai flag trên, script sửa file sẽ treo hoặc bị từ chối.
 
 ### Phím tắt REPL
 
 - **Input nhiều dòng**: `\` + Enter, hoặc `Shift+Enter` (chạy `/terminal-setup` trước)
 - **Ngắt lượt hiện tại**: `Esc` — dừng response/tool call, giữ nguyên session
 - **Xóa input / rewind**: `Esc Esc` — xóa draft, hoặc (input rỗng) mở menu rewind
-- **Thoát**: `/exit`, hoặc `Ctrl+D` hai lần. `Ctrl+C` hai lần cũng thoát được, nhưng lần đầu chỉ
-  xóa input — dùng `Esc` để ngắt lượt đang chạy, không phải `Ctrl+C`
+- **Thoát**: `/exit`, hoặc `Ctrl+D` hai lần. `Ctrl+C` ngắt thao tác đang chạy giống `Esc`; "nếu
+  không có gì đang chạy, lần nhấn đầu xóa input và lần thứ hai thoát Claude Code" — ưu tiên dùng
+  `Esc` để ngắt, vì nó không bao giờ thoát session
 - **Dán ảnh**: `Ctrl+V` (`Cmd+V` trên iTerm2, `Alt+V` trên Windows/WSL)
 - **Đổi model**: `Option+P` / `Alt+P`
 - **Bật/tắt thinking**: `Option+T` / `Alt+T` — không có tác dụng trên model luôn bật thinking
@@ -125,15 +127,16 @@ Trong REPL, `/context` hiển thị lưới màu. Kiểm tra headless (`claude -
 $ claude -p "/context"
 ```
 
-```markdown
-# Output có thể khác — phụ thuộc plugin/skill đã cài
-## Context Usage
-**Model:** claude-opus-5-5 · **Tokens:** 26.7k / 1m (3%)
-| Category | Tokens | Percentage |
-|----------|--------|------------|
-| System prompt | 2.2k | 0.2% |
-| Memory files | 7.1k | 0.7% |
-| Free space | 940.3k | 94.0% |
+```text
+# Output có thể khác — phụ thuộc plugin/skill đã cài; dòng bị cắt đánh dấu …
+Context Usage
+Model: claude-opus-5-5 · Tokens: 26.7k / 1m (3%)
+
+Category | Tokens | Percentage
+System prompt | 2.2k | 0.2%
+Memory files | 7.1k | 0.7%
+…
+Free space | 940.3k | 94.0%
 ```
 
 Xem chi tiêu: `claude -p "/usage"` (`/cost` là alias):
@@ -141,7 +144,7 @@ Xem chi tiêu: `claude -p "/usage"` (`/cost` là alias):
 ```text
 # Output có thể khác — dạng subscriber; tài khoản API key thấy khối Session cost thay vào đó
 You are currently using your subscription to power your Claude Code usage
-Current session: 4% used · resets Sep 28 at 8am (Asia/Saigon)
+Current session: 4% used · resets … (giờ địa phương)
   ...
 ```
 
@@ -195,7 +198,7 @@ $ ./quick-explain.sh "TypeError: Cannot read property 'map' of undefined"
 
 ```bash
 # Lưu output ra file
-$ claude -p "Viết README template cho TypeScript project" > README.md
+$ claude -p "In ra markdown cho README của TypeScript project, không kèm lời bình" > README.md
 ```
 
 ---
@@ -235,7 +238,7 @@ $ git log --oneline -10 | claude -p "Commit nào trong số này là bug fix?"
 
 ### Bài tập 1: Thành thạo REPL Mode
 
-**Mục tiêu**: Dùng REPL mode cho conversation debugging iterative.
+**Mục tiêu**: Conversation debugging iterative trong REPL mode.
 
 **Hướng dẫn**:
 1. Bắt đầu Claude Code session với `claude`
@@ -278,7 +281,7 @@ $ claude
 
 ### Bài tập 2: Thành thạo One-shot Mode
 
-**Mục tiêu**: Dùng one-shot mode trong shell workflow thực tế.
+**Mục tiêu**: One-shot mode trong shell workflow thực tế.
 
 **Hướng dẫn**:
 1. Dùng `claude -p` để hỏi: "Flag -r trong lệnh rm làm gì?"
@@ -287,7 +290,7 @@ $ claude
    `alias explain='claude -p "Giải thích lệnh này:"'`
 4. Test: `explain "tar -xzf archive.tar.gz"`
 
-**Kết quả mong đợi**: Mỗi lệnh trả về response rồi thoát ngay lập tức.
+**Kết quả mong đợi**: Mỗi lệnh trả về response rồi thoát ngay.
 
 <details>
 <summary>💡 Gợi ý</summary>
@@ -313,7 +316,7 @@ $ explain "tar -xzf archive.tar.gz"
 
 ### Bài tập 3: Thành thạo Pipe Mode
 
-**Mục tiêu**: Dùng pipe mode để phân tích code hoặc diff.
+**Mục tiêu**: Pipe mode để phân tích code hoặc diff.
 
 **Hướng dẫn**:
 1. Navigate đến project có git history
@@ -322,12 +325,12 @@ $ explain "tar -xzf archive.tar.gz"
    nào?"`
 4. Thử nghiệm các combination khác
 
-**Kết quả mong đợi**: Claude trả lời dựa trên nội dung được pipe làm context.
+**Kết quả mong đợi**: Claude trả lời dựa trên nội dung được pipe.
 
 <details>
 <summary>💡 Gợi ý</summary>
 
-Nội dung pipe trở thành context cho prompt — không cần tự paste nội dung file.
+Nội dung pipe thành context cho prompt — không cần tự paste.
 
 </details>
 
@@ -390,12 +393,12 @@ Piped stdin giới hạn 10MB — với diff lớn, lọc trước:
 
 ## 7. REAL CASE — Tình huống thực tế
 
-**Bối cảnh**: Huy, mobile developer tại một công ty e-commerce Việt Nam, làm việc trên dự án Kotlin
-Multiplatform (KMP) chia sẻ business logic giữa Android và iOS. Senior reviewer thường bận họp nên
-PR hay bị đọng lại.
+**Bối cảnh**: Huy, mobile developer tại một công ty e-commerce Việt Nam, chia sẻ business logic
+giữa Android và iOS trên dự án Kotlin Multiplatform (KMP). Senior reviewer thường bận họp nên PR
+hay bị đọng lại.
 
 **Vấn đề**: Huy vừa refactor xong shared networking module — diff hơn 400 dòng — và muốn review sơ
-bộ trước khi review chính thức, để bắt lỗi rõ ràng sớm.
+bộ trước khi review chính thức.
 
 **Giải pháp**: Pipe mode để nhận feedback tức thì:
 
@@ -405,8 +408,6 @@ $ git diff main...feature/network-refactor | claude -p "Review thay đổi KMP
 code này. Focus vào: 1) Kotlin idiom 2) Coroutine usage 3) Error handling
 4) Vấn đề tương thích iOS/Android"
 ```
-
-Với file cụ thể, anh dùng review có target:
 
 ```bash
 # Review chỉ shared module

@@ -83,19 +83,19 @@ knows your framework, then customize for your project specifics. 30 minutes → 
 
 ### Keep Templates Lean: `@imports` and `.claude/rules/`
 
-The docs' own size guidance: "target under 200 lines per CLAUDE.md file. Longer files consume more
-context and reduce adherence" (S15). Two features keep a growing template library under that limit
-instead of one sprawling file:
+The docs' own size guidance: "Aim to keep CLAUDE.md under 200 lines by including only essentials"
+(S15). Two features organize a growing template library — but only one actually shrinks what loads:
 
 - **`@path/to/import`** pulls another file's content into `CLAUDE.md` at that point — relative
   paths resolve against the *importing file's* location, and imports can recursively import up to
   four hops deep. Put shared conventions (commit format, testing rules) in one file and `@import`
-  it from every template instead of copy-pasting.
+  it from every template instead of copy-pasting. ⚠️ This is organization only: "imported files
+  still load and enter the context window at launch" — splitting into imports doesn't reduce
+  context.
 - **`.claude/rules/*.md`** files load the same way as `.claude/CLAUDE.md` by default, but adding a
   `paths:` frontmatter key scopes a rule to specific files — it "trigger[s] when Claude reads files
-  matching the pattern, not on every tool use." This replaces a chunk of always-loaded template text
-  with content that only appears when it's relevant (e.g., a `paths: ["**/*.test.ts"]` rule with
-  your testing conventions).
+  matching the pattern, not on every tool use." This is what actually keeps content out of context
+  until it's relevant (e.g., a `paths: ["**/*.test.ts"]` rule with your testing conventions).
 
 ---
 

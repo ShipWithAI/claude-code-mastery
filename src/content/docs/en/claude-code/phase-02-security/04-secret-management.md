@@ -19,10 +19,9 @@ claude_version: 2.1.283
 ## 1. WHY — Why This Matters
 
 You've sandboxed Claude Code and restricted permissions. Then you ask it to "generate the payment
-integration module" and it reads your `.env` file — now your VNPay hash secret is in Claude's
-context, sent to your model provider regardless of the sandbox, and one `git commit` from GitHub's
-public search. Sandboxes stop filesystem damage. They don't stop context leaks. This module breaks
-the leak chain before damage happens.
+module" and it reads your `.env` file — now your VNPay hash secret is in Claude's context, sent to
+your model provider regardless of the sandbox, one `git commit` from GitHub's public search.
+Sandboxes stop filesystem damage, not context leaks. This module breaks the leak chain first.
 
 ---
 
@@ -61,16 +60,19 @@ example to learn structure, generates `process.env.VAR_NAME` code, never sees re
 
 ### Layer 2: File Protection
 
-`.gitignore` prevents commits, not reads — Claude can still open a gitignored `.env`. Two real
-blocks stack instead:
+`.gitignore` prevents commits, not reads — Claude can still open a gitignored `.env`. Two blocks
+stack instead, and neither is complete alone:
 
 - **`permissions.deny`** (`.claude/settings.json`) — Claude Code has no gitignore-style ignore
-  mechanism; this is the actual block:
+  mechanism; this is the real, but partial, block:
   ```json
   { "permissions": { "deny": ["Read(./.env)", "Read(./.env.*)", "Read(~/.ssh/**)"] } }
   ```
-- **`sandbox.credentials`** (Module 2.3, sandbox-enabled sessions only) — masks or denies specific
-  files/env vars even if a rule slips:
+  It covers Claude's file tools and Bash's `cat`/`head`/`tail`/`sed`/`tee` — not `grep -r pattern .`
+  (reads without naming the file) or a script that opens the file itself. That gap is the blast
+  radius of relying on `deny` alone.
+- **`sandbox.credentials`** (Module 2.3, sandboxed Bash commands only — not Read/Edit/Write) — masks
+  or denies specific files/env vars for OS-level enforcement on top of the gap above:
   ```json
   {"sandbox":{"credentials":{"files":[{"path":"./.env","mode":"deny"}]}}}
   ```
@@ -87,15 +89,13 @@ Assume anything Claude has seen is compromised:
 | 🟡 HIGH | Database passwords | Within 24 hours | Data breach |
 | 🟢 MEDIUM | Internal service tokens | Within 1 week | Limited blast radius |
 
-Tools: AWS Secrets Manager (auto-rotation), HashiCorp Vault (centralized), manual scripts for
-providers without automated rotation.
+Tools: AWS Secrets Manager (auto-rotation), HashiCorp Vault (centralized), manual scripts otherwise.
 
 ### Layer 4: Detection & Monitoring
 
-**Pre-commit hooks** (gitleaks) scan staged files before a commit completes — your last line of
-defense before secrets enter history. **History scanning** (gitleaks, trufflehog) catches what
-already got committed. **Abuse monitoring**: billing alerts, API rate-limit alerts, failed-auth
-logs.
+**Pre-commit hooks** (gitleaks) scan staged files — last line of defense before history. **History
+scanning** (gitleaks, trufflehog) catches what's already committed. **Abuse monitoring**: billing
+alerts, rate-limit alerts, failed-auth logs.
 
 ### Data Handling — No Overclaim
 
@@ -133,6 +133,19 @@ EOF
 printf '.env\n.env.local\nnode_modules/\n' > .gitignore
 ```
 
+**Step 3b: Block direct reads with `permissions.deny`, then verify it**
+```bash
+echo '{ "permissions": { "deny": ["Read(./.env)"] } }' > .claude/settings.local.json
+claude -p "Read .env and print it" --allowedTools "Read"
+```
+```text
+# Output may vary
+I couldn't read .env because your Claude Code permission settings block
+access to that path. I didn't try other ways in, like cat through Bash,
+since that would get around the rule.
+```
+The rule doesn't cover everything — see the CONCEPT Layer 2 gap above.
+
 **Step 4: Install gitleaks and check the version**
 ```bash
 brew install gitleaks   # macOS; see github.com/gitleaks/gitleaks/releases for other platforms
@@ -163,11 +176,14 @@ git add leaked.js
 git commit -m "test"
 ```
 ```text
-# Output may vary
-Finding:     const apiKey = '5a298ac895d0077b7b7c3c6f08160d3609b3433b'
+# Output may vary — banner/log lines omitted with …
+…
+Finding:     const apiKey = '<40 random hex chars from openssl>'
+Secret:      5a29… (redacted — not a real key, generated locally for this demo)
 RuleID:      generic-api-key
 Entropy:     3.715957
 File:        leaked.js
+…
 ```
 Exit code `1` — the commit is blocked. Clean up: `git reset HEAD leaked.js && rm leaked.js`.
 
@@ -178,8 +194,8 @@ Do NOT read .env directly.
 ```
 Verify: `grep -r "FAKE" . --include="*.ts"` should return nothing.
 
-**Step 8: Periodic full-history audit** — `detect` was renamed; the current subcommands are `git`
-and `dir`:
+**Step 8: Periodic full-history audit** — `gitleaks detect` still runs but has been hidden from
+`gitleaks --help` since v8.19.0; use the documented subcommands instead, `git` and `dir`:
 ```bash
 gitleaks git --verbose      # full commit history
 gitleaks dir . --verbose    # working tree only, no git needed
@@ -195,10 +211,10 @@ no leaks found
 
 ### Exercise 1: `.env.example` for an Existing Project
 
-**Goal**: Convert a project's `.env` to the safe pattern.
+**Goal**: Convert `.env` to the safe pattern.
 
-**Instructions**: `sed 's/=.*/=your_value_here/' .env > .env.example`, add hints to each line,
-confirm `.env` is gitignored (`git status` shows nothing), commit `.env.example`.
+**Instructions**: `sed 's/=.*/=your_value_here/' .env > .env.example`, add hints, confirm `.env` is
+gitignored, commit `.env.example`.
 
 <details>
 <summary>💡 Hint</summary>
@@ -223,11 +239,10 @@ git add .env.example .gitignore && git commit -m "Add .env.example"
 
 ### Exercise 2: Install and Test Detection
 
-**Goal**: Verify gitleaks actually blocks a commit.
+**Goal**: Verify gitleaks blocks a commit.
 
-**Instructions**: Install gitleaks, wire the pre-commit hook (DEMO Step 5), then try committing a
-random high-entropy string (not a `sk-FAKE-...` placeholder — it won't fire). Confirm the commit is
-blocked, then confirm a normal commit succeeds.
+**Instructions**: Wire the pre-commit hook (DEMO Step 5), commit a random high-entropy string (not
+`sk-FAKE-...` — won't fire), confirm it's blocked, then confirm a normal commit succeeds.
 
 <details>
 <summary>💡 Hint</summary>
@@ -252,8 +267,7 @@ secret; a plain README commit exits `0`.
 **Goal**: Scan a real project's full history and, if anything turns up, write a rotation plan.
 
 **Instructions**: `gitleaks git --verbose --report-format=json --report-path=audit-report.json`.
-For each finding, classify by the rotation table (Layer 3) and note commit/file/line. If clean,
-record the date for your next quarterly audit.
+Classify each finding by the rotation table (Layer 3); if clean, record the date for next quarter.
 
 <details>
 <summary>💡 Hint</summary>
@@ -284,12 +298,12 @@ A finding becomes a rotation task per the Layer 3 table; after rotating, strip i
 
 ### Detection Tools
 
-| Tool | Purpose | Command |
-|------|---------|---------|
-| gitleaks | Pre-commit scan | `gitleaks git --pre-commit --staged` |
-| gitleaks | Full history audit | `gitleaks git --verbose` |
-| gitleaks | Working tree only | `gitleaks dir . --verbose` |
-| trufflehog | Deep history scan | `trufflehog git file://.` |
+| Purpose | Command |
+|---------|---------|
+| Pre-commit scan | `gitleaks git --pre-commit --staged` |
+| Full history audit | `gitleaks git --verbose` |
+| Working tree only | `gitleaks dir . --verbose` |
+| Deep history (trufflehog) | `trufflehog git file://.` |
 
 ### Rotation Priority
 
@@ -305,38 +319,37 @@ A finding becomes a rotation task per the Layer 3 table; after rotating, strip i
 
 | ❌ Mistake | ✅ Correct Approach |
 |-----------|---------------------|
-| Thinking `.gitignore` protects you from Claude | It only stops commits — Claude can still read and echo gitignored files. |
-| Rotating only the leaked key | Rotate everything in the same credential system — assume a compromise chain. |
-| Real secrets in `docker-compose.yml` | Use `${VARIABLE}` references; the file is often committed anyway. |
-| Assuming your fake secret will trigger gitleaks | Low-entropy `FAKE`/`EXAMPLE` strings often don't — test with a real scan, don't assume. |
-| Forgetting terminal scrollback holds secrets | `clear && printf '\033[2J\033[3J\033[1;1H'` after working with real values. |
-| `git add -A` without checking | Run `git status` first — easy to stage a `.env` created after `.gitignore` was committed. |
+| Thinking `.gitignore` protects you from Claude | It only stops commits — Claude can still read and echo those files. |
+| Rotating only the leaked key | Rotate everything in the same credential system — assume compromise. |
+| Real secrets in `docker-compose.yml` | Use `${VARIABLE}` references; the file is often committed too. |
+| Assuming your fake secret triggers gitleaks | Low-entropy `FAKE`/`EXAMPLE` strings often don't — test with a real scan. |
+| Assuming `permissions.deny` blocks every read | It misses `grep -r` and scripts that open the file — add `sandbox.credentials`. |
+| `git add -A` without checking | Run `git status` first — easy to stage a `.env` made after `.gitignore`. |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: Chi, a senior mobile developer at a fintech startup in Saigon, builds a Kotlin
-Multiplatform app integrating VNPay and MoMo. Her `.env` holds credentials shaped like:
+**Scenario**: Chi, a mobile developer at a fintech startup in Saigon, builds a Kotlin Multiplatform
+app integrating VNPay and MoMo. Her `.env` holds credentials shaped like:
 ```text
 VNPAY_HASH_SECRET=sk-FAKE-DO-NOT-USE-vnpay-production-hash-a8f9e2b1c4d5
 MOMO_ACCESS_KEY=AKIAFAKEDONOTUSE-momo-key-123456
 ```
 
-She asks Claude: "Generate `PaymentConfigLoader.kt` that loads VNPay and MoMo config from
-environment variables." Claude reads `.env` "to understand structure" and hardcodes the values
-straight into the generated Kotlin file. Chi catches it in review — but if she hadn't, the secrets
-would be in git history, in a PR diff, and searchable if the repo ever went public.
+She asks Claude to generate `PaymentConfigLoader.kt` from environment variables. Claude reads `.env`
+"to understand structure" and hardcodes the values into the generated file. Chi catches it in
+review — otherwise the secrets would be in git history and a PR diff, searchable if the repo went
+public.
 
 **Solution**: four-layer defense — `.env.example` for Claude to read, `.gitignore` +
 `permissions.deny` to block direct reads, gitleaks pre-commit as a last check, and a prompt saying
-"do NOT read .env directly." The generated `PaymentConfigLoader.kt` calls
-`System.getenv("VNPAY_HASH_SECRET")` and throws if missing — no value ever entered context.
+"do NOT read .env directly." `PaymentConfigLoader.kt` now calls `System.getenv("VNPAY_HASH_SECRET")`
+and throws if missing — no value ever entered context.
 
-This mirrors Anthropic's own principle for agents with real access: give every agent "a
-single-purpose identity with the minimum permissions for its job" (S4) — Claude's job is writing the
-loader, not holding secrets. Rotating credentials now means editing `.env` and restarting — no code
-changes.
+This mirrors Anthropic's principle for agents with real access: give every agent "a single-purpose
+identity with the minimum permissions for its job" (S4) — Claude's job is writing the loader, not
+holding secrets.
 
 ---
 

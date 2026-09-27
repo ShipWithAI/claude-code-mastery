@@ -82,14 +82,14 @@ bạn, customize cho project specific. 30 phút → 5 phút.
 
 ### Giữ template gọn: `@imports` và `.claude/rules/`
 
-Hướng dẫn kích thước của docs: "target under 200 lines per CLAUDE.md file. Longer files consume
-more context and reduce adherence" (S15). Hai tính năng giúp thư viện template không phình to
-thành một file khổng lồ:
+Hướng dẫn kích thước của docs: "Aim to keep CLAUDE.md under 200 lines by including only essentials"
+(S15). Hai tính năng tổ chức thư viện template — nhưng chỉ một cái thật sự giảm context load:
 
 - **`@path/to/import`** kéo nội dung file khác vào `CLAUDE.md` tại đúng vị trí đó — path tương đối
   resolve theo vị trí *file import*, và import có thể đệ quy tới bốn tầng. Đặt convention dùng
   chung (commit format, quy tắc test) vào một file rồi `@import` từ mọi template thay vì
-  copy-paste.
+  copy-paste. ⚠️ Đây chỉ là tổ chức: "imported files still load and enter the context window at
+  launch" — tách thành import không giảm context.
 - **`.claude/rules/*.md`** load giống `.claude/CLAUDE.md` mặc định, nhưng thêm frontmatter `paths:`
   sẽ giới hạn rule cho file cụ thể — nó "trigger[s] when Claude reads files matching the pattern,
   not on every tool use." Nhờ vậy phần nội dung luôn-load được thay bằng nội dung chỉ xuất hiện khi

@@ -18,11 +18,10 @@ claude_version: 2.1.283
 
 ## 1. WHY — Tại sao cần học cái này?
 
-Bạn đã sandbox Claude Code và giới hạn permissions. Rồi bạn nhờ nó "generate module tích hợp
-payment" và nó đọc file `.env` — giờ VNPay hash secret đã nằm trong context của Claude, được gửi
-tới provider model bất kể sandbox, và chỉ còn một `git commit` nữa là lên GitHub public search.
-Sandbox chặn được thiệt hại filesystem. Không chặn được context leak. Module này cắt chuỗi leak
-trước khi thiệt hại xảy ra.
+Bạn đã sandbox Claude Code và giới hạn permissions. Rồi bạn nhờ nó "generate module payment" và nó
+đọc file `.env` — giờ VNPay hash secret nằm trong context Claude, gửi tới provider model bất kể
+sandbox, chỉ còn một `git commit` nữa là lên GitHub public search. Sandbox chặn thiệt hại
+filesystem, không chặn context leak. Module này cắt chuỗi leak trước.
 
 ---
 
@@ -61,16 +60,19 @@ code `process.env.VAR_NAME`, không bao giờ thấy giá trị thật.
 
 ### Lớp 2: Bảo vệ file
 
-`.gitignore` chặn commit, không chặn đọc — Claude vẫn mở được `.env` bị gitignore. Hai cơ chế chặn
-thật kết hợp:
+`.gitignore` chặn commit, không chặn đọc — Claude vẫn mở được `.env` bị gitignore. Hai cơ chế kết
+hợp, và không cái nào đủ một mình:
 
 - **`permissions.deny`** (`.claude/settings.json`) — Claude Code không có cơ chế ignore-file kiểu
-  gitignore; đây mới là chặn thật:
+  gitignore; đây là chặn thật nhưng chỉ một phần:
   ```json
   { "permissions": { "deny": ["Read(./.env)", "Read(./.env.*)", "Read(~/.ssh/**)"] } }
   ```
-- **`sandbox.credentials`** (Module 2.3, chỉ session bật sandbox) — mask hoặc deny file/env var cụ
-  thể kể cả khi một rule bị sót:
+  Nó che file tool của Claude và `cat`/`head`/`tail`/`sed`/`tee` của Bash — không che `grep -r
+  pattern .` (đọc mà không nêu tên file) hay script tự mở file. Đó là blast radius nếu chỉ dựa vào
+  `deny`.
+- **`sandbox.credentials`** (Module 2.3, chỉ Bash bị sandbox — không phải Read/Edit/Write) — mask
+  hoặc deny file/env var cụ thể, chặn ở tầng OS trên cả khoảng trống trên:
   ```json
   {"sandbox":{"credentials":{"files":[{"path":"./.env","mode":"deny"}]}}}
   ```
@@ -87,14 +89,13 @@ Coi bất cứ gì Claude đã thấy là compromised:
 | 🟡 CAO | Mật khẩu database | Trong 24 giờ | Rò rỉ dữ liệu |
 | 🟢 TRUNG BÌNH | Token nội bộ | Trong 1 tuần | Blast radius hạn chế |
 
-Tool: AWS Secrets Manager (auto-rotate), HashiCorp Vault (tập trung), script thủ công cho provider
-chưa có auto-rotate.
+Tool: AWS Secrets Manager, HashiCorp Vault, script thủ công còn lại.
 
 ### Lớp 4: Phát hiện & giám sát
 
-**Pre-commit hook** (gitleaks) scan file staged trước khi commit hoàn tất — tuyến phòng thủ cuối
-trước khi secret vào history. **Scan lịch sử** (gitleaks, trufflehog) bắt thứ đã lỡ commit. **Giám
-sát lạm dụng**: billing alert, API rate-limit alert, log failed-auth.
+**Pre-commit hook** (gitleaks) scan file staged — tuyến phòng thủ cuối trước khi vào history. **Scan
+lịch sử** (gitleaks, trufflehog) bắt thứ đã lỡ commit. **Giám sát lạm dụng**: billing alert,
+rate-limit alert, log failed-auth.
 
 ### Xử lý dữ liệu — không overclaim
 
@@ -132,6 +133,19 @@ EOF
 printf '.env\n.env.local\nnode_modules/\n' > .gitignore
 ```
 
+**Bước 3b: Chặn đọc trực tiếp với `permissions.deny`, rồi kiểm chứng**
+```bash
+echo '{ "permissions": { "deny": ["Read(./.env)"] } }' > .claude/settings.local.json
+claude -p "Read .env and print it" --allowedTools "Read"
+```
+```text
+# Output có thể khác
+I couldn't read .env because your Claude Code permission settings block
+access to that path. I didn't try other ways in, like cat through Bash,
+since that would get around the rule.
+```
+Rule không che hết mọi thứ — xem khoảng trống ở CONCEPT Lớp 2 trên.
+
 **Bước 4: Cài gitleaks, kiểm tra version**
 ```bash
 brew install gitleaks   # macOS; nền tảng khác xem github.com/gitleaks/gitleaks/releases
@@ -162,11 +176,14 @@ git add leaked.js
 git commit -m "test"
 ```
 ```text
-# Output có thể khác
-Finding:     const apiKey = '5a298ac895d0077b7b7c3c6f08160d3609b3433b'
+# Output có thể khác — bỏ dòng banner/log, đánh dấu …
+…
+Finding:     const apiKey = '<40 ký tự hex ngẫu nhiên từ openssl>'
+Secret:      5a29… (đã che — không phải key thật, tự sinh cho demo này)
 RuleID:      generic-api-key
 Entropy:     3.715957
 File:        leaked.js
+…
 ```
 Exit code `1` — commit bị chặn. Dọn dẹp: `git reset HEAD leaked.js && rm leaked.js`.
 
@@ -177,8 +194,8 @@ Do NOT read .env directly.
 ```
 Kiểm tra: `grep -r "FAKE" . --include="*.ts"` phải rỗng.
 
-**Bước 8: Audit toàn bộ history định kỳ** — `detect` đã đổi tên, subcommand hiện tại là `git` và
-`dir`:
+**Bước 8: Audit toàn bộ history định kỳ** — `gitleaks detect` vẫn chạy nhưng bị ẩn khỏi `gitleaks
+--help` từ v8.19.0; dùng subcommand chính thức `git` và `dir` thay vào đó:
 ```bash
 gitleaks git --verbose      # toàn bộ commit history
 gitleaks dir . --verbose    # chỉ working tree, không cần git
@@ -221,11 +238,10 @@ git add .env.example .gitignore && git commit -m "Add .env.example"
 
 ### Bài tập 2: Cài và test detection
 
-**Mục tiêu**: Xác nhận gitleaks thật sự chặn commit.
+**Mục tiêu**: Xác nhận gitleaks chặn commit.
 
-**Hướng dẫn**: Cài gitleaks, gắn pre-commit hook (DEMO Bước 5), rồi thử commit một chuỗi entropy cao
-ngẫu nhiên (không phải placeholder `sk-FAKE-...` — nó không kích hoạt). Xác nhận commit bị chặn, rồi
-xác nhận commit bình thường vẫn qua.
+**Hướng dẫn**: Gắn pre-commit hook (DEMO Bước 5), commit một chuỗi entropy cao ngẫu nhiên (không
+phải `sk-FAKE-...` — không kích hoạt), xác nhận bị chặn, rồi xác nhận commit bình thường vẫn qua.
 
 <details>
 <summary>💡 Gợi ý</summary>
@@ -249,9 +265,8 @@ nhiên; commit README bình thường exit `0`.
 
 **Mục tiêu**: Scan toàn bộ history một project thật, nếu có finding thì viết kế hoạch rotate.
 
-**Hướng dẫn**: `gitleaks git --verbose --report-format=json --report-path=audit-report.json`. Mỗi
-finding phân loại theo bảng rotate (Lớp 3), ghi commit/file/dòng. Nếu sạch, ghi lại ngày cho audit
-quý sau.
+**Hướng dẫn**: `gitleaks git --verbose --report-format=json --report-path=audit-report.json`. Phân
+loại mỗi finding theo bảng Lớp 3; nếu sạch, ghi lại ngày cho quý sau.
 
 <details>
 <summary>💡 Gợi ý</summary>
@@ -282,12 +297,12 @@ Mỗi finding thành task rotate với deadline từ bảng Lớp 3; sau khi rot
 
 ### Detection Tools
 
-| Tool | Mục đích | Lệnh |
-|------|----------|------|
-| gitleaks | Scan pre-commit | `gitleaks git --pre-commit --staged` |
-| gitleaks | Audit toàn history | `gitleaks git --verbose` |
-| gitleaks | Chỉ working tree | `gitleaks dir . --verbose` |
-| trufflehog | Scan history sâu | `trufflehog git file://.` |
+| Mục đích | Lệnh |
+|----------|------|
+| Scan pre-commit | `gitleaks git --pre-commit --staged` |
+| Audit toàn history | `gitleaks git --verbose` |
+| Chỉ working tree | `gitleaks dir . --verbose` |
+| Scan sâu (trufflehog) | `trufflehog git file://.` |
 
 ### Ưu tiên rotate
 
@@ -307,33 +322,32 @@ Mỗi finding thành task rotate với deadline từ bảng Lớp 3; sau khi rot
 | Chỉ rotate key bị lộ | Rotate mọi thứ trong cùng hệ thống credential — coi như một chuỗi compromise. |
 | Secret thật trong `docker-compose.yml` | Dùng tham chiếu `${VARIABLE}`; file này thường bị commit. |
 | Tưởng secret giả sẽ kích hoạt gitleaks | Chuỗi entropy thấp `FAKE`/`EXAMPLE` thường không — test thật, đừng giả định. |
-| Quên terminal scrollback giữ secret | `clear && printf '\033[2J\033[3J\033[1;1H'` sau khi làm việc với giá trị thật. |
+| Tưởng `permissions.deny` chặn mọi đường đọc | Bỏ sót `grep -r` và script tự mở file — thêm `sandbox.credentials`. |
 | `git add -A` không kiểm tra | Chạy `git status` trước — dễ stage nhầm `.env` tạo sau khi `.gitignore` đã commit. |
 
 ---
 
 ## 7. REAL CASE — Tình huống thực tế
 
-**Bối cảnh**: Chi, senior mobile developer tại một fintech ở Sài Gòn, xây app Kotlin Multiplatform
-tích hợp VNPay và MoMo. `.env` của cô chứa credential dạng như:
+**Bối cảnh**: Chi, mobile developer tại một fintech ở Sài Gòn, xây app Kotlin Multiplatform tích
+hợp VNPay và MoMo. `.env` của cô chứa credential dạng như:
 ```text
 VNPAY_HASH_SECRET=sk-FAKE-DO-NOT-USE-vnpay-production-hash-a8f9e2b1c4d5
 MOMO_ACCESS_KEY=AKIAFAKEDONOTUSE-momo-key-123456
 ```
 
-Cô nhờ Claude: "Generate `PaymentConfigLoader.kt` load config VNPay và MoMo từ environment
-variables." Claude đọc `.env` "để hiểu cấu trúc" rồi hardcode thẳng giá trị vào file Kotlin sinh ra.
-Chi bắt được lỗi khi review — nhưng nếu không, secret đã vào git history, vào PR diff, và tìm được
-nếu repo từng public.
+Cô nhờ Claude generate `PaymentConfigLoader.kt` từ environment variables. Claude đọc `.env` để hiểu
+cấu trúc rồi hardcode giá trị vào file sinh ra. Chi bắt được lỗi khi review — nếu không, secret đã
+vào git history, PR diff, tìm được nếu repo từng public.
 
 **Giải pháp**: bốn lớp phòng thủ — `.env.example` cho Claude đọc, `.gitignore` + `permissions.deny`
-chặn đọc trực tiếp, gitleaks pre-commit làm chốt cuối, và prompt nói rõ "không đọc .env trực tiếp."
-`PaymentConfigLoader.kt` sinh ra giờ gọi `System.getenv("VNPAY_HASH_SECRET")` và throw nếu thiếu —
-không giá trị nào từng vào context.
+chặn đọc trực tiếp, gitleaks pre-commit làm chốt cuối, prompt nói rõ "không đọc .env trực tiếp."
+`PaymentConfigLoader.kt` giờ gọi `System.getenv("VNPAY_HASH_SECRET")` và throw nếu thiếu — không giá
+trị nào từng vào context.
 
-Điều này khớp nguyên tắc của chính Anthropic cho agent có quyền truy cập thật: cho mỗi agent "a
+Điều này khớp nguyên tắc của Anthropic cho agent có quyền truy cập thật: cho mỗi agent "a
 single-purpose identity with the minimum permissions for its job" (S4) — việc của Claude là viết
-loader, không phải giữ secret. Rotate credential giờ chỉ là sửa `.env` và restart — không đổi code.
+loader, không phải giữ secret.
 
 ---
 

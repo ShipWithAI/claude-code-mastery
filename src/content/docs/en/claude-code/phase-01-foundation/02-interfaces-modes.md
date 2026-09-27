@@ -17,12 +17,11 @@ claude_version: 2.1.283
 
 ## 1. WHY — Why This Matters
 
-You've installed Claude Code and run your first query — but you're using it
-like a chatbot, one question at a time. Meanwhile a colleague pipes entire git
-diffs through Claude for instant PR summaries, and another has it wired into
-CI, catching bugs before merge. The difference is knowing the three
-interaction modes: interactive, one-shot, and pipe. Pick the right one and
-Claude Code stops being a chat window and becomes part of your automation.
+You've installed Claude Code — but you're using it like a chatbot, one question at a time.
+Meanwhile a colleague pipes git diffs through Claude for instant PR summaries, and another has it
+wired into CI, catching bugs before merge. The difference is knowing the three interaction modes:
+interactive, one-shot, and pipe. Pick the right one and Claude Code stops being a chat window and
+becomes part of your automation.
 
 ---
 
@@ -38,17 +37,14 @@ Claude Code stops being a chat window and becomes part of your automation.
 
 ### Key Differences
 
-**REPL Mode** keeps conversation context across turns — refine questions,
-reference earlier answers, use slash commands. Think working session, not
-one-off query.
+**REPL Mode** keeps context across turns — refine questions, reference earlier answers, use slash
+commands. A working session, not a one-off query.
 
-**One-shot Mode** runs one prompt and exits — no history, each call
-independent. Built for scripts and automation that need stateless,
-predictable behavior.
+**One-shot Mode** runs one prompt and exits — no history, each call independent. Built for
+stateless, predictable scripts and automation.
 
-**Pipe Mode** feeds external data — files, command output — to Claude as
-context. Paired with `-p`, Claude becomes just another tool in a Unix
-pipeline.
+**Pipe Mode** feeds external data — files, command output — to Claude as context. Paired with
+`-p`, Claude becomes another tool in a Unix pipeline.
 
 ### Session Continuation
 
@@ -63,17 +59,19 @@ Claude Code saves your conversations. You can resume any previous session:
 
 REPL and one-shot start in different permission modes. On v2.1.283+, **auto mode** (a classifier
 reviews actions instead of you) is the built-in starting mode for interactive REPL sessions.
-`claude -p` always starts in Manual mode "on every plan" — pass `--permission-mode
-acceptEdits|auto|dontAsk` or `--allowedTools "Edit,Write"`, or a script that edits files will hang
-or get denied.
+`claude -p` always starts in Manual mode "on every plan" — pass `--permission-mode acceptEdits` (or
+`auto`) or `--allowedTools "Edit,Write"` to let it edit files. `dontAsk` alone isn't enough: it
+auto-denies anything that would still need approval, it doesn't grant it. Without one of these, a
+script that edits files will hang or get denied.
 
 ### REPL Keyboard Shortcuts
 
 - **Multi-line input**: `\` + Enter, or `Shift+Enter` (run `/terminal-setup` first)
 - **Interrupt current turn**: `Esc` — stops the response or tool call, keeps the session
 - **Clear input / rewind**: `Esc Esc` — clears your draft, or (empty input) opens the rewind menu
-- **Exit**: `/exit`, or `Ctrl+D` twice. `Ctrl+C` twice also exits, but the first press only clears
-  your input — use `Esc` to interrupt a running turn, not `Ctrl+C`
+- **Exit**: `/exit`, or `Ctrl+D` twice. `Ctrl+C` interrupts a running operation just like `Esc`; "if
+  nothing is running, the first press clears the prompt input and a second press exits Claude
+  Code" — prefer `Esc` to interrupt, since it never exits the session
 - **Paste image**: `Ctrl+V` (`Cmd+V` on iTerm2, `Alt+V` on Windows/WSL)
 - **Switch model**: `Option+P` / `Alt+P`
 - **Toggle thinking**: `Option+T` / `Alt+T` — no effect on always-on-thinking models
@@ -132,15 +130,16 @@ table instead):
 $ claude -p "/context"
 ```
 
-```markdown
-# Output may vary — depends on your installed plugins/skills
-## Context Usage
-**Model:** claude-opus-5-5 · **Tokens:** 26.7k / 1m (3%)
-| Category | Tokens | Percentage |
-|----------|--------|------------|
-| System prompt | 2.2k | 0.2% |
-| Memory files | 7.1k | 0.7% |
-| Free space | 940.3k | 94.0% |
+```text
+# Output may vary — depends on your installed plugins/skills; rows trimmed with …
+Context Usage
+Model: claude-opus-5-5 · Tokens: 26.7k / 1m (3%)
+
+Category | Tokens | Percentage
+System prompt | 2.2k | 0.2%
+Memory files | 7.1k | 0.7%
+…
+Free space | 940.3k | 94.0%
 ```
 
 For spend, run `claude -p "/usage"` (`/cost` is an alias, works inside the REPL too):
@@ -148,7 +147,7 @@ For spend, run `claude -p "/usage"` (`/cost` is an alias, works inside the REPL 
 ```text
 # Output may vary — subscriber-plan view; an API-key account sees a Session cost block instead
 You are currently using your subscription to power your Claude Code usage
-Current session: 4% used · resets Sep 28 at 8am (Asia/Saigon)
+Current session: 4% used · resets … (local time)
   ...
 ```
 
@@ -202,7 +201,7 @@ $ ./quick-explain.sh "TypeError: Cannot read property 'map' of undefined"
 
 ```bash
 # Save output to a file
-$ claude -p "Write a README template for a TypeScript project" > README.md
+$ claude -p "Print only the markdown for a TypeScript project's README, no commentary" > README.md
 ```
 
 ---
@@ -242,7 +241,7 @@ $ git log --oneline -10 | claude -p "Which of these commits are bug fixes?"
 
 ### Exercise 1: Master REPL Mode
 
-**Goal**: Use REPL mode for an iterative debugging conversation.
+**Goal**: An iterative debugging conversation in REPL mode.
 
 **Instructions**:
 1. Start a Claude Code session with `claude`
@@ -286,7 +285,7 @@ $ claude
 
 ### Exercise 2: Master One-shot Mode
 
-**Goal**: Use one-shot mode in a practical shell workflow.
+**Goal**: One-shot mode in a shell workflow.
 
 **Instructions**:
 1. Use `claude -p` to ask: "What does the -r flag do in rm command?"
@@ -295,7 +294,7 @@ $ claude
    `alias explain='claude -p "Explain this command:"'`
 4. Test it: `explain "tar -xzf archive.tar.gz"`
 
-**Expected result**: Each command returns a response and exits immediately.
+**Expected result**: Each command returns and exits immediately.
 
 <details>
 <summary>💡 Hint</summary>
@@ -321,7 +320,7 @@ $ explain "tar -xzf archive.tar.gz"
 
 ### Exercise 3: Master Pipe Mode
 
-**Goal**: Use pipe mode to analyze code or diffs.
+**Goal**: Pipe mode to analyze code or diffs.
 
 **Instructions**:
 1. Navigate to any project with a git history
@@ -330,12 +329,12 @@ $ explain "tar -xzf archive.tar.gz"
    this project use?"`
 4. Experiment with other combinations
 
-**Expected result**: Claude responds using the piped content as context.
+**Expected result**: Claude responds using the piped content.
 
 <details>
 <summary>💡 Hint</summary>
 
-The piped content becomes the prompt's context — no need to paste file contents yourself.
+Piped content becomes the prompt's context — no need to paste file contents.
 
 </details>
 
@@ -389,8 +388,8 @@ Piped stdin is capped at 10MB — for larger diffs, filter first:
 |-----------|-------------------|
 | Using REPL for one-off questions | Use `claude -p "question"` — faster, no session to exit. |
 | Forgetting `-p` in scripts | Without it, `claude` enters interactive mode and the script hangs waiting for input. |
-| Piping huge files | Pipe only relevant sections: `head -100 file \| claude -p "..."` — large files burn tokens. |
-| Not checking `/usage` in long sessions | Tokens accumulate. Run `/usage` periodically; `/context` shows what's filling the window. |
+| Piping huge files | Pipe only relevant sections: `head -100 file \| claude -p "..."` |
+| Not checking `/usage` in long sessions | Run `/usage` periodically; `/context` shows what's filling the window. |
 | Assuming `-p` inherits your REPL permission mode | `-p` always starts in Manual mode — pass `--permission-mode acceptEdits` or `--allowedTools` to edit/write files. |
 | Expecting pipe mode to keep state | Each piped command is independent — use REPL for multi-step analysis. |
 
@@ -398,12 +397,12 @@ Piped stdin is capped at 10MB — for larger diffs, filter first:
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: Huy, a mobile developer at a Vietnamese e-commerce company, works on a Kotlin
-Multiplatform (KMP) project sharing business logic between Android and iOS. The senior reviewer is
-often in meetings, so PRs sit.
+**Scenario**: Huy, a mobile developer at a Vietnamese e-commerce company, shares business logic
+between Android and iOS on a Kotlin Multiplatform (KMP) project. The senior reviewer is often in
+meetings, so PRs sit.
 
-**Problem**: Huy refactored the shared networking module — a 400+ line diff — and wanted a
-preliminary review before the formal one, to catch obvious issues early.
+**Problem**: Huy refactored the shared networking module — a 400+ line diff — and wanted a quick
+review before the formal one.
 
 **Solution**: Pipe mode for instant feedback:
 
@@ -413,8 +412,6 @@ $ git diff main...feature/network-refactor | claude -p "Review this KMP code
 change. Focus on: 1) Kotlin idioms 2) Coroutine usage 3) Error handling
 4) iOS/Android compatibility issues"
 ```
-
-For specific files, he used targeted reviews:
 
 ```bash
 # Review just the shared module
