@@ -108,8 +108,7 @@ call to `agent-service`. That AI Agent node can itself hold n8n **Tool** sub-nod
 tool, a database tool) if the classification needs to look something up — but none of them touch a
 filesystem the way Claude Code's `Read`/`Grep`/`Bash` tools do.
 
-**Step 4: Add hooks in `agent-service` code (not in a `.claude/settings.json` this service never
-reads)**
+**Step 4: Add hooks in `agent-service` code**
 
 ```javascript
 // docs: https://code.claude.com/docs/en/agent-sdk/typescript — options.hooks
