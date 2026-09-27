@@ -48,16 +48,21 @@ directory read last:
 If two files disagree, that's a contradiction to fix at the source — not something the hierarchy
 resolves for you.
 
-### Three ways to keep it lean (progressive disclosure, S8)
+### Three ways to keep it lean
 
 1. **CLAUDE.md** — loads every session. Keep only what applies broadly; target under 200 lines
-   per file (costs docs, S15).
+   per file (S15).
 2. **`@path/to/file` imports** — pull a doc in by reference instead of pasting it. Imports resolve
    relative to the *importing file*, recurse up to 4 hops, and skip anything inside a fenced code
    block. An import outside the working directory triggers a one-time approval.
 3. **`.claude/rules/*.md`** — one topic per file, path-scoped with `paths:` frontmatter (the only
    field Claude Code reads there). A rule *without* `paths:` loads at launch like CLAUDE.md; a rule
    *with* `paths:` "trigger[s] when Claude reads files matching the pattern, not on every tool use."
+
+Claude Code layers these by relevance instead of loading everything up front: CLAUDE.md every
+session, a `paths:`-scoped rule only once a matching file is opened, a skill only when it's
+relevant to the task at hand (Module 15.3) — the same progressive-disclosure pattern Anthropic
+describes for agent skills (S8).
 
 ```mermaid
 graph TD
@@ -161,7 +166,8 @@ Memory
    └ 3 files · 7.5k tokens
 ```
 
-Now ask Claude to read the test file, and run `/context` again:
+Rules with `paths:` don't show up in that baseline — the docs say they trigger only when Claude
+reads a matching file. Ask Claude to read one, and watch the tool transcript:
 ```text
 > Read tests/math.test.mjs and reply with one sentence about what it tests.
 ```
@@ -172,10 +178,8 @@ Now ask Claude to read the test file, and run `/context` again:
 ⏺ It checks that add(1, 2) from src/math.js returns 3.
 ```
 
-`⎿ Loaded .claude/rules/tests.md` is the proof: the rule stayed out of context until a matching
-file was opened. In this session the top-level "Memory files" count in `/context` didn't move
-(rules aren't broken out separately in that summary) — the lazy load shows up in the tool
-transcript, and as a small bump in the "System tools" line.
+`⎿ Loaded .claude/rules/tests.md` is the proof: the rule was absent from context until this exact
+moment, when a matching file was opened.
 
 **Step 5: Personal notes with `CLAUDE.local.md`**
 
@@ -204,7 +208,7 @@ git checkout -- . && git clean -fd
 **Goal**: Apply the S1 prune test to a real (if exaggerated) offender.
 
 A 120-line `CLAUDE.md` — full text in
-[`templates/claude-md-project-example.md`](/templates/claude-md-project-example.md) — opens with a
+[`templates/claude-md-project-example.md`](https://github.com/ShipWithAI/claude-code-mastery/blob/develop/templates/claude-md-project-example.md) — opens with a
 "Welcome to our project!" preamble and spends whole sections explaining what Express and
 PostgreSQL are. An excerpt:
 
@@ -235,7 +239,7 @@ doesn't need a library's history to use it correctly.
 <summary>✅ Solution</summary>
 
 Full before/after and the two extracted rule files are in
-[`templates/claude-md-project-example.md`](/templates/claude-md-project-example.md). The result:
+[`templates/claude-md-project-example.md`](https://github.com/ShipWithAI/claude-code-mastery/blob/develop/templates/claude-md-project-example.md). The result:
 a 28-line `CLAUDE.md` (stack, structure, commands, git, constraints, context) plus
 `.claude/rules/style.md` (`paths: ["src/**/*.ts", "src/**/*.tsx"]`) and `.claude/rules/tests.md`
 (`paths: ["tests/**"]`) — 45 lines total, none of it loaded unless the matching files are opened.

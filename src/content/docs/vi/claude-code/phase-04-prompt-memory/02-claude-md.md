@@ -45,16 +45,20 @@ file nào thay thế file nào**. Thứ tự từ rộng đến hẹp, file càn
 
 Hai file mâu thuẫn là lỗi cần sửa tại gốc — hierarchy không tự "phân xử" giúp bạn.
 
-### Ba cách giữ CLAUDE.md gọn (progressive disclosure, S8)
+### Ba cách giữ CLAUDE.md gọn
 
 1. **CLAUDE.md** — load mỗi session. Chỉ giữ cái áp dụng rộng rãi; mục tiêu dưới 200 dòng/file
-   (docs costs, S15).
+   (S15).
 2. **`@path/to/file` imports** — kéo doc vào bằng reference thay vì copy-paste. Resolve tương đối
    theo *file đang import*, đệ quy tối đa 4 hop, bỏ qua nội dung trong code block. Import ra ngoài
    thư mục làm việc có dialog approve một lần.
 3. **`.claude/rules/*.md`** — mỗi file một chủ đề, scope theo `paths:` frontmatter (field duy nhất
    được đọc). Rule *không có* `paths:` load ngay lúc khởi động như CLAUDE.md; rule *có* `paths:`
    "kích hoạt khi Claude đọc file khớp pattern, không phải mỗi lần gọi tool."
+
+Claude Code load các lớp này theo mức độ liên quan: CLAUDE.md mỗi session, rule `paths:` chỉ khi
+có file khớp mở, skill chỉ khi liên quan task (Module 15.3) — cùng pattern progressive disclosure
+Anthropic mô tả cho agent skills (S8).
 
 ```mermaid
 graph TD
@@ -158,7 +162,8 @@ Memory
    └ 3 files · 7.5k tokens
 ```
 
-Giờ bảo Claude đọc file test, rồi chạy `/context` lần nữa:
+Rule có `paths:` không xuất hiện ở baseline đó — theo docs, nó chỉ kích hoạt khi Claude đọc file
+khớp pattern. Bảo Claude đọc file test, rồi xem tool transcript:
 ```text
 > Read tests/math.test.mjs and reply with one sentence about what it tests.
 ```
@@ -169,9 +174,8 @@ Giờ bảo Claude đọc file test, rồi chạy `/context` lần nữa:
 ⏺ It checks that add(1, 2) from src/math.js returns 3.
 ```
 
-`⎿ Loaded .claude/rules/tests.md` là bằng chứng: rule không nằm trong context tới khi có file khớp
-được mở. Con số "Memory files" ở `/context` không đổi (bảng tổng quan không tách riêng rules) —
-việc load lười thể hiện qua tool transcript, và một chút tăng nhẹ ở dòng "System tools".
+`⎿ Loaded .claude/rules/tests.md` là bằng chứng: rule vắng mặt trong context cho tới đúng khoảnh
+khắc này, khi file khớp được mở.
 
 **Bước 5: Ghi chú cá nhân với `CLAUDE.local.md`**
 
@@ -200,7 +204,7 @@ git checkout -- . && git clean -fd
 **Mục tiêu**: Áp dụng prune test của S1 lên một "thủ phạm" thật (dù hơi cường điệu).
 
 Một `CLAUDE.md` 120 dòng — toàn văn ở
-[`templates/claude-md-project-example.md`](/templates/claude-md-project-example.md) — mở đầu bằng
+[`templates/claude-md-project-example.md`](https://github.com/ShipWithAI/claude-code-mastery/blob/develop/templates/claude-md-project-example.md) — mở đầu bằng
 lời chào "Welcome to our project!" và dành hẳn từng section giải thích Express hay PostgreSQL là
 gì. Trích đoạn:
 
@@ -231,7 +235,7 @@ không cần biết lịch sử một thư viện để dùng nó đúng cách.
 <summary>✅ Giải Pháp</summary>
 
 Bản before/after đầy đủ cùng 2 file rule tách ra nằm ở
-[`templates/claude-md-project-example.md`](/templates/claude-md-project-example.md). Kết quả:
+[`templates/claude-md-project-example.md`](https://github.com/ShipWithAI/claude-code-mastery/blob/develop/templates/claude-md-project-example.md). Kết quả:
 `CLAUDE.md` còn 28 dòng (stack, structure, commands, git, constraints, context) cộng
 `.claude/rules/style.md` (`paths: ["src/**/*.ts", "src/**/*.tsx"]`) và `.claude/rules/tests.md`
 (`paths: ["tests/**"]`) — tổng 45 dòng, không dòng nào load trừ khi đúng file khớp được mở.
