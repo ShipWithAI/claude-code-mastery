@@ -1,323 +1,199 @@
 ---
 title: 'n8n + SDK Orchestration'
-description: 'Orchestrate Claude from n8n Code nodes and hand off to Claude Code headless for repo-aware tasks.'
+description: 'Resume Agent SDK sessions across n8n calls, and decide when to reach for the native AI Agent node instead of Claude Code.'
+verified: 2026-09-28
+claude_version: 2.1.283
 ---
 
 # Module 12.3: n8n + SDK Orchestration
 
 > **Estimated time**: ~40 minutes
 >
-> **Prerequisite**: Module 12.2 (Workflow Patterns), Module 11.2 (SDK Integration)
+> **Prerequisite**: Module 12.2 (Workflow Patterns), Module 11.2 (Claude Agent SDK)
 >
-> **Outcome**: After this module, you will know how to use Claude SDK within n8n, build production-grade AI orchestration, and implement advanced features like streaming and tools.
+> **Outcome**: After this module, you will be able to carry a Claude Code conversation across
+> multiple n8n calls with `resume`, and know when to use n8n's native AI Agent node instead of
+> Claude Code entirely.
 
 ---
 
 ## 1. WHY — Why This Matters
 
-The Execute Command approach (`claude -p`) works but has limits: no streaming, no tool calling, string parsing instead of structured data. You're limited to basic prompts.
-
-SDK integration gives you the FULL POWER of Claude API within n8n's visual framework. Best of both worlds: visual orchestration for workflow design, programmatic control for advanced AI features. This is how you build production-grade AI automation.
+Every call in Modules 12.1 and 12.2 started a fresh Claude Code session — no memory of the last
+call. A support-ticket workflow that asks a follow-up question, or a review loop that revises a
+draft based on feedback, needs the second call to remember the first. And not every n8n AI
+workflow needs Claude Code at all — plenty of chat/tool-calling automations are a better fit for
+n8n's own AI Agent node. Picking the wrong one costs you either unnecessary complexity or missing
+filesystem access.
 
 ---
 
 ## 2. CONCEPT — Core Ideas
 
-### Three Integration Levels
+### Resuming a session across calls
 
-| Level | Method | Use Case |
-|-------|--------|----------|
-| Basic | Execute Command (`claude -p`) | Simple prompts, quick setup |
-| Intermediate | HTTP Request (API direct) | Structured responses, no SDK |
-| Advanced | Code node (SDK) | Full features, streaming, tools |
+The Agent SDK's `query()` takes a `resume` option: `resume` | `string` | "Session ID to resume".
+Pass the `session_id` your first call returned, and the second call continues the same
+conversation instead of starting cold — no repo re-scan, and Claude remembers what it just told
+you.
 
-### Code Node with Anthropic SDK
-
-```javascript
-const Anthropic = require('@anthropic-ai/sdk');
-
-const client = new Anthropic({
-  apiKey: $env.ANTHROPIC_API_KEY
-});
-
-const response = await client.messages.create({
-  model: "sonnet",
-  max_tokens: 1024,
-  messages: [{ role: "user", content: $json.prompt }]
-});
-
-return { response: response.content[0].text };
+```mermaid
+graph LR
+    C1[n8n call 1<br/>prompt only] --> S1[agent-service]
+    S1 --> R1[session_id X]
+    R1 --> C2[n8n call 2<br/>prompt + session_id X]
+    C2 --> S2[agent-service<br/>resume: X]
 ```
 
-### HTTP Request Node (No SDK)
+### Claude Code vs n8n's native AI nodes
 
-```json
-{
-  "method": "POST",
-  "url": "https://api.anthropic.com/v1/messages",
-  "headers": {
-    "x-api-key": "={{ $env.ANTHROPIC_API_KEY }}",
-    "anthropic-version": "2023-06-01",
-    "content-type": "application/json"
-  },
-  "body": {
-    "model": "sonnet",
-    "max_tokens": 1024,
-    "messages": [{"role": "user", "content": "={{ $json.prompt }}"}]
-  }
-}
-```
+n8n ships its own **AI Agent** node ("Connect a chat model and one or more tools, and the agent
+decides which tools to call") paired with an **Anthropic Chat Model** node ("Use Anthropic's
+Claude family of chat models with conversational agents"). These run entirely inside n8n — no
+separate service, no repo checkout.
 
-### Advanced SDK Features
+| Need | Use |
+|---|---|
+| Chat/tool-calling over n8n-defined tools (an API call, a database lookup) | n8n **AI Agent** + **Anthropic Chat Model** |
+| Needs to read/search an actual repository | Claude Code via `agent-service` (Module 12.1) |
+| Needs `Bash`, `Edit`, or other Claude Code built-in tools | Claude Code via `agent-service` |
+| Needs the exact same permission model (`allowedTools`, hooks) across every call | Claude Code via `agent-service` |
+| A quick classification or chat reply with no filesystem involved | n8n **AI Agent** + **Anthropic Chat Model** — one fewer moving part |
 
-- **Tool Use**: Let Claude call functions you define
-- **System Prompts**: Set consistent behavior across calls
-- **Multi-turn**: Maintain conversation context
-- **Usage Tracking**: Monitor tokens for cost control
+The Anthropic Chat Model node's **Model** field is populated live from your connected credential —
+there's no fixed list published in the node's docs, so this course doesn't hardcode a model ID
+here either. Pick whatever current Claude model your credential's dropdown shows, the same way you
+would pass a model *alias* (not a dated ID) to the Agent SDK's own `model` option.
 
 ---
 
 ## 3. DEMO — Step by Step
 
-### Demo 1: SDK in Code Node
+**Step 1: First call — no `session_id` yet**
 
-```javascript
-// n8n Code node — Full SDK usage
-const Anthropic = require('@anthropic-ai/sdk');
-const client = new Anthropic({ apiKey: $env.ANTHROPIC_API_KEY });
-
-const userPrompt = $input.first().json.prompt;
-
-const response = await client.messages.create({
-  model: "sonnet",
-  max_tokens: 2048,
-  system: "You are a helpful assistant. Always respond in JSON format.",
-  messages: [{ role: "user", content: userPrompt }]
-});
-
-const text = response.content[0].text;
-let parsed;
-try {
-  parsed = JSON.parse(text);
-} catch (e) {
-  parsed = { raw: text, parseError: true };
-}
-
-return { response: parsed, usage: response.usage };
+```bash
+curl -s localhost:8787/run -H 'content-type: application/json' \
+  -d '{"prompt":"In one sentence, what does tests/math.test.mjs test?"}'
 ```
-
-### Demo 2: Tool Use in n8n
-
-```javascript
-// n8n Code node — Claude with Tools
-const Anthropic = require('@anthropic-ai/sdk');
-const client = new Anthropic({ apiKey: $env.ANTHROPIC_API_KEY });
-
-const tools = [{
-  name: "search_database",
-  description: "Search internal database",
-  input_schema: {
-    type: "object",
-    properties: { query: { type: "string" } },
-    required: ["query"]
-  }
-}];
-
-const response = await client.messages.create({
-  model: "sonnet",
-  max_tokens: 1024,
-  tools: tools,
-  messages: [{ role: "user", content: $json.prompt }]
-});
-
-const toolUse = response.content.find(c => c.type === 'tool_use');
-
-if (toolUse) {
-  return { needsTool: true, toolName: toolUse.name, toolInput: toolUse.input };
-} else {
-  return { needsTool: false, response: response.content[0].text };
-}
-```
-
-### Demo 3: Complete Workflow
-
+Expected output:
 ```text
-[Webhook] → [Claude with Tools] → [IF: needsTool?]
-                                        ↓ Yes
-                                  [Switch: toolName]
-                                  ├→ [DB Query] →┐
-                                  └→ [API Call] ─┤
-                                        ↓        │
-                              [Claude: Process] ←┘
-                                        ↓ No
-                                    [Output]
+# Output may vary
+{"result":"This test file verifies that the `add` function from `../src/math.js` correctly returns 3 when given the inputs 1 and 2.","session_id":"ca3ccf44-3294-4806-b3b8-12f48cdaa336","total_cost_usd":0.0551}
 ```
+
+**Step 2: Second call — pass that `session_id` back**
+
+```bash
+curl -s localhost:8787/run -H 'content-type: application/json' \
+  -d '{"prompt":"Which function from that file did I just ask about? Answer in 5 words or fewer.","session_id":"ca3ccf44-3294-4806-b3b8-12f48cdaa336"}'
+```
+Expected output:
+```text
+# Output may vary
+{"result":"The `add` function.","session_id":"ca3ccf44-3294-4806-b3b8-12f48cdaa336","total_cost_usd":0.0085}
+```
+
+Notice: the `session_id` in the response is unchanged, and the second call correctly answers
+"which function," which it could only know from the first call's context — the resume worked. In
+n8n, wire this by storing `session_id` from the first HTTP Request node's response (a Set node, or
+a workflow-scoped variable) and referencing it in the second HTTP Request node's body:
+`{"prompt": "{{ $json.followup }}", "session_id": "{{ $('HTTP Request').item.json.session_id }}"}`.
+
+**Step 3: When to skip Claude Code entirely**
+
+For a workflow that only classifies incoming Slack messages by intent — no file access needed —
+add n8n's own **AI Agent** node with an **Anthropic Chat Model** sub-node attached, instead of a
+call to `agent-service`. That AI Agent node can itself hold n8n **Tool** sub-nodes (an HTTP Request
+tool, a database tool) if the classification needs to look something up — but none of them touch a
+filesystem the way Claude Code's `Read`/`Grep`/`Bash` tools do.
+
+**Step 4: Add hooks in `agent-service` code (not in a `.claude/settings.json` this service never
+reads)**
+
+```javascript
+// docs: https://code.claude.com/docs/en/agent-sdk/typescript — options.hooks
+options: {
+  cwd: REPO_DIR,
+  allowedTools: ['Read', 'Grep', 'Glob'],
+  permissionMode: 'dontAsk',
+  resume: session_id,
+  hooks: {
+    PreToolUse: [{
+      hooks: [async (input) => {
+        console.log(`[audit] about to run ${input.tool_name}`);
+        return { continue: true };
+      }],
+    }],
+  },
+}
+```
+Because this service passes `hooks` directly to `query()`, it has no `.claude/settings.json` to
+read from — pass `settingSources: []` (the SDK default already excludes CLAUDE.md-style project
+settings unless you explicitly include `'project'`) if you want to guarantee nothing on the host's
+filesystem changes this service's behavior.
 
 ---
 
 ## 4. PRACTICE — Try It Yourself
 
-### Exercise 1: SDK Basic
+### Exercise 1: Build a two-turn follow-up workflow
 
-**Goal**: Call Claude with system prompt, return JSON.
+**Goal**: Ask the agent one question, then a follow-up that depends on the first answer, in a
+single n8n workflow.
 
 **Instructions**:
-1. Create workflow with Webhook trigger
-2. Add Code node with Anthropic SDK
-3. Set system prompt for JSON output
-4. Test with curl
+1. Webhook receives `{"question": "...", "followup": "..."}`.
+2. HTTP Request #1 calls `agent-service` with `question` only.
+3. HTTP Request #2 calls `agent-service` with `followup` and the `session_id` from #1's response.
+4. Respond to Webhook returns both results.
+
+**Expected result**: The second answer clearly depends on context only the first call established
+— test it the way Step 1–2 of the DEMO did.
 
 <details>
 <summary>💡 Hint</summary>
-
-Use `$env.ANTHROPIC_API_KEY` for the API key. The Code node supports `await` for async calls.
-
+Reference the first node's output from the second node's body with
+`{{ $('HTTP Request').item.json.session_id }}`, not `$json.session_id` (which refers to the
+immediately preceding node — fine here, but the explicit node reference is clearer once you have
+branches).
 </details>
 
 <details>
 <summary>✅ Solution</summary>
-
-```javascript
-const Anthropic = require('@anthropic-ai/sdk');
-const client = new Anthropic({ apiKey: $env.ANTHROPIC_API_KEY });
-
-const response = await client.messages.create({
-  model: "sonnet",
-  max_tokens: 1024,
-  system: "Respond only in valid JSON format.",
-  messages: [{ role: "user", content: $json.prompt }]
-});
-
-return { result: JSON.parse(response.content[0].text) };
-```
-
+This is exactly the wiring shown in DEMO Step 2's closing paragraph — two HTTP Request nodes
+sharing one `session_id`.
 </details>
 
-### Exercise 2: Tool Integration
+### Exercise 2: Choose the right tool
 
-**Goal**: Define a calculator tool, let Claude decide when to use it.
+**Goal**: Decide, for three scenarios, whether to use `agent-service` (Claude Code) or n8n's AI
+Agent + Anthropic Chat Model node.
 
-**Instructions**:
-1. Define tool with `input_schema` for two numbers and operation
-2. Claude receives math question
-3. Check if `tool_use` in response
-4. Execute calculation, return result
-
-<details>
-<summary>💡 Hint</summary>
-
-Check `response.content.find(c => c.type === 'tool_use')` to detect tool calls.
-
-</details>
+**Instructions**: For each, name the right approach and one sentence why:
+1. Summarize a Slack thread and suggest three reply options.
+2. Find every file in a repo that imports a deprecated function and list them.
+3. Answer "what's our refund policy?" from a short pasted FAQ text.
 
 <details>
 <summary>✅ Solution</summary>
-
-```javascript
-const tools = [{
-  name: "calculate",
-  description: "Perform math calculation",
-  input_schema: {
-    type: "object",
-    properties: {
-      a: { type: "number" },
-      b: { type: "number" },
-      operation: { type: "string", enum: ["add", "subtract", "multiply", "divide"] }
-    },
-    required: ["a", "b", "operation"]
-  }
-}];
-
-const response = await client.messages.create({
-  model: "sonnet",
-  max_tokens: 1024,
-  tools: tools,
-  messages: [{ role: "user", content: "What is 42 times 17?" }]
-});
-
-const toolUse = response.content.find(c => c.type === 'tool_use');
-if (toolUse) {
-  const { a, b, operation } = toolUse.input;
-  const ops = { add: a+b, subtract: a-b, multiply: a*b, divide: a/b };
-  return { result: ops[operation] };
-}
-```
-
-</details>
-
-### Exercise 3: Production Workflow
-
-**Goal**: Build complete workflow with error handling.
-
-**Instructions**:
-1. Webhook → Claude analysis → Tool execution → Response
-2. Add try/catch for API errors
-3. Log usage to separate node
-
-<details>
-<summary>💡 Hint</summary>
-
-Wrap SDK calls in try/catch. Return error object on failure for downstream handling.
-
-</details>
-
-<details>
-<summary>✅ Solution</summary>
-
-```javascript
-try {
-  const response = await client.messages.create({...});
-  return { success: true, data: response.content[0].text, usage: response.usage };
-} catch (error) {
-  return { success: false, error: error.message };
-}
-```
-
-Connect to IF node: `{{ $json.success }}` → true branch processes, false branch logs error.
-
+1. n8n AI Agent + Anthropic Chat Model — no filesystem involved, just text in, text out.
+2. `agent-service` (Claude Code) — needs `Grep`/`Glob` over an actual repository.
+3. n8n AI Agent + Anthropic Chat Model — the FAQ text can go straight in the prompt; no repo
+   access needed.
 </details>
 
 ---
 
 ## 5. CHEAT SHEET
 
-### Code Node Setup
-
-```javascript
-const Anthropic = require('@anthropic-ai/sdk');
-const client = new Anthropic({ apiKey: $env.ANTHROPIC_API_KEY });
-```
-
-### Basic Call
-
-```javascript
-const response = await client.messages.create({
-  model: "sonnet",
-  max_tokens: 1024,
-  messages: [{ role: "user", content: prompt }]
-});
-return { text: response.content[0].text };
-```
-
-### With System Prompt
-
-```javascript
-system: "You are a JSON-only assistant.",
-```
-
-### With Tools
-
-```javascript
-tools: [{ name: "...", description: "...", input_schema: {...} }],
-```
-
-### Integration Selection
-
-| Need | Use |
-|------|-----|
-| Simple prompt | Execute Command |
-| No SDK dependency | HTTP Request |
-| Tools, streaming | Code Node + SDK |
+| Need | Option |
+|---|---|
+| Continue a prior conversation | `query({ prompt, options: { resume: session_id } })` |
+| Ignore all filesystem settings for this service | `settingSources: []` |
+| Per-tool audit logging | `options.hooks.PreToolUse` |
+| Chat/classification, no repo | n8n **AI Agent** + **Anthropic Chat Model** node |
+| Repo-aware task (`Read`, `Grep`, `Bash`, `Edit`) | `agent-service` (Claude Code) |
+| Model choice | An alias from your credential's live dropdown, never a hardcoded dated ID |
 
 ---
 
@@ -325,45 +201,37 @@ tools: [{ name: "...", description: "...", input_schema: {...} }],
 
 | ❌ Mistake | ✅ Correct Approach |
 |---|---|
-| SDK not in n8n environment | `npm install @anthropic-ai/sdk` in n8n's directory |
-| Synchronous code in Code node | Always use `await`, node supports async |
-| Not handling tool_use response | Check `response.content` for `type: 'tool_use'` |
-| Ignoring usage/tokens | Track `response.usage` for cost monitoring |
-| No error handling | Try/catch with meaningful error returns |
-| Hardcoded API key | Use `$env.ANTHROPIC_API_KEY` |
-| SDK for simple prompts | Use Execute Command for basic cases |
+| Calling the Messages API directly with `require('@anthropic-ai/sdk')` in a Code node | Use the Agent SDK's `query()` in `agent-service`; it already gives you tools, permissions, and sessions |
+| Assuming every call needs a repo | If there's no filesystem involved, n8n's native AI Agent node is simpler and one fewer service to run |
+| Hardcoding a dated, versioned model snapshot ID | Use the model alias your credential's dropdown currently shows, or the Agent SDK's `model` alias option |
+| Forgetting to pass `resume` on the follow-up call | Without it, every call is a brand-new session with no memory of the last one |
+| Letting `agent-service` read the host's `.claude/settings.json` unintentionally | Pass `settingSources: []` if you need the service's behavior to depend only on its own code |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: Vietnamese SaaS company building AI customer support. Need: intent detection, tool execution (check order, process refund, escalate), conversation history.
+**Scenario**: A Vietnamese SaaS support team wants a workflow that drafts a reply, lets the agent
+answer a clarifying question from a human reviewer, then finalizes the reply — all as one logical
+conversation.
 
-**Architecture**:
-```text
-[Chat Webhook] → [Claude with Tools] → [Switch: Tool?]
-                    Tools: check_order,     ├→ [Order DB] → [Format Response]
-                    process_refund,         ├→ [Human Approval] → [Refund API]
-                    escalate_human,         ├→ [Create Zendesk Ticket]
-                    search_kb               └→ [Vector Search] → [Answer]
-```
+**Problem**: Their first version called `agent-service` fresh for every step, so the "clarifying
+question" step had no idea what the original ticket said — every call needed the entire ticket
+history pasted back in, which was slow and error-prone to keep in sync across nodes.
 
-**Why SDK over CLI**:
-- Tool use required (Claude decides action)
-- Token tracking for billing
-- JSON responses for structured data
-- System prompt for consistent personality
+**Solution**: The first HTTP Request node's response `session_id` is stored in a Set node and
+threaded through every later call in the workflow with `resume`. Simple classification (routing a
+new ticket to a queue) went to n8n's native **AI Agent** + **Anthropic Chat Model** node instead,
+since it needs no repo access and runs one node lighter than a service round-trip.
 
-**Results** (after 3 months):
-- 70% tickets auto-resolved
-- Response time: 3 seconds average
-- Human escalation: complex cases only
-- Cost tracking: per-conversation billing
-
-**Quote**: "SDK in n8n gave us code flexibility with visual workflow visibility. Best of both worlds."
+**Result**: The multi-step reply workflow reads like one conversation instead of three
+disconnected calls, and the simple routing step no longer depends on `agent-service` being up at
+all.
 
 ---
 
-> **Phase 12 Complete!** You've mastered n8n + Claude Code integration — from basic workflows to advanced SDK orchestration.
+> **Phase 12 Complete!** You've gone from a single HTTP call to a small service, through fan-out
+> and error-recovery patterns, to session-aware orchestration and knowing when to reach for n8n's
+> own AI nodes instead.
 >
 > **Next Phase**: [Phase 13: Data & Analysis](../../phase-13-data-analysis/01-data-analysis/) →

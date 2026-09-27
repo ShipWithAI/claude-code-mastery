@@ -1,369 +1,230 @@
 ---
 title: 'Điều phối n8n + SDK'
-description: 'Kết hợp n8n với Claude Code SDK để điều phối workflow phức tạp: multi-step automation và orchestration.'
+description: 'Resume session Agent SDK qua nhiều call n8n, và quyết định khi nào dùng node AI Agent gốc thay vì Claude Code.'
+verified: 2026-09-28
+claude_version: 2.1.283
 ---
 
 # Module 12.3: Điều phối n8n + SDK
 
 > **Thời gian học**: ~40 phút
 >
-> **Yêu cầu trước**: Module 12.2 (Các mẫu Workflow), Module 11.2 (Tích hợp SDK)
+> **Yêu cầu trước**: Module 12.2 (Các mẫu Workflow), Module 11.2 (Claude Agent SDK)
 >
-> **Kết quả**: Sau module này, bạn sẽ biết dùng Claude SDK trong n8n, build production-grade AI orchestration, và implement streaming cùng tool use.
+> **Kết quả**: Sau module này, bạn sẽ nối được một conversation Claude Code qua nhiều call n8n
+> bằng `resume`, và biết khi nào dùng node AI Agent gốc của n8n thay vì Claude Code hoàn toàn.
 
 ---
 
 ## 1. WHY — Tại sao cần học
 
-Execute Command (`claude -p`) hoạt động nhưng có giới hạn: không streaming, không tool calling, parse string thay vì structured data. Bạn bị giới hạn ở basic prompt.
-
-SDK integration cho bạn FULL POWER của Claude API trong n8n visual framework. Best of both: visual orchestration để design workflow, programmatic control cho advanced AI feature. Đây là cách build production-grade AI automation.
+Mọi call ở Module 12.1 và 12.2 đều bắt đầu một session Claude Code mới toanh — không nhớ gì call
+trước. Một workflow ticket hỗ trợ cần hỏi thêm câu follow-up, hoặc một vòng review cần sửa draft
+theo feedback, đòi hỏi call thứ hai phải nhớ call đầu. Và không phải workflow AI nào trong n8n
+cũng cần Claude Code — nhiều automation chat/tool-calling hợp với node AI Agent gốc của n8n hơn.
+Chọn sai công cụ khiến bạn hoặc rước thêm phức tạp không cần thiết, hoặc thiếu quyền truy cập
+filesystem.
 
 ---
 
 ## 2. CONCEPT — Ý tưởng cốt lõi
 
-### Ba Integration Level
+### Resume session qua nhiều call
 
-| Level | Method | Use Case |
-|-------|--------|----------|
-| Basic | Execute Command (`claude -p`) | Simple prompt, setup nhanh |
-| Intermediate | HTTP Request (API direct) | Structured response, không cần SDK |
-| Advanced | Code node (SDK) | Full feature, streaming, tool |
+`query()` của Agent SDK có option `resume`: `resume` | `string` | "Session ID to resume". Truyền
+`session_id` mà call đầu trả về, call thứ hai sẽ nối tiếp cùng conversation thay vì bắt đầu lạnh —
+không quét lại repo, và Claude nhớ nó vừa nói gì.
 
-### Code Node với Anthropic SDK
-
-```javascript
-const Anthropic = require('@anthropic-ai/sdk');
-
-const client = new Anthropic({
-  apiKey: $env.ANTHROPIC_API_KEY
-});
-
-const response = await client.messages.create({
-  model: "sonnet",
-  max_tokens: 1024,
-  messages: [{ role: "user", content: $json.prompt }]
-});
-
-return { response: response.content[0].text };
+```mermaid
+graph LR
+    C1[n8n call 1<br/>chỉ prompt] --> S1[agent-service]
+    S1 --> R1[session_id X]
+    R1 --> C2[n8n call 2<br/>prompt + session_id X]
+    C2 --> S2[agent-service<br/>resume: X]
 ```
 
-### HTTP Request Node (Không SDK)
+### Claude Code vs node AI gốc của n8n
 
-```json
-{
-  "method": "POST",
-  "url": "https://api.anthropic.com/v1/messages",
-  "headers": {
-    "x-api-key": "={{ $env.ANTHROPIC_API_KEY }}",
-    "anthropic-version": "2023-06-01",
-    "content-type": "application/json"
-  },
-  "body": {
-    "model": "sonnet",
-    "max_tokens": 1024,
-    "messages": [{"role": "user", "content": "={{ $json.prompt }}"}]
-  }
-}
-```
+n8n có sẵn node **AI Agent** ("Connect a chat model and one or more tools, and the agent decides
+which tools to call") kết hợp với node **Anthropic Chat Model** ("Use Anthropic's Claude family of
+chat models with conversational agents"). Cả hai chạy hoàn toàn bên trong n8n — không cần service
+riêng, không cần checkout repo.
 
-### Advanced SDK Feature
+| Cần gì | Dùng gì |
+|---|---|
+| Chat/tool-calling qua tool tự định nghĩa trong n8n (gọi API, tra database) | n8n **AI Agent** + **Anthropic Chat Model** |
+| Cần đọc/search một repository thật | Claude Code qua `agent-service` (Module 12.1) |
+| Cần `Bash`, `Edit`, hay tool built-in khác của Claude Code | Claude Code qua `agent-service` |
+| Cần đúng permission model (`allowedTools`, hooks) giống hệt mọi call | Claude Code qua `agent-service` |
+| Một câu classify hay chat reply nhanh, không đụng filesystem | n8n **AI Agent** + **Anthropic Chat Model** — ít một moving part hơn |
 
-- **Tool Use**: Cho Claude gọi function bạn define
-- **System Prompt**: Set behavior nhất quán
-- **Multi-turn**: Maintain conversation context
-- **Usage Tracking**: Monitor token cho cost control
+Field **Model** của node Anthropic Chat Model được load động từ credential bạn kết nối — docs của
+node không công bố list cố định nào, nên course này cũng không hardcode model ID ở đây. Chọn bất
+kỳ model Claude hiện tại nào dropdown của credential hiện ra, giống cách bạn truyền một *alias*
+model (không phải ID có ngày tháng) vào option `model` của Agent SDK.
 
 ---
 
 ## 3. DEMO — Từng bước thực hành
 
-### Demo 1: SDK trong Code Node
+**Bước 1: Call đầu tiên — chưa có `session_id`**
 
-```javascript
-// n8n Code node — Full SDK usage
-const Anthropic = require('@anthropic-ai/sdk');
-const client = new Anthropic({ apiKey: $env.ANTHROPIC_API_KEY });
-
-const userPrompt = $input.first().json.prompt;
-
-const response = await client.messages.create({
-  model: "sonnet",
-  max_tokens: 2048,
-  system: "Bạn là assistant hữu ích. Luôn trả lời JSON format.",
-  messages: [{ role: "user", content: userPrompt }]
-});
-
-const text = response.content[0].text;
-let parsed;
-try {
-  parsed = JSON.parse(text);
-} catch (e) {
-  parsed = { raw: text, parseError: true };
-}
-
-return { response: parsed, usage: response.usage };
+```bash
+curl -s localhost:8787/run -H 'content-type: application/json' \
+  -d '{"prompt":"In one sentence, what does tests/math.test.mjs test?"}'
 ```
-
-### Demo 2: Tool Use trong n8n
-
-```javascript
-// n8n Code node — Claude với Tool
-const Anthropic = require('@anthropic-ai/sdk');
-const client = new Anthropic({ apiKey: $env.ANTHROPIC_API_KEY });
-
-const tools = [{
-  name: "search_database",
-  description: "Tìm kiếm database nội bộ",
-  input_schema: {
-    type: "object",
-    properties: { query: { type: "string" } },
-    required: ["query"]
-  }
-}];
-
-const response = await client.messages.create({
-  model: "sonnet",
-  max_tokens: 1024,
-  tools: tools,
-  messages: [{ role: "user", content: $json.prompt }]
-});
-
-const toolUse = response.content.find(c => c.type === 'tool_use');
-
-if (toolUse) {
-  return { needsTool: true, toolName: toolUse.name, toolInput: toolUse.input };
-} else {
-  return { needsTool: false, response: response.content[0].text };
-}
-```
-
-### Demo 3: Complete Workflow
-
+Expected output:
 ```text
-[Webhook] → [Claude with Tools] → [IF: needsTool?]
-                                        ↓ Yes
-                                  [Switch: toolName]
-                                  ├→ [DB Query] →┐
-                                  └→ [API Call] ─┤
-                                        ↓        │
-                              [Claude: Process] ←┘
-                                        ↓ No
-                                    [Output]
+# Output may vary
+{"result":"This test file verifies that the `add` function from `../src/math.js` correctly returns 3 when given the inputs 1 and 2.","session_id":"ca3ccf44-3294-4806-b3b8-12f48cdaa336","total_cost_usd":0.0551}
 ```
+
+**Bước 2: Call thứ hai — gửi lại `session_id` đó**
+
+```bash
+curl -s localhost:8787/run -H 'content-type: application/json' \
+  -d '{"prompt":"Which function from that file did I just ask about? Answer in 5 words or fewer.","session_id":"ca3ccf44-3294-4806-b3b8-12f48cdaa336"}'
+```
+Expected output:
+```text
+# Output may vary
+{"result":"The `add` function.","session_id":"ca3ccf44-3294-4806-b3b8-12f48cdaa336","total_cost_usd":0.0085}
+```
+
+Chú ý: `session_id` trong response không đổi, và call thứ hai trả lời đúng "hàm nào," điều nó chỉ
+có thể biết từ context của call đầu — resume đã hoạt động. Trong n8n, nối dây bằng cách lưu
+`session_id` từ response của HTTP Request node đầu tiên (node Set, hoặc biến scope workflow) và
+reference nó trong body của HTTP Request node thứ hai:
+`{"prompt": "{{ $json.followup }}", "session_id": "{{ $('HTTP Request').item.json.session_id }}"}`.
+
+**Bước 3: Khi nào bỏ qua Claude Code hoàn toàn**
+
+Với một workflow chỉ classify tin nhắn Slack đến theo intent — không cần đụng file — thêm node
+**AI Agent** gốc của n8n với sub-node **Anthropic Chat Model** đính kèm, thay vì gọi
+`agent-service`. Node AI Agent đó có thể tự chứa sub-node **Tool** của n8n (một tool HTTP Request,
+một tool database) nếu việc classify cần tra cứu gì đó — nhưng không cái nào đụng filesystem theo
+cách tool `Read`/`Grep`/`Bash` của Claude Code làm.
+
+**Bước 4: Thêm hooks trong code `agent-service` (không phải trong `.claude/settings.json` mà
+service này không bao giờ đọc)**
+
+```javascript
+// docs: https://code.claude.com/docs/en/agent-sdk/typescript — options.hooks
+options: {
+  cwd: REPO_DIR,
+  allowedTools: ['Read', 'Grep', 'Glob'],
+  permissionMode: 'dontAsk',
+  resume: session_id,
+  hooks: {
+    PreToolUse: [{
+      hooks: [async (input) => {
+        console.log(`[audit] about to run ${input.tool_name}`);
+        return { continue: true };
+      }],
+    }],
+  },
+}
+```
+Vì service này truyền `hooks` thẳng vào `query()`, nó không có `.claude/settings.json` nào để đọc
+— truyền `settingSources: []` (mặc định SDK đã loại project settings kiểu CLAUDE.md trừ khi bạn
+chủ động thêm `'project'`) nếu bạn muốn đảm bảo không gì trên filesystem của host thay đổi hành vi
+service này.
 
 ---
 
 ## 4. PRACTICE — Luyện tập
 
-### Bài 1: SDK Basic
+### Bài 1: Build workflow follow-up hai lượt
 
-**Mục tiêu**: Gọi Claude với system prompt, return JSON.
+**Mục tiêu**: Hỏi agent một câu, rồi một câu follow-up phụ thuộc câu đầu, trong một workflow n8n.
 
 **Hướng dẫn**:
-1. Tạo workflow với Webhook trigger
-2. Add Code node với Anthropic SDK
-3. Set system prompt cho JSON output
-4. Test với curl
+1. Webhook nhận `{"question": "...", "followup": "..."}`.
+2. HTTP Request #1 gọi `agent-service` chỉ với `question`.
+3. HTTP Request #2 gọi `agent-service` với `followup` và `session_id` từ response #1.
+4. Respond to Webhook trả cả hai kết quả.
+
+**Kết quả mong đợi**: Câu trả lời thứ hai rõ ràng phụ thuộc context chỉ call đầu thiết lập — test
+giống cách Bước 1–2 của DEMO đã làm.
 
 <details>
 <summary>💡 Hint</summary>
-
-Dùng `$env.ANTHROPIC_API_KEY` cho API key. Code node support `await` cho async call.
-
+Reference output của node đầu từ body node thứ hai bằng
+`{{ $('HTTP Request').item.json.session_id }}`, không phải `$json.session_id` (cái này trỏ tới
+node ngay trước — ổn ở đây, nhưng reference node rõ ràng sẽ dễ hiểu hơn khi có branch).
 </details>
 
 <details>
 <summary>✅ Solution</summary>
-
-```javascript
-const Anthropic = require('@anthropic-ai/sdk');
-const client = new Anthropic({ apiKey: $env.ANTHROPIC_API_KEY });
-
-const response = await client.messages.create({
-  model: "sonnet",
-  max_tokens: 1024,
-  system: "Chỉ trả lời valid JSON format.",
-  messages: [{ role: "user", content: $json.prompt }]
-});
-
-return { result: JSON.parse(response.content[0].text) };
-```
-
+Đây chính là cách nối dây ở đoạn cuối Bước 2 của DEMO — hai node HTTP Request chia sẻ một
+`session_id`.
 </details>
 
-### Bài 2: Tool Integration
+### Bài 2: Chọn đúng công cụ
 
-**Mục tiêu**: Define calculator tool, cho Claude quyết định khi nào dùng.
+**Mục tiêu**: Với ba scenario, quyết định dùng `agent-service` (Claude Code) hay node AI Agent +
+Anthropic Chat Model của n8n.
 
-**Hướng dẫn**:
-1. Define tool với `input_schema` cho 2 số và operation
-2. Claude nhận math question
-3. Check nếu `tool_use` trong response
-4. Execute calculation, return result
-
-<details>
-<summary>💡 Hint</summary>
-
-Check `response.content.find(c => c.type === 'tool_use')` để detect tool call.
-
-</details>
+**Hướng dẫn**: Với mỗi cái, nêu cách đúng và một câu lý do:
+1. Tóm tắt một thread Slack và đề xuất ba câu reply.
+2. Tìm mọi file trong repo import một function đã deprecated và liệt kê ra.
+3. Trả lời "chính sách hoàn tiền của tụi mình là gì?" từ một đoạn FAQ dán sẵn.
 
 <details>
 <summary>✅ Solution</summary>
-
-```javascript
-const tools = [{
-  name: "calculate",
-  description: "Thực hiện phép tính",
-  input_schema: {
-    type: "object",
-    properties: {
-      a: { type: "number" },
-      b: { type: "number" },
-      operation: { type: "string", enum: ["add", "subtract", "multiply", "divide"] }
-    },
-    required: ["a", "b", "operation"]
-  }
-}];
-
-const response = await client.messages.create({
-  model: "sonnet",
-  max_tokens: 1024,
-  tools: tools,
-  messages: [{ role: "user", content: "42 nhân 17 bằng mấy?" }]
-});
-
-const toolUse = response.content.find(c => c.type === 'tool_use');
-if (toolUse) {
-  const { a, b, operation } = toolUse.input;
-  const ops = { add: a+b, subtract: a-b, multiply: a*b, divide: a/b };
-  return { result: ops[operation] };
-}
-```
-
-</details>
-
-### Bài 3: Production Workflow
-
-**Mục tiêu**: Build complete workflow với error handling.
-
-**Hướng dẫn**:
-1. Webhook → Claude analysis → Tool execution → Response
-2. Add try/catch cho API error
-3. Log usage tới node riêng
-
-<details>
-<summary>💡 Hint</summary>
-
-Wrap SDK call trong try/catch. Return error object khi fail để downstream handle.
-
-</details>
-
-<details>
-<summary>✅ Solution</summary>
-
-```javascript
-try {
-  const response = await client.messages.create({...});
-  return { success: true, data: response.content[0].text, usage: response.usage };
-} catch (error) {
-  return { success: false, error: error.message };
-}
-```
-
-Connect tới IF node: `{{ $json.success }}` → true branch process, false branch log error.
-
+1. n8n AI Agent + Anthropic Chat Model — không đụng filesystem, chỉ text vào text ra.
+2. `agent-service` (Claude Code) — cần `Grep`/`Glob` trên repository thật.
+3. n8n AI Agent + Anthropic Chat Model — đoạn FAQ đưa thẳng vào prompt được; không cần đụng repo.
 </details>
 
 ---
 
 ## 5. CHEAT SHEET
 
-### Code Node Setup
-
-```javascript
-const Anthropic = require('@anthropic-ai/sdk');
-const client = new Anthropic({ apiKey: $env.ANTHROPIC_API_KEY });
-```
-
-### Basic Call
-
-```javascript
-const response = await client.messages.create({
-  model: "sonnet",
-  max_tokens: 1024,
-  messages: [{ role: "user", content: prompt }]
-});
-return { text: response.content[0].text };
-```
-
-### Với System Prompt
-
-```javascript
-system: "Bạn là JSON-only assistant.",
-```
-
-### Với Tool
-
-```javascript
-tools: [{ name: "...", description: "...", input_schema: {...} }],
-```
-
-### Chọn Integration Level
-
-| Cần | Dùng |
-|-----|------|
-| Simple prompt | Execute Command |
-| Không muốn SDK | HTTP Request |
-| Tool, streaming | Code Node + SDK |
+| Cần gì | Cách làm |
+|---|---|
+| Nối tiếp conversation trước | `query({ prompt, options: { resume: session_id } })` |
+| Bỏ qua mọi filesystem setting cho service | `settingSources: []` |
+| Audit log theo từng tool | `options.hooks.PreToolUse` |
+| Chat/classify, không cần repo | Node n8n **AI Agent** + **Anthropic Chat Model** |
+| Task cần repo (`Read`, `Grep`, `Bash`, `Edit`) | `agent-service` (Claude Code) |
+| Chọn model | Một alias từ dropdown động của credential, không bao giờ hardcode ID có ngày tháng |
 
 ---
 
 ## 6. PITFALLS — Lỗi thường gặp
 
 | ❌ Sai | ✅ Đúng |
-|--------|---------|
-| SDK không install trong n8n | `npm install @anthropic-ai/sdk` trong n8n directory |
-| Synchronous code trong Code node | Luôn dùng `await`, node support async |
-| Không handle tool_use response | Check `response.content` cho `type: 'tool_use'` |
-| Ignore usage/token | Track `response.usage` cho cost monitoring |
-| Không error handling | Try/catch với meaningful error return |
-| Hardcode API key | Dùng `$env.ANTHROPIC_API_KEY` |
-| SDK cho simple prompt | Execute Command cho basic, SDK cho advanced |
+|---|---|
+| Gọi thẳng Messages API bằng `require('@anthropic-ai/sdk')` trong node Code | Dùng `query()` của Agent SDK trong `agent-service`; nó đã cho sẵn tool, permission, và session |
+| Nghĩ call nào cũng cần repo | Nếu không đụng filesystem, node AI Agent gốc của n8n đơn giản hơn và ít một service phải chạy |
+| Hardcode một model ID có ngày tháng, có version cụ thể | Dùng alias model dropdown của credential đang hiện, hoặc option alias `model` của Agent SDK |
+| Quên truyền `resume` ở call follow-up | Không có nó, mỗi call là một session hoàn toàn mới, không nhớ gì call trước |
+| Để `agent-service` vô tình đọc `.claude/settings.json` của host | Truyền `settingSources: []` nếu bạn cần hành vi service chỉ phụ thuộc code của chính nó |
 
 ---
 
 ## 7. REAL CASE — Câu chuyện thực tế
 
-**Scenario**: Công ty SaaS Việt Nam build AI customer support. Cần: intent detection, tool execution (check order, process refund, escalate), conversation history.
+**Scenario**: Một team support SaaS Việt Nam muốn workflow draft một reply, để agent trả lời một
+câu hỏi làm rõ từ người review, rồi hoàn thiện reply — tất cả như một conversation logic.
 
-**Architecture**:
-```text
-[Chat Webhook] → [Claude with Tools] → [Switch: Tool?]
-                    Tools: check_order,     ├→ [Order DB] → [Format Response]
-                    process_refund,         ├→ [Human Approval] → [Refund API]
-                    escalate_human,         ├→ [Create Zendesk Ticket]
-                    search_kb               └→ [Vector Search] → [Answer]
-```
+**Problem**: Bản đầu tiên gọi `agent-service` mới toanh ở mỗi bước, nên bước "câu hỏi làm rõ"
+không biết ticket gốc nói gì — mỗi call phải dán lại toàn bộ history ticket, chậm và dễ lệch nhau
+giữa các node.
 
-**Tại sao SDK thay vì CLI**:
-- Tool use required (Claude quyết định action)
-- Token tracking cho billing
-- JSON response cho structured data
-- System prompt cho personality nhất quán
+**Solution**: `session_id` từ response của HTTP Request node đầu được lưu vào node Set và xâu chuỗi
+qua mọi call sau trong workflow bằng `resume`. Bước classify đơn giản (route ticket mới vào đúng
+queue) chuyển sang node **AI Agent** + **Anthropic Chat Model** gốc của n8n, vì không cần đụng
+repo và chạy nhẹ hơn một service round-trip.
 
-**Kết quả** (sau 3 tháng):
-- 70% ticket auto-resolved
-- Response time: 3 giây trung bình
-- Human escalation: chỉ complex case
-- Cost tracking: billing per conversation
-
-**Quote**: "SDK trong n8n cho flexibility của code với visibility của visual workflow. Best of both worlds."
+**Result**: Workflow reply nhiều bước đọc như một conversation duy nhất thay vì ba call rời rạc, và
+bước route đơn giản không còn phụ thuộc `agent-service` phải đang chạy.
 
 ---
 
-> **Phase 12 Hoàn Thành!** Bạn đã master n8n + Claude Code — từ basic workflow đến advanced SDK orchestration.
+> **Hoàn thành Phase 12!** Bạn đã đi từ một call HTTP đơn lẻ tới một service nhỏ, qua các pattern
+> fan-out và error-recovery, tới điều phối có nhớ session và biết khi nào dùng node AI gốc của n8n
+> thay vì Claude Code.
 >
 > **Phase Tiếp Theo**: [Phase 13: Data & Analysis](../../phase-13-data-analysis/01-data-analysis/) →
