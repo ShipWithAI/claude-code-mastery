@@ -43,13 +43,15 @@ graph LR
 to 2.5x faster at a higher cost per token." Chỉ tồn tại cho **Opus 5.5, Opus 5, và Opus 4.8** —
 Sonnet, Haiku, và Opus 4.7 không support. Toggle bằng `/fast` (Space để đổi, Enter để confirm)
 hoặc `Option+O` / `Alt+O`. Lần đầu bật trong một conversation, bạn trả full uncached input price
-cho toàn bộ context, một lần duy nhất — nên bật/tắt qua lại trong cùng session rất tốn.
-`CLAUDE_CODE_DISABLE_FAST_MODE=1` tắt hẳn cho máy dùng chung hoặc script.
+cho toàn bộ context tính tới lúc đó — bật sớm là rẻ nhất. Cái giá đó chỉ tính một lần mỗi
+conversation; tắt rồi bật lại sau đó không lặp lại giá này. `CLAUDE_CODE_DISABLE_FAST_MODE=1` tắt
+hẳn cho máy dùng chung hoặc script.
 
 **`/effort`** đánh đổi độ sâu reasoning lấy tốc độ trên mọi model: `low`, `medium`, `high`,
-`xhigh`, `max` (thêm `auto` để clear override, `ultracode` cho `xhigh` kèm ultracode). Thấp hơn =
-nhanh hơn; default khác nhau theo model — Opus 5.5 mặc định `medium` ("một bậc dưới model khác"),
-hầu hết model khác mặc định `high`. Flag `--effort` chỉ áp dụng một session, không lưu lại.
+`xhigh`, `max` (thêm `auto` để clear, `ultracode` cho `xhigh` kèm ultracode). Opus 5.5/5/4.8 và
+Sonnet 5 support cả năm mức; Opus 4.6 và Sonnet 4.6 không có `xhigh`. Thấp hơn = nhanh hơn;
+default khác nhau theo model — Opus 5.5 mặc định `medium` ("một bậc dưới model khác"), hầu hết
+model khác mặc định `high`. `--effort` chỉ áp dụng một session, không lưu lại.
 
 **Parallelism thật** đánh bại mọi cách tăng tốc trong một session: một subagent (natural
 language — "use a subagent to…") chạy context window riêng song song với bạn, tối đa 20 cái
@@ -277,7 +279,7 @@ mode, dev server, timeout dài — đều bị đẩy ra nền, dù do bạn `Ct
 | `claude -p "task 1" & claude -p "task 2" &` trong cùng checkout | Cùng working directory, cùng git index — race và bị deny write. Dùng `claude -w a`, `claude -w b` |
 | Coi `/cost` là thước đo tốc độ | `/cost` là alias của `/usage` — hiện spend, không phải latency. Đo wall-clock time thay vào đó |
 | Để fast mode bật cả ngày làm việc | Chỉ dành cho Opus, research preview, giá per-token cao hơn; tắt nó giữa các task đáng dùng fast mode |
-| Bật/tắt `/fast` qua lại giữa conversation để "test" | Turn đầu sau khi bật tính lại toàn bộ context ở rate fast-mode — không miễn phí |
+| Bật `/fast` lần đầu khi đã đi sâu vào session dài | Giá re-price càng vào sâu càng tốn — bật ngay từ đầu nếu biết sẽ cần |
 | Cho rằng effort thấp hơn luôn xong nhanh hơn | Trên task tầm thường chênh lệch chỉ là nhiễu; effort phát huy trên task có tải reasoning thật |
 
 ---

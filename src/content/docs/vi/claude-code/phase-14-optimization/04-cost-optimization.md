@@ -53,10 +53,10 @@ rate as a 9k-token request.)"
 **Prompt caching tự động** — "Claude Code handles prompt caching for you, unless you disable it."
 Cache mặc định sống **1 giờ** trong plan usage của Claude subscription, **5 phút** trên usage
 credits, API key, hoặc cloud provider; một hit tốn 0.1x base input trên hầu hết model (0.05x trên
-Opus 5.5, 0.025x trên Fable 5.1). Cái làm reset: đổi model hoặc effort level (trừ Opus 5.5/Fable
-5.1 trên API key hoặc subscription), lần đầu bật fast mode trong conversation, thêm/bỏ MCP server,
-compact, upgrade Claude Code. Cái không làm reset: sửa file, đổi permission mode, đổi output
-style, chạy skill hoặc command.
+Opus 5.5, 0.025x trên Fable 5.1). Làm reset: đổi model hoặc effort level, lần đầu bật fast mode
+trong conversation, thêm/bỏ MCP server, compact, upgrade Claude Code. Không làm reset: sửa file,
+đổi permission mode, đổi output style, chạy skill/command, tắt fast mode rồi bật lại. Danh sách
+đầy đủ kèm ngoại lệ: [prompt-caching](https://code.claude.com/docs/en/prompt-caching).
 
 **Góc nhìn subscription vs API.** `/usage` (alias `/cost` và `/stats`) hiện view plan-usage cho
 seat subscription, hoặc Session block với `Total cost` bằng đô trên usage credits / API key.

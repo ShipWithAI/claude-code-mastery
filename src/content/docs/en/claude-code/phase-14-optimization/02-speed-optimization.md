@@ -44,15 +44,15 @@ graph LR
 up to 2.5x faster at a higher cost per token." It only exists for **Opus 5.5, Opus 5, and Opus
 4.8** — Sonnet, Haiku, and Opus 4.7 don't support it. Toggle it with `/fast` (Space to flip,
 Enter to confirm) or `Option+O` / `Alt+O`. The first time you turn it on in a conversation you
-pay the full uncached input price for the whole context, once — so flipping it on and off inside
-one session is expensive. `CLAUDE_CODE_DISABLE_FAST_MODE=1` turns it off entirely for scripted or
-shared machines.
+pay the full uncached input price for the whole context so far — enabling it early is cheapest.
+That cost applies once per conversation; toggling it off and back on later doesn't repeat it.
+`CLAUDE_CODE_DISABLE_FAST_MODE=1` turns it off entirely for scripted or shared machines.
 
 **`/effort`** trades reasoning depth for speed on every model, not just Opus: `low`, `medium`,
-`high`, `xhigh`, `max` (plus `auto` to clear an override, and `ultracode` for `xhigh` with
-ultracode on). Lower is faster; defaults differ by model — Opus 5.5 defaults to `medium` ("one
-level below other models"), most others default to `high`. The `--effort` CLI flag is
-session-only and does not persist.
+`high`, `xhigh`, `max` (plus `auto` to clear, `ultracode` for `xhigh` with ultracode on). Opus
+5.5/5/4.8 and Sonnet 5 support all five; Opus 4.6 and Sonnet 4.6 lack `xhigh`. Lower is faster;
+defaults differ by model — Opus 5.5 defaults to `medium` ("one level below other models"), most
+others default to `high`. `--effort` is session-only and doesn't persist.
 
 **Real parallelism** beats any single-session speedup: a subagent (natural language — "use a
 subagent to…") runs its own context window alongside yours, up to 20 concurrent
@@ -279,7 +279,7 @@ server, a long timeout — ends up backgrounded, whether by your `Ctrl+B` or by 
 | `claude -p "task 1" & claude -p "task 2" &` in the same checkout | Same working directory, same git index — races and denied writes. Use `claude -w a`, `claude -w b` |
 | Treating `/cost` as a speed gauge | `/cost` is an alias for `/usage` — it shows spend, not latency. Use wall-clock timing instead |
 | Leaving fast mode on across a whole workday | It's Opus-only, research preview, and priced higher per token; turn it off between fast-mode-worthy tasks |
-| Flipping `/fast` on and off mid-conversation to "test" it | The first turn after enabling re-prices the entire context at fast-mode rates — that's not free |
+| Turning `/fast` on for the first time deep into a long session | That first re-price costs more the further in you are — enable it at the start of a session if you'll want it, not mid-task |
 | Assuming a lower `/effort` always finishes faster | On trivial tasks the difference is noise; effort pays off on tasks with real reasoning load |
 
 ---

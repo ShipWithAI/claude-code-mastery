@@ -52,10 +52,11 @@ rate as a 9k-token request.)"
 **Prompt caching is automatic** — "Claude Code handles prompt caching for you, unless you disable
 it." Cache lifetime defaults to **1 hour** inside a Claude subscription's plan usage, **5
 minutes** on usage credits, an API key, or a cloud provider; a hit costs 0.1x base input on most
-models (0.05x on Opus 5.5, 0.025x on Fable 5.1). What resets it: switching models or effort level
-(except Opus 5.5/Fable 5.1 on API key or subscription), first-time fast mode in a conversation,
-adding/removing an MCP server, compacting, upgrading Claude Code. What doesn't: editing files,
-permission mode, output style, running skills or commands.
+models (0.05x on Opus 5.5, 0.025x on Fable 5.1). Resets it: switching models or effort level,
+first-time fast mode in a conversation, adding/removing an MCP server, compacting, upgrading
+Claude Code. Doesn't: editing files, permission mode, output style, skills/commands, toggling
+fast mode off and back on. Full list with exceptions:
+[prompt-caching](https://code.claude.com/docs/en/prompt-caching).
 
 **Subscription vs API view.** `/usage` (aliased by `/cost` and `/stats`) shows a plan-usage view
 for a subscription seat, or a Session block with a dollar `Total cost` on usage credits / an API
