@@ -17,7 +17,7 @@ claude_version: 2.1.283
 
 ## 1. WHY — Why This Matters
 
-You type `/` and a wall of names scrolls past — some built into Claude Code, some skills a teammate installed, some plugins you forgot you enabled. You need `/compact`, but is it `/compact` or `/context`? Meanwhile your team keeps pasting the same "review this diff for security issues" prompt into every session. Both problems have the same fix: know the built-in command surface, and turn your own repeated prompts into commands your whole team gets for free from git.
+You type `/` and a wall of names scrolls past — some built-in, some skills a teammate installed, some plugins you forgot you enabled. You need `/compact`, but is it `/compact` or `/context`? Meanwhile your team keeps pasting the same "review this diff for security issues" prompt into every session. Both problems share one fix: know the built-in command surface, and turn repeated prompts into commands your whole team gets for free from git.
 
 ---
 
@@ -31,7 +31,7 @@ Everything that starts with `/` falls into one of three buckets:
 | **Custom command** | `.claude/commands/<name>.md` (project, committed) or `~/.claude/commands/<name>.md` (personal, all projects) | `/name` |
 | **Skill / plugin** | `.claude/skills/<name>/SKILL.md`; plugin skills load as `<plugin>:<skill>` | `/name`, or Claude auto-invokes it |
 
-Custom commands and skills overlap on purpose: "A file at `.claude/commands/deploy.md` and a skill at `.claude/skills/deploy/SKILL.md` both create `/deploy` and work the same way." A subdirectory namespaces the command: `.claude/commands/frontend/component.md` becomes `/frontend:component`. If a skill and a command file share a name, the skill runs.
+Custom commands and skills overlap on purpose: "A file at `.claude/commands/deploy.md` and a skill at `.claude/skills/deploy/SKILL.md` both create `/deploy` and work the same way." A subdirectory namespaces it: `.claude/commands/frontend/component.md` becomes `/frontend:component`. A skill wins a same-name collision.
 
 ### Frontmatter a command can set
 
@@ -43,7 +43,7 @@ Custom commands and skills overlap on purpose: "A file at `.claude/commands/depl
 | `model` | Override the session model while this command runs |
 | `disable-model-invocation` | `true` — only you can run it, never Claude on its own |
 
-Inside the body: `$ARGUMENTS` is everything typed after the command name; `$0`, `$1`, `$2`… are positional pieces of it. `` !`command` `` runs a shell command before your prompt reaches Claude and substitutes its output — but "a failed command aborts the entire invocation," so append `|| true` when failure is expected. `@file` references a file's contents inline.
+Inside the body: `$ARGUMENTS` is everything typed after the command name; `$0`, `$1`, `$2`… are positional pieces. `` !`command` `` runs a shell command before your prompt reaches Claude and substitutes its output — "a failed command aborts the entire invocation," so append `|| true` when failure is expected. `@file` attaches a file's contents the same way it does for a local skill (per skills.md; no dedicated `@file` syntax page exists).
 
 ### Built-in commands worth knowing by heart
 
@@ -51,8 +51,8 @@ Inside the body: `$ARGUMENTS` is everything typed after the command name; `$0`, 
 |---|---|
 | **Session** | `/clear` (fresh conversation, keeps memory) · `/compact [instructions]` (summarize to free context) · `/context` (colored grid of what's using space) · `/resume` (reopen a past session) · `/rewind` (roll code/conversation back to a checkpoint) |
 | **Config** | `/model` (switch model) · `/effort` (low…xhigh reasoning) · `/permissions` (allow/ask/deny rules) · `/config` (theme, output style, settings) · `/memory` (edit CLAUDE.md, toggle auto memory) |
-| **Extend** | `/agents` (create/manage subagents) · `/hooks` (view hook config) · `/mcp` (MCP server connections) · `/plugin` (install/enable/disable plugins) · `/skills` (list and toggle skill visibility) |
-| **Account** | `/login` / `/status` (version, model, account, connectivity) · `/usage` (session cost, plan limits — `/cost` and `/stats` are aliases) · `/doctor` (setup checkup, can fix issues) |
+| **Extend** | `/agents` (ask Claude to create/manage subagents, or edit `.claude/agents/` yourself) · `/hooks` (view hook config) · `/mcp` (MCP server connections) · `/plugin` (install/enable/disable plugins) · `/skills` (list and toggle skill visibility) |
+| **Account** | `/login` (sign in to your Anthropic account) · `/status` (version, model, account, connectivity) · `/usage` (session cost, plan limits — `/cost` and `/stats` are aliases) · `/doctor` (setup checkup, can fix issues) |
 
 Skills like `/deploy` are a natural next step once a command file grows a supporting script or reference doc commands can't hold (Module 15.3).
 
@@ -62,17 +62,27 @@ Skills like `/deploy` are a natural next step once a command file grows a suppor
 
 Working directory: `~/cc-lab`.
 
-**Step 1: Type `/` and look at what's actually offered**
+**Step 1: Type `/` then a few letters to filter**
+
+Bare `/` opens a short, fixed-height popup — here its first rows were the author's own skills, so
+type a few letters to narrow it to built-ins:
 
 ```text
-# Output may vary — this list is whatever skills/plugins/commands you have installed
-❯ /
-  …                                                       … (redacted — your own installed skill)
-  …                                                       … (redacted — your own installed skill)
-  …                                                       … (redacted — your own installed skill)
-  …                                                       … (redacted — your own installed skill)
+# Output may vary — narrowed with a letter filter so built-ins surface immediately
+❯ /co
+  /copy                                                  Copy Claude's last response to clipboard (or /copy N for the Nth-latest)
+  /color                                                 Set the prompt bar color for this session
+  /config                                                Open settings
+  /compact                                               Free up context by summarizing the conversation so far
+  /context                                               Visualize current context usage as a colored grid
 ```
-The popup is short and scrollable — press `↓` to page through the rest, including every built-in command from the table above, alphabetically.
+Press `↓` to keep scrolling the same filtered list — it mixes built-ins with whatever else matches:
+```text
+# Output may vary
+  /code-review                                           3 free /ultrareview · Review the current diff, or a PR number/branch/path target, for correctness bugs…
+  …                                                       … (redacted — your own installed skill, also matched "co")
+```
+The list always blends built-ins with whatever the reader has installed — hence the `…` redaction.
 
 **Step 2: `/help` for the quick reference**
 
@@ -89,7 +99,7 @@ The popup is short and scrollable — press `↓` to page through the rest, incl
    /btw for side question    ctrl + t to toggle tasks            opt + p to switch model
    Esc to cancel
 ```
-The **Commands** tab lists every built-in; **Custom commands** lists skills and `.claude/commands/` files, tagged with their source.
+**Commands** lists every built-in; **Custom commands** lists skills and `.claude/commands/` files, tagged with source.
 
 **Step 3: Write a project command with an argument and a pre-run check**
 
@@ -122,7 +132,7 @@ Review the file at $1. Flag bugs, missing error handling, and missing tests.
   Missing tests
   3. subtract (the new function) has no test…
 ```
-Claude also asked to run `npm test`, which is outside `Bash(git diff *)` — proof that `allowed-tools` covers exactly the pattern you listed, nothing more.
+Claude also asked to run `npm test`, outside `Bash(git diff *)` — proof `allowed-tools` covers exactly the pattern listed, nothing more.
 
 **Step 5: Namespace a command in a subdirectory**
 
@@ -142,7 +152,7 @@ Create a new component named $1 under src/components/, plus a matching test file
   /frontend:component                                    Scaffold a new frontend component with a matching test file (project)
   …                                                       (redacted — your own installed skill)
 ```
-The `(project)` tag confirms it came from `.claude/commands/`, and the subdirectory became the namespace prefix.
+The `(project)` tag confirms it came from `.claude/commands/`; the subdirectory became the namespace.
 
 **Step 6: Clean up**
 ```bash
@@ -155,9 +165,9 @@ git -C ~/cc-lab checkout -- . && git -C ~/cc-lab clean -fd
 
 ### Exercise 1: `/fix-issue`
 
-**Goal**: Write `.claude/commands/fix-issue.md` that takes an issue number and pre-loads the issue body.
+**Goal**: Write `.claude/commands/fix-issue.md` that takes an issue number and pre-loads the issue.
 
-**Instructions**: Use `$1` for the number and `` !`gh issue view $1` `` to inject the issue before Claude reads your instructions.
+**Instructions**: Use `$1` for the number and `` !`gh issue view $1` `` to inject it before Claude reads your instructions.
 
 <details>
 <summary>💡 Hint</summary>
@@ -186,16 +196,16 @@ Read the issue above, find the relevant code, and propose a fix.
 
 **Goal**: Decide when `.claude/commands/deploy.md` should become `.claude/skills/deploy/SKILL.md` instead.
 
-**Instructions**: A command file can't ship a supporting script or a reference doc alongside it — a skill directory can. Once your command needs a second file, move it. See Module 15.3 for the skill directory layout.
+**Instructions**: A command file can't ship a supporting script or reference doc — a skill directory can. Once it needs a second file, move it. See Module 15.3 for the skill directory layout.
 
 <details>
 <summary>✅ Solution</summary>
-If `deploy.md` starts saying "see the checklist below" and the checklist keeps growing, split it into `SKILL.md` (short) plus `checklist.md` (loaded only when needed) — same `/deploy` invocation, lower context cost per turn.
+If `deploy.md` starts saying "see the checklist below" and that checklist keeps growing, split into `SKILL.md` (short) plus `checklist.md` (loaded only when needed) — same `/deploy`, lower context cost.
 </details>
 
 ### Exercise 3: `/compact` vs `/clear`
 
-**Goal**: Confirm the difference between summarizing and erasing.
+**Goal**: Confirm summarizing vs. erasing.
 
 **Instructions**: Implement something small, run `/compact`, ask "what did we just build?" Then run `/clear` and ask again.
 
@@ -216,9 +226,11 @@ If `deploy.md` starts saying "see the checklist below" and the checklist keeps g
 | `/model` | Switch model |
 | `/effort` | Set reasoning effort |
 | `/permissions` | Allow/ask/deny rules |
+| `/sandbox` | Toggle sandbox mode (supported platforms only) |
 | `/config` | Theme, output style, settings |
+| `/output-style` | List/switch output styles |
 | `/memory` | Edit CLAUDE.md, toggle auto memory |
-| `/agents` | Manage subagents |
+| `/agents` | Ask Claude to manage subagents, or edit `.claude/agents/` |
 | `/hooks` | View hook config |
 | `/mcp` | Manage MCP connections |
 | `/plugin` | Install/enable/disable plugins |
@@ -256,9 +268,9 @@ If `deploy.md` starts saying "see the checklist below" and the checklist keeps g
 
 ## 7. REAL CASE — Production Story
 
-A backend team at a Vietnamese fintech kept three prompts alive only in Slack: "review this diff for auth bugs," "draft the changelog entry," and "investigate issue #N." New hires never found them. The team committed three files to `.claude/commands/`: `review-file.md`, `ship-notes.md`, and `fix-issue.md`, each with an `argument-hint` and a pre-run `!` block pulling the relevant diff or issue.
+A backend team at a Vietnamese fintech kept three prompts alive only in Slack: "review this diff for auth bugs," "draft the changelog entry," "investigate issue #N." New hires never found them. The team committed three files to `.claude/commands/`: `review-file.md`, `ship-notes.md`, `fix-issue.md`, each with an `argument-hint` and a pre-run `!` block pulling the relevant diff or issue.
 
-Result: every teammate got the same three commands the moment they cloned the repo — no onboarding doc, no copy-pasted prompt. When `fix-issue.md` grew a second file (a triage checklist), they promoted it to a skill under `.claude/skills/fix-issue/`, keeping the same `/fix-issue` name their muscle memory already knew.
+Result: every teammate got the same three commands the moment they cloned the repo — no onboarding doc, no copy-pasted prompt. When `fix-issue.md` grew a second file (a triage checklist), the team promoted it to a skill under `.claude/skills/fix-issue/`, keeping the `/fix-issue` name their muscle memory already knew.
 
 ---
 

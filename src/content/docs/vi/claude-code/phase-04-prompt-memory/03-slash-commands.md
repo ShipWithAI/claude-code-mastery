@@ -17,7 +17,7 @@ claude_version: 2.1.283
 
 ## 1. WHY — Tại Sao Cần Biết
 
-Bạn gõ `/` và cả danh sách tên trôi qua — vài cái built-in, vài cái là skill đồng nghiệp cài, vài cái là plugin bạn quên đã bật. Cần `/compact`, nhưng là `/compact` hay `/context`? Trong khi đó, team bạn cứ dán đi dán lại cùng một prompt "review diff này xem có lỗi bảo mật không" vào mỗi session. Cả hai vấn đề chung một cách giải: nắm bề mặt built-in command, và biến prompt lặp lại thành command cả team lấy miễn phí qua git.
+Bạn gõ `/` và cả danh sách tên trôi qua — vài cái built-in, vài cái là skill đồng nghiệp cài, vài cái là plugin bạn quên đã bật. Cần `/compact`, nhưng là `/compact` hay `/context`? Trong khi đó, team bạn cứ dán lại cùng một prompt "review diff này xem có lỗi bảo mật không" vào mỗi session. Cả hai vấn đề chung một cách giải: nắm bề mặt built-in, biến prompt lặp lại thành command cả team lấy miễn phí qua git.
 
 ---
 
@@ -31,7 +31,7 @@ Mọi thứ bắt đầu bằng `/` rơi vào một trong ba nhóm:
 | **Custom command** | `.claude/commands/<name>.md` (project, commit vào git) hoặc `~/.claude/commands/<name>.md` (cá nhân, mọi project) | `/name` |
 | **Skill / plugin** | `.claude/skills/<name>/SKILL.md`; skill của plugin load thành `<plugin>:<skill>` | `/name`, hoặc Claude tự invoke |
 
-Custom command và skill cố ý chồng nhau: "A file at `.claude/commands/deploy.md` and a skill at `.claude/skills/deploy/SKILL.md` both create `/deploy` and work the same way." Subdirectory sẽ namespace command: `.claude/commands/frontend/component.md` → `/frontend:component`. Skill và command trùng tên thì skill chạy.
+Custom command và skill cố ý chồng nhau: "A file at `.claude/commands/deploy.md` and a skill at `.claude/skills/deploy/SKILL.md` both create `/deploy` and work the same way." Subdirectory sẽ namespace: `.claude/commands/frontend/component.md` → `/frontend:component`. Trùng tên thì skill thắng.
 
 ### Frontmatter mà command có thể set
 
@@ -43,7 +43,7 @@ Custom command và skill cố ý chồng nhau: "A file at `.claude/commands/depl
 | `model` | Đổi model của session trong lúc command này chạy |
 | `disable-model-invocation` | `true` — chỉ bạn được chạy, Claude không tự chạy được |
 
-Bên trong body: `$ARGUMENTS` là toàn bộ text gõ sau tên command; `$0`, `$1`, `$2`… là từng phần theo vị trí. `` !`command` `` chạy một shell command trước khi prompt của bạn đến tay Claude và thay output vào chỗ đó — nhưng "a failed command aborts the entire invocation" (lệnh fail sẽ hủy toàn bộ lần invoke), nên thêm `|| true` khi bạn biết trước lệnh có thể fail. `@file` chèn nội dung file vào trực tiếp.
+Bên trong body: `$ARGUMENTS` là toàn bộ text gõ sau tên command; `$0`, `$1`, `$2`… là từng phần theo vị trí. `` !`command` `` chạy một shell command trước khi prompt của bạn đến tay Claude và thay output vào chỗ đó — "a failed command aborts the entire invocation" (lệnh fail sẽ hủy toàn bộ lần invoke), nên thêm `|| true` khi bạn biết trước lệnh có thể fail. `@file` chèn nội dung file y hệt cách nó làm với local skill (theo skills.md; không có trang riêng nói về cú pháp `@file`).
 
 ### Built-in command nên thuộc lòng
 
@@ -51,8 +51,8 @@ Bên trong body: `$ARGUMENTS` là toàn bộ text gõ sau tên command; `$0`, `$
 |---|---|
 | **Session** | `/clear` (conversation mới, giữ memory) · `/compact [instructions]` (tóm tắt để giải phóng context) · `/context` (lưới màu hiển thị context đang dùng) · `/resume` (mở lại session cũ) · `/rewind` (lùi code/conversation về checkpoint) |
 | **Config** | `/model` (đổi model) · `/effort` (mức reasoning low…xhigh) · `/permissions` (rule allow/ask/deny) · `/config` (theme, output style, settings) · `/memory` (sửa CLAUDE.md, bật/tắt auto memory) |
-| **Extend** | `/agents` (tạo/quản lý subagent) · `/hooks` (xem cấu hình hook) · `/mcp` (quản lý kết nối MCP) · `/plugin` (install/enable/disable plugin) · `/skills` (liệt kê và bật/tắt hiển thị skill) |
-| **Account** | `/login` / `/status` (version, model, account, connectivity) · `/usage` (chi phí session, giới hạn plan — `/cost` và `/stats` là alias) · `/doctor` (setup checkup, tự fix được vài lỗi) |
+| **Extend** | `/agents` (nhờ Claude tạo/quản lý subagent, hoặc tự sửa `.claude/agents/`) · `/hooks` (xem cấu hình hook) · `/mcp` (quản lý kết nối MCP) · `/plugin` (install/enable/disable plugin) · `/skills` (liệt kê và bật/tắt hiển thị skill) |
+| **Account** | `/login` (đăng nhập tài khoản Anthropic) · `/status` (version, model, account, connectivity) · `/usage` (chi phí session, giới hạn plan — `/cost` và `/stats` là alias) · `/doctor` (setup checkup, tự fix được vài lỗi) |
 
 Skill kiểu `/deploy` là bước tiếp theo tự nhiên khi một file command lớn thêm script hỗ trợ hoặc tài liệu tham khảo mà command file không chứa được (Module 15.3).
 
@@ -62,17 +62,27 @@ Skill kiểu `/deploy` là bước tiếp theo tự nhiên khi một file comman
 
 Thư mục làm việc: `~/cc-lab`.
 
-**Bước 1: Gõ `/` và xem thực tế hiển thị gì**
+**Bước 1: Gõ `/` rồi gõ thêm vài chữ để filter**
+
+Gõ `/` trống mở popup ngắn, cao cố định — ở máy này mấy dòng đầu là skill riêng, nên gõ thêm vài
+chữ để lọc ra built-in:
 
 ```text
-# Output may vary — danh sách này là bất cứ skill/plugin/command nào bạn đã cài
-❯ /
-  …                                                       … (đã che — skill riêng của bạn)
-  …                                                       … (đã che — skill riêng của bạn)
-  …                                                       … (đã che — skill riêng của bạn)
-  …                                                       … (đã che — skill riêng của bạn)
+# Output may vary — lọc bằng vài chữ để built-in hiện ra ngay
+❯ /co
+  /copy                                                  Copy Claude's last response to clipboard (or /copy N for the Nth-latest)
+  /color                                                 Set the prompt bar color for this session
+  /config                                                Open settings
+  /compact                                               Free up context by summarizing the conversation so far
+  /context                                               Visualize current context usage as a colored grid
 ```
-Popup này ngắn và cuộn được — nhấn `↓` để lướt qua phần còn lại, gồm mọi built-in command trong bảng trên, theo thứ tự alphabet.
+Nhấn `↓` để cuộn tiếp cùng danh sách đã lọc — nó vẫn trộn built-in với bất cứ thứ gì khác trùng khớp:
+```text
+# Output may vary
+  /code-review                                           3 free /ultrareview · Review the current diff, or a PR number/branch/path target, for correctness bugs…
+  …                                                       … (đã che — skill riêng của bạn, cũng khớp "co")
+```
+Danh sách luôn trộn built-in với thứ bạn đã cài — nên mục cá nhân ở đây bị che bằng `…`.
 
 **Bước 2: `/help` để tra cứu nhanh**
 
@@ -89,7 +99,7 @@ Popup này ngắn và cuộn được — nhấn `↓` để lướt qua phần 
    /btw for side question    ctrl + t to toggle tasks            opt + p to switch model
    Esc to cancel
 ```
-Tab **Commands** liệt kê mọi built-in; tab **Custom commands** liệt kê skill và file `.claude/commands/`, có gắn nhãn nguồn.
+Tab **Commands** liệt kê built-in; tab **Custom commands** liệt kê skill và file `.claude/commands/`, có gắn nhãn nguồn.
 
 **Bước 3: Viết project command nhận argument và chạy trước một bước kiểm tra**
 
@@ -122,7 +132,7 @@ Review the file at $1. Flag bugs, missing error handling, and missing tests.
   Missing tests
   3. subtract (the new function) has no test…
 ```
-Claude còn xin chạy thêm `npm test`, nằm ngoài `Bash(git diff *)` — bằng chứng rằng `allowed-tools` chỉ bao đúng pattern bạn liệt kê, không hơn.
+Claude còn xin chạy `npm test`, nằm ngoài `Bash(git diff *)` — bằng chứng `allowed-tools` chỉ bao đúng pattern bạn liệt kê.
 
 **Bước 5: Namespace một command trong subdirectory**
 
@@ -142,7 +152,7 @@ Create a new component named $1 under src/components/, plus a matching test file
   /frontend:component                                    Scaffold a new frontend component with a matching test file (project)
   …                                                       (đã che — skill riêng của bạn)
 ```
-Nhãn `(project)` xác nhận command đến từ `.claude/commands/`, và subdirectory trở thành tiền tố namespace.
+Nhãn `(project)` xác nhận command đến từ `.claude/commands/`; subdirectory trở thành namespace.
 
 **Bước 6: Dọn dẹp**
 ```bash
@@ -155,9 +165,9 @@ git -C ~/cc-lab checkout -- . && git -C ~/cc-lab clean -fd
 
 ### Bài Tập 1: `/fix-issue`
 
-**Mục tiêu**: Viết `.claude/commands/fix-issue.md` nhận số issue và load sẵn nội dung issue.
+**Mục tiêu**: Viết `.claude/commands/fix-issue.md` nhận số issue và load sẵn issue.
 
-**Hướng dẫn**: Dùng `$1` cho số issue và `` !`gh issue view $1` `` để chèn nội dung issue trước khi Claude đọc hướng dẫn của bạn.
+**Hướng dẫn**: Dùng `$1` cho số issue và `` !`gh issue view $1` `` để chèn issue trước khi Claude đọc hướng dẫn.
 
 <details>
 <summary>💡 Gợi Ý</summary>
@@ -186,20 +196,20 @@ Read the issue above, find the relevant code, and propose a fix.
 
 **Mục tiêu**: Quyết định khi nào `.claude/commands/deploy.md` nên trở thành `.claude/skills/deploy/SKILL.md`.
 
-**Hướng dẫn**: File command không đi kèm được script hay tài liệu riêng — thư mục skill thì được. Cần thêm file thứ hai thì chuyển sang skill. Xem Module 15.3.
+**Hướng dẫn**: File command không đi kèm được script hay tài liệu riêng — skill thì được. Cần thêm file thứ hai thì chuyển sang skill (Module 15.3).
 
 <details>
 <summary>✅ Giải Pháp</summary>
-`deploy.md` cứ phải nói "xem checklist bên dưới" và checklist dài thêm mãi → tách thành `SKILL.md` (ngắn) cộng `checklist.md` (chỉ load khi cần), vẫn gọi `/deploy` như cũ nhưng tốn ít context hơn.
+`deploy.md` cứ nói "xem checklist bên dưới" và checklist dài mãi → tách `SKILL.md` (ngắn) cộng `checklist.md` (load khi cần), vẫn gọi `/deploy` nhưng tốn ít context hơn.
 </details>
 
 ### Bài Tập 3: `/compact` vs `/clear`
 
-**Mục tiêu**: Phân biệt tóm tắt và xóa hẳn.
+**Mục tiêu**: Tóm tắt vs. xóa hẳn.
 
-**Hướng dẫn**: Implement một thứ nhỏ, chạy `/compact`, hỏi "vừa build cái gì?" Rồi chạy `/clear` và hỏi lại.
+**Hướng dẫn**: Implement thứ nhỏ, chạy `/compact`, hỏi "vừa build cái gì?" Rồi chạy `/clear`, hỏi lại.
 
-**Kết quả mong đợi**: Sau `/compact`, Claude trả lời dựa trên bản tóm tắt. Sau `/clear`, Claude không biết gì — `/clear` giữ project memory (CLAUDE.md), không giữ lịch sử hội thoại.
+**Kết quả mong đợi**: Sau `/compact`, Claude trả lời dựa trên bản tóm tắt. Sau `/clear`, Claude không biết gì — `/clear` giữ CLAUDE.md, không giữ lịch sử hội thoại.
 
 ---
 
@@ -216,9 +226,11 @@ Read the issue above, find the relevant code, and propose a fix.
 | `/model` | Đổi model |
 | `/effort` | Đặt mức reasoning effort |
 | `/permissions` | Rule allow/ask/deny |
+| `/sandbox` | Bật/tắt sandbox mode (chỉ vài platform hỗ trợ) |
 | `/config` | Theme, output style, settings |
+| `/output-style` | Liệt kê/đổi output style |
 | `/memory` | Sửa CLAUDE.md, bật/tắt auto memory |
-| `/agents` | Quản lý subagent |
+| `/agents` | Nhờ Claude quản lý subagent, hoặc tự sửa `.claude/agents/` |
 | `/hooks` | Xem cấu hình hook |
 | `/mcp` | Quản lý kết nối MCP |
 | `/plugin` | Install/enable/disable plugin |
@@ -256,9 +268,9 @@ Read the issue above, find the relevant code, and propose a fix.
 
 ## 7. REAL CASE — Câu Chuyện Thực Tế
 
-Một team backend ở fintech Việt Nam giữ ba prompt chỉ sống trong Slack: "review diff này xem có lỗi auth không," "viết changelog entry," "điều tra issue #N." Nhân viên mới không bao giờ tìm ra. Team commit ba file vào `.claude/commands/`: `review-file.md`, `ship-notes.md`, `fix-issue.md`, mỗi file có `argument-hint` và một khối `!` lấy sẵn diff hoặc issue liên quan.
+Một team backend ở fintech Việt Nam giữ ba prompt chỉ sống trong Slack: "review diff xem có lỗi auth không," "viết changelog entry," "điều tra issue #N." Nhân viên mới không tìm ra. Team commit ba file vào `.claude/commands/`: `review-file.md`, `ship-notes.md`, `fix-issue.md`, mỗi file có `argument-hint` và một khối `!` lấy sẵn diff hoặc issue.
 
-Kết quả: mọi người có ngay ba command giống nhau lúc vừa clone repo — không cần tài liệu onboarding, không dán lại prompt. Khi `fix-issue.md` cần thêm một file phụ (checklist triage), team nâng nó thành skill dưới `.claude/skills/fix-issue/`, vẫn giữ tên `/fix-issue` quen thuộc.
+Kết quả: mọi người có ngay ba command giống nhau lúc vừa clone repo — không cần onboarding, không dán lại prompt. Khi `fix-issue.md` cần thêm file phụ (checklist triage), team nâng nó thành skill dưới `.claude/skills/fix-issue/`, vẫn giữ tên `/fix-issue` quen thuộc.
 
 ---
 
