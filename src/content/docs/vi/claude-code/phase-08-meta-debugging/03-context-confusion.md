@@ -1,6 +1,8 @@
 ---
 title: 'Context bị lẫn'
 description: 'Xử lý khi Claude Code bị lẫn context: triệu chứng, nguyên nhân và cách reset để phục hồi độ chính xác.'
+verified: 2026-09-28
+claude_version: 2.1.283
 ---
 
 # Module 8.3: Context bị lẫn
@@ -115,19 +117,40 @@ signature verification — MIXED approach]
 
 **Worse**: Giờ nó blend cả hai approach. Correction không help — confusion quá deep.
 
-### Step 3: Dùng /compact để Clear Confusion
+### Step 3: Check Context, Rồi Compact Với Focus
+
+Trước khi compact, `/context` cho thấy token đang đi đâu (category và size tương đối — số chính
+xác phụ thuộc vào máy bạn cài gì):
 
 ```text
-/compact
+# Output may vary — chạy 2026-09-28
+  Context Usage
+  ...  42.6k/1m tokens (4%)
+
+  Estimated usage by category
+  ⛁ System prompt: 3.8k tokens (0.4%)
+  ⛁ System tools: 14.2k tokens (1.4%)
+  ⛁ Memory files: 7.1k tokens (0.7%)
+  ⛁ Skills: 9.9k tokens (1.0%)
+  ⛁ Messages: 1.3k tokens (0.1%)
+  ⛶ Free space: 924.4k (92.4%)
 ```
 
-Expected output:
+Giờ compact với focus rõ ràng thay vì `/compact` trơn — đây mới thật sự nói Claude giữ gì:
+
 ```text
-Context compacted. Summary retained:
-- Đang làm payment system integration
-- Cần webhook handler cho payment notification
-- Project dùng TypeScript, Express
+/compact Focus vào payment webhook requirement. Bỏ discussion auth/JWT trước đó.
 ```
+
+Confirmation thật:
+```text
+# Output may vary
+⎿  Compacted (ctrl+o to see full summary)
+```
+
+`/compact` không print summary inline — nhấn `Ctrl+O` để expand. Cái thật sự shrink là category
+**Messages** trong `/context`; System prompt, tools, skills vẫn load bất kể compaction, nên đừng
+expect tổng phần trăm giảm mạnh trong một session ngắn.
 
 ### Step 4: Re-ground Sau Compact
 
@@ -173,17 +196,65 @@ Confusion trigger tốt:
 Watch for: pattern cũ xuất hiện trong implementation mới, mixed terminology.
 </details>
 
+<details>
+<summary>✅ Solution</summary>
+
+**Trước `/compact` (contaminated)**:
+```text
+Bạn: "Build cái này bằng GraphQL đi."
+Claude: "Đây là GraphQL resolver...
+         return res.status(200).json({ data })"  # REST leftover
+```
+Vocabulary REST (`res.status`, `route`, `endpoint`) leak vào câu trả lời GraphQL vì cả hai topic
+vẫn còn trong context.
+
+**Fix**:
+```text
+/compact Focus vào requirement GraphQL. Bỏ hẳn discussion REST.
+"New topic: GraphQL API cho cùng feature. KHÔNG dùng REST nữa —
+không res.status, không route. Dùng resolver trả typed object."
+```
+
+**Sau `/compact` + re-grounding (clean)**:
+```text
+Claude: "Đây là GraphQL resolver:
+         resolve: async (_, { id }) => ({ id, name, ... })"
+```
+
+**Why it works**: `/compact` drop detail discussion REST khỏi context, và câu re-grounding explicit
+ngăn Claude re-derive pattern cũ từ summary conversation.
+</details>
+
 ### Bài 2: Proactive Compaction
 
 **Goal**: Practice prevent confusion trước khi xảy ra.
 
 **Instructions**:
 1. Work trên feature 30+ phút
-2. Trước khi switch topic, run `/compact` proactively
+2. Trước khi switch topic, run `/compact <focus>` proactively
 3. Explicit state: "New topic: X. Topic trước Y done, đừng reference."
 4. Compare: confusion có ít hơn không proactive?
 
 **Expected result**: Cleaner transition, ít contamination từ topic trước.
+
+<details>
+<summary>✅ Solution</summary>
+
+**Proactive compaction sequence**:
+```text
+[30+ phút discussion/implementation auth feature]
+
+/compact Focus vào decision cần giữ; bỏ chi tiết implementation của auth.
+
+"New topic: Payment processing.
+Topic trước (auth) đã complete — đừng reference.
+Payment dùng Stripe webhook, không JWT/user token."
+```
+
+**So sánh**: không proactive compact → hỏi về payment giữa session thường ra câu trả lời reference
+auth middleware, JWT check. Có proactive compact + explicit statement → response scoped đúng vào
+Stripe/webhook, không leak vocabulary auth.
+</details>
 
 ### Bài 3: Re-grounding Drills
 
@@ -276,6 +347,7 @@ Key constraint: [most important requirement]."
 | Không recognize confusion (blame Claude) | Mixed reference = confusion, không phải incompetence |
 | Quá nhiều correction không reset | 3 correction cùng confusion? `/compact` time. |
 | Switch topic không notice | Explicit: "Done với X. Giờ làm Y." |
+| Chạy một session "kitchen-sink" cả ngày (auth, rồi payment, rồi fix doc, rồi refactor) | (S1) gọi đây là failure pattern đã biết — `/clear` giữa các task không liên quan, đừng để chúng tích lũy trong cùng context. |
 
 ---
 
@@ -294,7 +366,7 @@ Key constraint: [most important requirement]."
 **Fix applied**:
 
 ```text
-/compact
+/compact Focus vào scope order service; bỏ discussion product catalog.
 ```
 
 Sau đó:

@@ -1,6 +1,8 @@
 ---
 title: 'Context Confusion'
 description: 'Recognize context confusion symptoms in Claude Code and use /compact and /clear to restore clarity.'
+verified: 2026-09-28
+claude_version: 2.1.283
 ---
 
 # Module 8.3: Context Confusion
@@ -113,19 +115,41 @@ signature verification — a MIXED approach]
 
 **Worse**: Now it's blending both approaches together. Correction didn't help — the confusion is too deep.
 
-### Step 3: Use /compact to Clear Confusion
+### Step 3: Check Context, Then Compact With a Focus
+
+Before compacting, `/context` shows where tokens are actually going (categories and rough sizes —
+exact numbers depend on what's installed locally):
 
 ```text
-/compact
+# Output may vary — captured 2026-09-28
+  Context Usage
+  ...  42.6k/1m tokens (4%)
+
+  Estimated usage by category
+  ⛁ System prompt: 3.8k tokens (0.4%)
+  ⛁ System tools: 14.2k tokens (1.4%)
+  ⛁ Memory files: 7.1k tokens (0.7%)
+  ⛁ Skills: 9.9k tokens (1.0%)
+  ⛁ Messages: 1.3k tokens (0.1%)
+  ⛶ Free space: 924.4k (92.4%)
 ```
 
-Expected output:
+Now compact with an explicit focus instead of a bare `/compact` — this is what actually tells
+Claude what to keep:
+
 ```text
-Context compacted. Summary retained:
-- Working on payment system integration
-- Need webhook handler for payment notifications
-- Project uses TypeScript, Express
+/compact Focus on the payment webhook requirements. Drop the earlier auth/JWT discussion.
 ```
+
+Real confirmation line:
+```text
+# Output may vary
+⎿  Compacted (ctrl+o to see full summary)
+```
+
+`/compact` doesn't print the summary inline — press `Ctrl+O` to expand it. What actually shrinks is
+the **Messages** category in `/context`; System prompt, tools, and skills stay loaded regardless of
+compaction, so don't expect the *total* percentage to drop dramatically in a short session.
 
 ### Step 4: Re-ground After Compact
 
@@ -184,7 +208,7 @@ REST vocabulary (`res.status`, `route`, `endpoint`) leaks into the GraphQL answe
 
 **Fix**:
 ```text
-/compact
+/compact Focus on the GraphQL requirement. Drop the REST discussion entirely.
 "New topic: GraphQL API for the same feature. We are NOT using REST anymore —
 no res.status, no routes. Use a resolver returning a typed object."
 ```
@@ -217,7 +241,7 @@ Claude: "Here's the GraphQL resolver:
 ```text
 [30+ min of auth feature discussion/implementation]
 
-/compact
+/compact Focus on decisions we're keeping; drop the auth implementation detail.
 
 "New topic: Payment processing.
 Previous topic (auth) is complete — don't reference it.
@@ -322,6 +346,7 @@ Key constraint: [most important requirement]."
 | Not recognizing confusion (blaming Claude) | Mixed references = confusion, not incompetence |
 | Too many corrections without reset | 3 corrections for same confusion? `/compact` time. |
 | Switching topics without notice | Explicit: "We're done with X. Now doing Y." |
+| Running one "kitchen-sink" session for the whole day (auth, then payments, then a doc fix, then a refactor) | (S1) names this as a known failure pattern — `/clear` between unrelated tasks, don't let them accumulate in one context. |
 
 ---
 
@@ -340,7 +365,7 @@ Key constraint: [most important requirement]."
 **Fix applied**:
 
 ```text
-/compact
+/compact Focus on order service scope; drop the product catalog discussion.
 ```
 
 Then:
