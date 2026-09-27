@@ -1,8 +1,8 @@
 ---
 title: 'Permission System Deep Dive'
 description: 'Viết rule allow/deny/ask, chọn permission mode, và chứng minh rule đã thật sự chặn hành động.'
-verified: 2026-09-23
-claude_version: 2.1.280
+verified: 2026-09-27
+claude_version: 2.1.283
 ---
 
 # Module 2.2: Permission System Deep Dive
@@ -140,7 +140,7 @@ report. I didn't try reading the file another way.
 Bằng chứng nằm ở tool result phía sau câu trả lời:
 `Permission to use Bash with command cat .env has been denied.` `--allowedTools Bash` cho phép
 *tool*, nhưng deny `Read(./.env)` vẫn thắng vì deny xét trước. `--permission-mode default` ép hành
-vi mặc định; trên gói Pro, Max và Team, starting mode built-in là `auto`.
+vi mặc định: `claude -p` khởi động ở Manual trên mọi gói.
 
 **Step 3: Chứng minh allow rule xoá prompt**
 

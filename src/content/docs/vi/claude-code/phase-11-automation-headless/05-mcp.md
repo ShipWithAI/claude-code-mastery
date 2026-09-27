@@ -1,8 +1,8 @@
 ---
 title: 'MCP — Model Context Protocol'
 description: 'Thêm MCP server bằng claude mcp add, chia sẻ qua .mcp.json với ${VAR}, và kiểm soát tool bằng permission rule mcp__.'
-verified: 2026-09-23
-claude_version: 2.1.280
+verified: 2026-09-27
+claude_version: 2.1.283
 ---
 
 # Module 11.5: MCP — Model Context Protocol
@@ -207,8 +207,8 @@ Chạy `claude --permission-mode default`, rồi hỏi:
  Esc to cancel · Tab to amend
 ```
 
-`--permission-mode default` chính là thứ làm prompt hiện ra: trên gói Pro, Max và Team, starting
-mode built-in là `auto`, và `permissions.defaultMode` ghi đè nó.
+`--permission-mode default` làm prompt hiện ra: từ v2.1.283, `auto` là starting mode built-in cho
+interactive session trên mọi gói, và `permissions.defaultMode` ghi đè nó.
 
 **Bước 9: Pre-allow một tool, deny tool khác** — headless không trả lời được prompt:
 

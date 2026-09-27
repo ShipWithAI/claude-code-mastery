@@ -1,8 +1,8 @@
 ---
 title: 'Hooks System'
 description: 'Configure PreToolUse, PostToolUse and Stop hooks in settings.json to log, block and gate Claude Code actions deterministically.'
-verified: 2026-09-22
-claude_version: 2.1.278
+verified: 2026-09-27
+claude_version: 2.1.283
 ---
 
 # Module 11.3: Hooks System
@@ -212,10 +212,10 @@ in Bash), since the hook is a deliberate guardrail.
 ```
 
 Why: exit 2 blocked `Read`; stderr became Claude's reason. `--permission-mode default`
-forces the stock behavior; on Pro, Max and Team plans the built-in starting mode is `auto`,
-which `permissions.defaultMode` overrides. Without it, this machine's `auto` mode let Claude
-`cat .env` through **Bash** — a tool this matcher never sees. `@`-references bypass tools too;
-add a `Read` deny rule (Module 2.2).
+forces the stock behavior: `claude -p` starts in Manual on every plan. Without the flag, a
+`permissions.defaultMode: "auto"` override on this machine let Claude `cat .env` through
+**Bash** — a tool this matcher never sees. `@`-references bypass tools too; add a `Read` deny
+rule (Module 2.2).
 
 **Step 4: Deny `git push --force` with JSON**
 

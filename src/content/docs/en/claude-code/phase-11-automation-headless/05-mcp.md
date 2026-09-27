@@ -1,8 +1,8 @@
 ---
 title: 'MCP — Model Context Protocol'
 description: 'Add MCP servers with claude mcp add, share them through .mcp.json with ${VAR}, and control their tools with mcp__ permission rules.'
-verified: 2026-09-23
-claude_version: 2.1.280
+verified: 2026-09-27
+claude_version: 2.1.283
 ---
 
 # Module 11.5: MCP — Model Context Protocol
@@ -207,8 +207,8 @@ Run `claude --permission-mode default`, then ask:
  Esc to cancel · Tab to amend
 ```
 
-`--permission-mode default` is what makes the prompt appear: on Pro, Max and Team plans the
-built-in starting mode is `auto`, which `permissions.defaultMode` overrides.
+`--permission-mode default` makes the prompt appear: from v2.1.283, `auto` is the built-in
+starting mode for interactive sessions on every plan, which `permissions.defaultMode` overrides.
 
 **Step 9: Pre-allow one tool, deny another** — headless cannot answer it:
 

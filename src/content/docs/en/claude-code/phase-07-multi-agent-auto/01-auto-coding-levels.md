@@ -1,8 +1,8 @@
 ---
 title: 'Auto Coding Levels'
 description: 'Map the three automation levels onto Claude Code permission modes: Shift+Tab, --permission-mode, defaultMode, and what auto mode does and does not guarantee.'
-verified: 2026-09-22
-claude_version: 2.1.278
+verified: 2026-09-27
+claude_version: 2.1.283
 ---
 
 # Module 7.1: Auto Coding Levels
@@ -67,8 +67,8 @@ graph LR
 
 ### What auto mode is — and isn't
 
-`auto` is the built-in starting mode on Pro/Max/Team. A second model, the classifier, reviews
-each action and blocks anything that "escalates beyond your request, targets unrecognized
+From v2.1.283, interactive sessions start in `auto` on every plan. A second model, the classifier,
+reviews each action and blocks anything that "escalates beyond your request, targets unrecognized
 infrastructure, or appears driven by hostile content Claude read". Anthropic reports **84% fewer
 prompts** in internal use with this two-layer classifier design (S13, "How we built Claude Code
 auto mode", 2026-03-25). The docs are blunt: *"Auto mode reduces permission prompts but does not
@@ -175,8 +175,8 @@ The write to `hello.txt` was blocked pending your permission. Please approve the
 ls: hello.txt: No such file or directory
 ```
 
-`--permission-mode default` forces the stock behavior; on Pro, Max and Team plans the built-in
-starting mode is `auto`, which `permissions.defaultMode` overrides. Level 2:
+`--permission-mode default` forces the stock behavior; `claude -p` starts in Manual on every plan,
+which `permissions.defaultMode` overrides. Level 2:
 
 ```bash
 claude -p "Create a file hello.txt containing hi" --permission-mode acceptEdits

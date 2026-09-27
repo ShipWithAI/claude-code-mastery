@@ -1,8 +1,8 @@
 ---
 title: 'Claude Agent SDK'
 description: 'Run the Claude Code agent loop from TypeScript or Python with query(), restrict tools and permissions, add in-process MCP tools, and fall back to a safe claude -p subprocess.'
-verified: 2026-09-22
-claude_version: 2.1.278
+verified: 2026-09-27
+claude_version: 2.1.283
 ---
 
 # Module 11.2: Claude Agent SDK
@@ -305,8 +305,8 @@ cost=$0.4687 session=324de8c2-c77b-4446-86f7-cf4746d2a0aa
 ```
 
 The quotes and `$(dollar)` reached Claude as text; interpolated into a shell command string, they
-would have run in your shell. `--permission-mode default` forces the stock behavior; on Pro, Max
-and Team plans the built-in starting mode is `auto`, which `permissions.defaultMode` overrides.
+would have run in your shell. `--permission-mode default` forces the stock behavior: `claude -p`
+starts in Manual on every plan, which `permissions.defaultMode` overrides.
 
 ---
 

@@ -1,8 +1,8 @@
 ---
 title: 'Các mức Auto Coding'
 description: 'Ánh xạ ba mức tự động hoá lên permission mode của Claude Code: Shift+Tab, --permission-mode, defaultMode, và auto mode đảm bảo gì — không đảm bảo gì.'
-verified: 2026-09-22
-claude_version: 2.1.278
+verified: 2026-09-27
+claude_version: 2.1.283
 ---
 
 # Module 7.1: Các mức Auto Coding
@@ -67,10 +67,10 @@ graph LR
 
 ### Auto mode là gì — và không là gì
 
-`auto` là mode khởi động mặc định trên Pro/Max/Team. Một model thứ hai, classifier, duyệt từng
-hành động và chặn thứ gì "vượt quá yêu cầu của bạn, nhắm vào hạ tầng lạ, hoặc có vẻ bị nội
-dung độc hại Claude vừa đọc điều khiển". Anthropic báo cáo **84% ít prompt hơn** khi dùng nội
-bộ với thiết kế classifier hai lớp này (S13, "How we built Claude Code auto mode", 2026-03-25).
+Từ v2.1.283, interactive session khởi động ở `auto` trên mọi gói. Một model thứ hai, classifier,
+duyệt từng hành động và chặn thứ gì "vượt quá yêu cầu của bạn, nhắm vào hạ tầng lạ, hoặc có vẻ bị
+nội dung độc hại Claude vừa đọc điều khiển". Anthropic báo cáo **84% ít prompt hơn** khi dùng nội bộ
+với thiết kế classifier hai lớp này (S13, "How we built Claude Code auto mode", 2026-03-25).
 Docs nói thẳng: *"Auto mode reduces permission prompts but does not guarantee safety."* Level 2
 có người duyệt, không phải Level 3. Nếu classifier chặn 3 lần liên tiếp (hoặc 20 lần tổng), auto
 mode tạm dừng và bạn được hỏi lại.
@@ -175,8 +175,8 @@ The write to `hello.txt` was blocked pending your permission. Please approve the
 ls: hello.txt: No such file or directory
 ```
 
-`--permission-mode default` ép hành vi gốc; trên gói Pro, Max và Team, starting mode built-in
-là `auto`, và `permissions.defaultMode` ghi đè nó. Level 2:
+`--permission-mode default` ép hành vi gốc; `claude -p` khởi động ở Manual trên mọi gói, và
+`permissions.defaultMode` ghi đè nó. Level 2:
 
 ```bash
 claude -p "Create a file hello.txt containing hi" --permission-mode acceptEdits
