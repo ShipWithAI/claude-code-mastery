@@ -12,7 +12,7 @@ Not another Getting Started guide — this is a structured, senior-level curricu
 ![Version](https://img.shields.io/badge/version-1.1.1-blue)
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-2.1%2B-green)
 
-> Verified against **Claude Code v2.1.278** (2026-09). Mechanics (commands, flags, config files) are checked against https://code.claude.com/docs; see docs/audit/ for the latest audit.
+> Verified against **Claude Code v2.1.278** (2026-09). Mechanics (commands, flags, config files) are checked against https://code.claude.com/docs; Tier 1 modules rewritten (audit Wave 1, v1.2); see docs/audit/ for the latest audit.
 
 **16 Phases · 64 Modules · English + Tiếng Việt**
 

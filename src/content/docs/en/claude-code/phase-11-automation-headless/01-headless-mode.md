@@ -428,4 +428,4 @@ echo "API documentation generated!"
 
 ---
 
-> **Next**: [Module 11.2: SDK Integration](../02-claude-code-sdk/) →
+> **Next**: [Module 11.2: Claude Agent SDK](../02-claude-agent-sdk/) →
