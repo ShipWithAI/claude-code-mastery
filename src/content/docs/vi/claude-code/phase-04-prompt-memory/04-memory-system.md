@@ -45,13 +45,12 @@ graph TB
 Bạn viết nó, nó nằm ở `./CLAUDE.md` hoặc `~/.claude/CLAUDE.md`, và tồn tại mãi mãi cho đến khi bạn
 sửa hoặc xóa.
 
-**2. Auto memory — ghi chú Claude để lại cho chính nó.** Bật mặc định. Claude tự viết các file
-ngắn vào `~/.claude/projects/<project>/memory/` — một index `MEMORY.md` cộng với một topic file
-cho mỗi memory, gắn tag `user`, `feedback`, `project`, hoặc `reference` — mà không cần bạn yêu cầu.
-"200 dòng đầu của `MEMORY.md`, hoặc 25KB đầu tiên, cái nào đến trước, được load khi bắt đầu mỗi
-conversation"; topic file chỉ load khi được reference. Nó tồn tại đến khi bạn sửa hoặc xóa — không
-như transcript, nó không bị retention quét dọn. Bật/tắt qua `/memory`, per-project bằng
-`{"autoMemoryEnabled": false}` trong `.claude/settings.json`, hoặc toàn cục bằng
+**2. Auto memory — ghi chú Claude để lại cho chính nó.** Bật mặc định. Claude tự viết file ngắn
+vào `~/.claude/projects/<project>/memory/` — index `MEMORY.md` cộng topic file cho mỗi memory,
+gắn tag `user`, `feedback`, `project`, hoặc `reference` — không cần bạn yêu cầu. "200 dòng đầu của
+`MEMORY.md`, hoặc 25KB đầu, cái nào đến trước, được load khi bắt đầu mỗi conversation"; topic file
+chỉ load khi được reference. Không như transcript, nó không bị retention quét dọn. Bật/tắt qua
+`/memory`, per-project bằng `{"autoMemoryEnabled": false}`, hoặc toàn cục bằng
 `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` ([docs/en/memory](https://code.claude.com/docs/en/memory)).
 
 **3. Session transcript — bản ghi âm.** Mọi message và tool call bạn trao đổi được append, trực
@@ -67,8 +66,8 @@ không track file bị sửa bởi Bash command** — `rm`, `mv`, `cp` vô hình
 qua rewind (S15) — và nó nói rõ "không phải thứ thay thế version control"
 ([docs/en/checkpointing](https://code.claude.com/docs/en/checkpointing)).
 
-Chỉ lớp 1 và 2 là knowledge Claude *mang theo vào việc mới*. Lớp 3 và 4 để *quay lại* việc đã làm
-— full history, không phải bộ não.
+Chỉ lớp 1 và 2 là knowledge Claude *mang theo vào việc mới*. Lớp 3 và 4 chỉ để *quay lại* việc đã
+làm.
 
 ---
 
@@ -113,8 +112,11 @@ stats-cache.json
 tasks
 …
 ```
+Entry cụ thể tùy version Claude Code và plugin/feature bạn đã cài.
+
 `projects/` chứa lớp 2 và 3, một thư mục cho mỗi repo:
 ```bash
+# docs: en/sessions — <project> = đường dẫn thư mục, ký tự non-alphanumeric thành -
 ls ~/.claude/projects | grep cc-lab
 ```
 ```text
@@ -148,16 +150,18 @@ $ claude
 ```
 Trên đĩa:
 ```bash
+# docs: en/memory — MEMORY.md là index; mỗi memory còn có topic file riêng
 cat ~/.claude/projects/-Users-you-cc-lab/memory/MEMORY.md
 ```
 ```text
 # Output có thể khác
 - [Test runner: node:test](test-runner-node-test.md) — cc-lab uses node:test, never jest
 ```
-Topic file mang frontmatter `type: feedback` cùng giải thích đầy đủ Claude tự viết.
+Topic file mang frontmatter `type: feedback` và giải thích đầy đủ Claude viết.
 
 **Bước 3: Resume một session có tên**
 ```bash
+# docs: en/sessions — claude -n <name> đặt tên; claude --resume <name> mở lại theo tên đó
 $ claude -n memory-demo
 > The magic word for this session is grapefruit.
 > /exit
@@ -168,7 +172,7 @@ $ claude --resume memory-demo
 # Output có thể khác
 ⏺ The magic word is grapefruit.
 ```
-`--resume <name>` mở lại đúng transcript theo tên — lớp 3, không phải lớp 2.
+`--resume <name>` mở lại transcript theo tên — lớp 3, không phải lớp 2.
 
 **Bước 4: Rewind một edit sai**
 
@@ -182,7 +186,9 @@ trống:
     math.js +1
   ❯ (current)
 ```
-Bấm Up, Enter để chọn checkpoint đó, rồi chọn **Restore code and conversation**:
+Bấm Up, Enter. Màn hình confirm này (chụp đủ chiều cao, không cắt) chỉ có tối đa 5 lựa chọn khi có
+code snapshot để restore — không có dòng "Never mind" ở đây, Esc để hủy thay vào đó; Bài Tập 3 bên
+dưới sẽ cho thấy bản 4 lựa chọn dùng khi không có code để restore:
 ```text
 # Output có thể khác
   Confirm you want to restore to the point before you sent this message:
@@ -192,9 +198,12 @@ Bấm Up, Enter để chọn checkpoint đó, rồi chọn **Restore code and co
     2. Restore conversation
     3. Restore code
     4. Summarize from here
+  ↓ 5. Summarize up to here
   ⚠ Rewinding does not affect files edited manually or via bash.
 ```
+Chọn **Restore code and conversation**, rồi kiểm tra:
 ```bash
+# docs: en/checkpointing
 git -C ~/cc-lab diff
 ```
 ```text
@@ -211,14 +220,15 @@ git -C ~/cc-lab diff
    /resume 1c8dba65-… ("branch-demo") to return to the original, or run claude -r
    1c8dba65-… in a new terminal.
 ```
-Hai session sống giờ chia sẻ history đến điểm branch rồi rẽ nhánh từ đó.
+Cả hai session chia sẻ history đến điểm branch, rồi rẽ nhánh.
 
 **Bước 6: Dọn dẹp memory bạn vừa tạo**
 ```bash
+# docs: en/memory — file thường, xóa trực tiếp an toàn
 rm ~/.claude/projects/-Users-you-cc-lab/memory/MEMORY.md \
    ~/.claude/projects/-Users-you-cc-lab/memory/test-runner-node-test.md
 ```
-Chỉ xóa những file *bạn* vừa tạo — auto memory dùng chung cho mọi worktree của repo đó.
+Chỉ xóa file *bạn* vừa tạo — auto memory dùng chung cho mọi worktree của repo đó.
 
 ---
 
@@ -226,7 +236,7 @@ Chỉ xóa những file *bạn* vừa tạo — auto memory dùng chung cho mọ
 
 ### Bài Tập 1: Export transcript hôm qua
 
-**Mục tiêu**: Tìm một session cũ của thư mục hiện tại và export nó ra file.
+**Mục tiêu**: Tìm session cũ của thư mục hiện tại và export ra file.
 
 **Hướng dẫn**: Chạy `claude --resume` (không tên) để mở session picker, tìm entry hôm qua,
 resume nó, rồi chạy `/export` và chọn "Save to file."
@@ -283,7 +293,7 @@ chọn "Restore conversation."
 
 <details>
 <summary>💡 Gợi Ý</summary>
-Để ý những restore option nào còn được đưa ra khi thay đổi đến từ Bash.
+Để ý restore option nào còn được đưa ra khi thay đổi đến từ Bash.
 </details>
 
 <details>
@@ -347,21 +357,20 @@ bạn (untracked — không có gì mang nó trở lại).
 **Tình huống**: Nam, một freelance developer ở TP.HCM, xoay vòng bốn repo client: một app ngân
 hàng KMP, một storefront Next.js, một data pipeline Python, và một social app Flutter.
 
-**Vấn đề**: Mỗi sáng anh giải thích lại thread debug dở dang hôm trước — branch nào, giả thuyết
-nào đã loại, client vừa đổi yêu cầu gì.
+**Vấn đề**: Mỗi sáng anh giải thích lại thread debug hôm trước — branch nào, giả thuyết nào đã
+loại, client vừa đổi yêu cầu gì.
 
-**Giải pháp**: Anh ngừng chống lại bốn lớp và bắt đầu dùng đúng chỗ của từng lớp. Quy tắc và
-convention của project vào `CLAUDE.md` mỗi repo — chủ đích, theo từng client. Các quirk lặp lại
-Claude tự nhận ra ("CI của repo này reject `node --test` nếu không chỉ file glob rõ ràng") rơi vào
-auto memory mà Nam không cần gõ gì cả. Và mỗi session debug được đặt tên: `claude -n
-checkout-bug`. Sáng hôm sau, `claude --resume checkout-bug` đưa anh về đúng chỗ đã dừng — full
-transcript, không cần giải thích lại — và nếu một fix đi sai hướng, Esc Esc chỉ rewind edit của
-session đó, không đụng vào ba client kia.
+**Giải pháp**: Anh ngừng chống lại bốn lớp và dùng đúng chỗ của từng lớp. Quy tắc project vào
+`CLAUDE.md` mỗi repo — chủ đích, theo client. Quirk Claude tự nhận ra ("CI repo này reject
+`node --test` nếu không chỉ file glob rõ ràng") rơi vào auto memory mà Nam không gõ gì. Mỗi
+session debug được đặt tên: `claude -n checkout-bug`. Sáng hôm sau, `claude --resume checkout-bug`
+đưa anh về đúng chỗ đã dừng — không cần giải thích lại — và nếu fix sai hướng, Esc Esc chỉ rewind
+session đó, không đụng ba client kia.
 
-**Kết quả**: Nghi thức "cập nhật cho tôi" mỗi sáng biến mất. Fix sai giờ tốn vài giây (rewind) thay
-vì revert tay; Claude xóa file qua Bash đưa anh thẳng tới `git restore`, không bao giờ `/rewind`.
+**Kết quả**: Nghi thức "cập nhật cho tôi" mỗi sáng biến mất. Fix sai giờ chỉ tốn vài giây, không
+phải revert tay; Claude xóa file qua Bash đưa anh thẳng tới `git restore`, không bao giờ `/rewind`.
 CLAUDE.md là bộ não anh viết có chủ đích; auto memory là cuốn sổ Claude âm thầm giữ; transcript là
-cuộn băng anh tua lại hoặc rẽ nhánh khi client đổi kế hoạch giữa chừng.
+cuộn băng anh tua lại hoặc rẽ nhánh.
 
 ---
 

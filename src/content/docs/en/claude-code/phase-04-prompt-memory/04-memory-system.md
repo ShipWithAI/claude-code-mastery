@@ -20,11 +20,10 @@ claude_version: 2.1.283
 ## 1. WHY — Why This Matters
 
 You close your laptop mid-task. Next morning you type `claude` and brace for a blank slate — but
-it already knows the JWT quirk you mentioned yesterday, and you never wrote it down anywhere.
-Then Claude runs `rm` on the wrong file, you mash Escape twice hoping for an undo, and... the file
-is still gone. Two different systems, two different outcomes, and most people never learn which
-is which. This module maps the four places Claude Code actually keeps state, so you stop guessing
-and start using the right one on purpose.
+it already knows the JWT quirk you mentioned yesterday, and you never wrote that down anywhere.
+Then Claude runs `rm` on the wrong file, you mash Escape twice hoping for an undo, and the file is
+still gone. Two systems, two outcomes, and most people never learn which is which. This module
+maps the four places Claude Code keeps state, so you stop guessing and use the right one on purpose.
 
 ---
 
@@ -47,13 +46,12 @@ write it, it sits in `./CLAUDE.md` or `~/.claude/CLAUDE.md`, and it survives for
 edit or delete it.
 
 **2. Auto memory — the note Claude leaves itself.** On by default. Claude writes short files to
-`~/.claude/projects/<project>/memory/` — one `MEMORY.md` index plus a topic file per memory, each
-tagged `user`, `feedback`, `project`, or `reference` — without you asking. "The first 200 lines of
+`~/.claude/projects/<project>/memory/` — a `MEMORY.md` index plus a topic file per memory, tagged
+`user`, `feedback`, `project`, or `reference` — without you asking. "The first 200 lines of
 `MEMORY.md`, or the first 25KB, whichever comes first, are loaded at the start of every
-conversation"; topic files load only when referenced. It persists until you edit or delete it —
-unlike the transcript, it is not swept by retention. Toggle it in `/memory`, per-project with
-`{"autoMemoryEnabled": false}` in `.claude/settings.json`, or globally with
-`CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` ([docs/en/memory](https://code.claude.com/docs/en/memory)).
+conversation"; topic files load only when referenced. Unlike the transcript, it isn't swept by
+retention. Toggle it in `/memory`, per-project with `{"autoMemoryEnabled": false}`, or globally
+with `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` ([docs/en/memory](https://code.claude.com/docs/en/memory)).
 
 **3. Session transcript — the recording.** Every message and tool call you exchange is appended,
 live, to `~/.claude/projects/<project>/<session-id>.jsonl`. This is what `--continue`, `--resume`,
@@ -68,8 +66,8 @@ most recent checkpoints in a session," restorable with `/rewind` or Esc Esc on a
 to it and cannot be undone through rewind (S15) — and it is explicitly "not a replacement for
 version control" ([docs/en/checkpointing](https://code.claude.com/docs/en/checkpointing)).
 
-Only layers 1 and 2 are knowledge Claude *carries into new work*. Layers 3 and 4 are about
-*getting back to* work you already did — full history, not a brain.
+Only layers 1 and 2 are knowledge Claude *carries into new work*. Layers 3 and 4 just *get you
+back to* work already done.
 
 ---
 
@@ -114,8 +112,11 @@ stats-cache.json
 tasks
 …
 ```
+Exact entries vary by Claude Code version and installed plugins/features.
+
 `projects/` holds layers 2 and 3, one folder per repo:
 ```bash
+# docs: en/sessions — <project> = working directory path, non-alphanumeric chars become -
 ls ~/.claude/projects | grep cc-lab
 ```
 ```text
@@ -149,6 +150,7 @@ $ claude
 ```
 On disk:
 ```bash
+# docs: en/memory — MEMORY.md is the index; each memory also gets its own topic file
 cat ~/.claude/projects/-Users-you-cc-lab/memory/MEMORY.md
 ```
 ```text
@@ -159,6 +161,7 @@ The topic file carries a `type: feedback` frontmatter tag and the full explanati
 
 **Step 3: Resume a named session**
 ```bash
+# docs: en/sessions — claude -n <name> names it; claude --resume <name> reopens it by that name
 $ claude -n memory-demo
 > The magic word for this session is grapefruit.
 > /exit
@@ -169,7 +172,7 @@ $ claude --resume memory-demo
 # Output may vary
 ⏺ The magic word is grapefruit.
 ```
-`--resume <name>` reopened the exact transcript by name — layer 3, not layer 2.
+`--resume <name>` reopened the transcript by name — layer 3, not layer 2.
 
 **Step 4: Rewind a bad edit**
 
@@ -183,7 +186,9 @@ empty prompt:
     math.js +1
   ❯ (current)
 ```
-Press Up, Enter to pick that checkpoint, then choose **Restore code and conversation**:
+Press Up, Enter. This confirm screen (full height, nothing cut off) tops out at 5 choices when
+there's a code snapshot to restore — no "Never mind" row here, Esc cancels instead; Exercise 3
+shows the 4-item version used when there's no code to restore:
 ```text
 # Output may vary
   Confirm you want to restore to the point before you sent this message:
@@ -193,9 +198,12 @@ Press Up, Enter to pick that checkpoint, then choose **Restore code and conversa
     2. Restore conversation
     3. Restore code
     4. Summarize from here
+  ↓ 5. Summarize up to here
   ⚠ Rewinding does not affect files edited manually or via bash.
 ```
+Choose **Restore code and conversation**, then verify:
 ```bash
+# docs: en/checkpointing
 git -C ~/cc-lab diff
 ```
 ```text
@@ -212,10 +220,11 @@ git -C ~/cc-lab diff
    /resume 1c8dba65-… ("branch-demo") to return to the original, or run claude -r
    1c8dba65-… in a new terminal.
 ```
-Two live sessions now share history up to the branch point and diverge from there.
+Both sessions share history up to the branch point, then diverge.
 
 **Step 6: Clean up the memory you created**
 ```bash
+# docs: en/memory — plain files, safe to delete directly
 rm ~/.claude/projects/-Users-you-cc-lab/memory/MEMORY.md \
    ~/.claude/projects/-Users-you-cc-lab/memory/test-runner-node-test.md
 ```
@@ -348,21 +357,20 @@ deleted. Recovery has to come from git: `git restore <path>` (tracked) or your o
 **Scenario**: Nam, a freelance developer in Ho Chi Minh City, juggles four client repos: a KMP
 banking app, a Next.js storefront, a Python data pipeline, and a Flutter social app.
 
-**Problem**: Every morning he re-explained the previous day's half-finished debugging thread —
-which branch, which theory he'd ruled out, what the client asked to change last.
+**Problem**: Every morning he re-explained the previous day's debugging thread — which branch,
+which theory he'd ruled out, what the client asked to change last.
 
 **Solution**: He stopped fighting the four layers and started using each one for what it's for.
-Project rules and conventions go in each repo's `CLAUDE.md` — deliberate, per client. Recurring
-quirks Claude notices on its own ("this repo's CI rejects `node --test` without explicit file
-globs") land in auto memory without Nam typing anything. And every debugging session gets a name:
-`claude -n checkout-bug`. The next morning, `claude --resume checkout-bug` puts him back exactly
-where he left off — full transcript, no re-explaining — and if a fix goes sideways, Esc Esc
-rewinds just that session's edits, not the other three clients' work.
+Project rules go in each repo's `CLAUDE.md` — deliberate, per client. Quirks Claude notices on its
+own ("this repo's CI rejects `node --test` without explicit file globs") land in auto memory
+without Nam typing anything. Every debugging session gets a name: `claude -n checkout-bug`. Next
+morning, `claude --resume checkout-bug` puts him back exactly where he left off — no re-explaining
+— and if a fix goes sideways, Esc Esc rewinds just that session, not the other three clients.
 
-**Result**: The morning "catch me up" ritual is gone. A bad fix now costs seconds (rewind), not a
-manual revert; a Bash deletion sends him straight to `git restore`, never `/rewind`. CLAUDE.md is
-the brain he wrote on purpose; auto memory is the notebook Claude keeps quietly; the transcript is
-the tape he can rewind or fork whenever a client changes the plan mid-thread.
+**Result**: The morning "catch me up" ritual is gone. A bad fix now costs seconds, not a manual
+revert; a Bash deletion sends him straight to `git restore`, never `/rewind`. CLAUDE.md is the
+brain he wrote on purpose; auto memory is the notebook Claude keeps quietly; the transcript is the
+tape he can rewind or fork.
 
 ---
 
