@@ -47,20 +47,21 @@ graph LR
 
 ### Attribution is a default, not a guess
 
-Every commit Claude makes gets a trailer; every PR gets a footer. Both are **defaults you can
-change**, not something Claude invents per commit:
+Every commit gets a trailer; every PR gets a footer. Both are **defaults you can change**, not
+something Claude invents per commit:
 
 - Commit trailer: `Co-Authored-By: <model> <noreply@anthropic.com>` — "the name is the model in
   use when the commit is made, such as `Claude Sonnet 5`."
 - PR footer: `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
-- `attribution.commit` / `attribution.pr` in settings override each line; `attribution: false`
-  (v2.1.281+) hides both. `includeCoAuthoredBy` is **deprecated since v2.0.62** — still honored
-  until you set `attribution.commit` or `attribution.pr`, then ignored.
+- `attribution.commit` / `attribution.pr` in settings override each line — set them team-wide from
+  [Module 10.2](../../phase-10-team-collaboration/02-git-conventions/). `attribution: false`
+  (v2.1.281+) hides both. `includeCoAuthoredBy` is **deprecated since v2.0.62** — honored until you
+  set `attribution.commit` or `attribution.pr`, then ignored.
 
-Claude Code tells Claude that your own CLAUDE.md or memory instructions about attribution take
-precedence — **unless** an admin fixed them in managed settings. That's the general rule for
-every convention you write in CLAUDE.md: advisory, not enforced. A rule that must hold every time
-belongs in a hook or managed settings (Module 2.2), not prose.
+Claude Code tells Claude your own CLAUDE.md or memory instructions about attribution take
+precedence — **unless** an admin fixed them in managed settings. That's the rule for every
+convention in CLAUDE.md: advisory, not enforced. A rule that must hold every time belongs in a
+hook or managed settings (Module 2.2), not prose.
 
 ### Atomic commits, by prompt
 

@@ -19,14 +19,13 @@ claude_version: 2.1.283
 
 ## 1. WHY — Why This Matters
 
-You ask Claude to install dependencies, run a build, then start a dev server to check it. Some of
-that takes seconds, some takes minutes, and a server never returns at all. If you don't know what
-the Bash tool actually does with a slow command — wait, time out, background it — you'll either
-sit there blocked or repeat myths about how backgrounding works.
+You ask Claude to install dependencies, run a build, then start a dev server to check it. Some
+takes seconds, some takes minutes, and a server never returns at all. Not knowing what the Bash
+tool actually does with a slow command — wait, time out, background it — leaves you either
+blocked or repeating myths about how backgrounding works.
 
 This module replaces guesswork with the documented mechanism: timeout, output limits,
-`run_in_background`, `/tasks`, and the permission-rule syntax that decides what runs without
-asking.
+`run_in_background`, `/tasks`, and the permission-rule syntax deciding what runs without asking.
 
 ---
 
@@ -36,9 +35,10 @@ asking.
 
 `cd` **does** carry over to later Bash calls in the running session — but only while it stays
 inside the project directory or an `--add-dir` path, and only within that one process. Landing
-outside those bounds resets it and Claude Code appends `Shell cwd was reset to <dir>`. Set
-`CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR=1` to force a return to the start directory after every
-command instead. `export VAR=value` does **not** persist, but shell aliases and functions from
+outside those bounds resets it and Claude Code appends `Shell cwd was reset to <dir>`. **Subagent
+sessions never carry over working directory changes** — each starts fresh. Set
+`CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR=1` to force a return to the start dir after every
+command instead. `export VAR=value` does **not** persist, but shell aliases/functions from
 `~/.zshrc`/`~/.bashrc`/`~/.profile` load once at session start and apply to every command.
 
 ```mermaid
@@ -49,18 +49,17 @@ graph TD
 
 ### Timeout and backgrounding are tool-level, not `&`
 
-Claude sets a `timeout` on the call when it expects a command to run long; the default is
-**120,000 ms**, and Claude can ask for up to **600,000 ms** (`BASH_DEFAULT_TIMEOUT_MS`,
-`BASH_MAX_TIMEOUT_MS`). If a command outruns its timeout with no estimate given, Claude Code moves
-it to the background automatically unless the command starts with `sleep`. There's no
-`BashOutput`/`KillShell` tool anymore: a backgrounded command is managed with
-`run_in_background: true` on the call and inspected or stopped from `/tasks` (alias `/bashes`), or
-by pressing **Ctrl+B** on a running command (tmux: twice). A bare `cmd &` still backgrounds within
-one OS shell — it doesn't make Claude Code treat the call as a managed background task.
+Claude sets a `timeout` on the call when it expects a command to run long; default **120,000 ms**,
+Claude can ask for up to **600,000 ms** (`BASH_DEFAULT_TIMEOUT_MS`, `BASH_MAX_TIMEOUT_MS`). If a
+command outruns its timeout with no estimate given, Claude Code moves it to the background
+automatically unless the command starts with `sleep`. There's no `BashOutput`/`KillShell` tool
+anymore: a backgrounded command is managed with `run_in_background: true` on the call, inspected
+or stopped from `/tasks` (alias `/bashes`), or by pressing **Ctrl+B** on a running command (tmux:
+twice). A bare `cmd &` still backgrounds within one OS shell — it isn't a managed background task.
 
 ### Output limits
 
-A successful command reads back roughly **30,000 characters** inline by default
+A successful command reads back **~30,000 characters** inline by default
 (`BASH_MAX_OUTPUT_LENGTH`, max 150,000; `bashOutputMaxChars` supersedes it up to 128,000) — past
 that, Claude gets a saved file path and a 2,000-character preview. A failing command reads back
 about 10,000 characters as a head-and-tail excerpt. Output over 5 GB kills the command outright.
@@ -68,19 +67,19 @@ about 10,000 characters as a head-and-tail excerpt. Output over 5 GB kills the c
 ### `!` shell mode runs outside the sandbox
 
 Typing `!command` runs it directly and folds the output into context — but it runs **outside**
-Claude Code's sandbox even when sandboxing is on, since sandboxing wraps commands Claude runs, not
-ones you type. Claude auto-responds to the output like a normal turn unless
-`respondToBashCommands: false`.
+Claude Code's sandbox even with sandboxing on, since sandboxing wraps commands Claude runs, not
+ones you type. Claude auto-responds like a normal turn unless `respondToBashCommands: false`.
 
 ### Bash permission rules aren't a security boundary
 
-`Bash(npm run build)` matches only that literal string. `Bash(npm run *)` (or `Bash(npm run:*)`)
-matches anything starting with `npm run ` — the space before the wildcard is part of the rule, so
-`Bash(ls *)` doesn't match `lsof` but `Bash(ls*)` does. Wrappers like `timeout`, `time`, `nice`,
-and `nohup` are stripped before matching, so `Bash(npm test *)` still catches `timeout 30 npm
-test`. But a **deny** rule for `Bash(rm *)` does not stop `/bin/rm -rf` or `bash -c 'rm -rf ...'`
-— Claude Code says plainly this "isn't a security boundary around the program." Treat deny rules
-as a speed bump; put real enforcement in a `PreToolUse` hook or the sandbox (Module 2.3).
+`Bash(npm run build)` matches only that literal string. `Bash(npm run test *)` ≡
+`Bash(npm run test:*)` — both match anything starting with `npm run test `; the space before the
+wildcard is part of the rule, so `Bash(ls *)` doesn't match `lsof` but `Bash(ls*)` does. Wrappers
+like `timeout`, `time`, `nice`, `nohup` are stripped before matching, so `Bash(npm test *)` still
+catches `timeout 30 npm test`. But a **deny** rule for `Bash(rm *)` does not stop `/bin/rm -rf` or
+`bash -c 'rm -rf ...'` — Claude Code says plainly this "isn't a security boundary around the
+program." Treat deny rules as a speed bump; enforce for real in a `PreToolUse` hook or the sandbox
+(Module 2.3).
 
 ---
 
@@ -190,8 +189,8 @@ Use a hook (Module 2.3) if `rm` must actually be blocked.
 **Goal**: Trigger the background transition and confirm it with `/tasks`.
 
 **Instructions**:
-1. In a scratch repo, ask Claude to run a ~3-minute command without saying how long it'll take
-   (a script, not `sleep`).
+1. Ask Claude to run a ~3-minute command without saying how long it'll take (a script, not
+   `sleep`).
 2. Watch what happens after roughly 120 seconds.
 3. Run `/tasks` and read the shell's status.
 
@@ -297,9 +296,8 @@ recent deployment had raised memory requests elsewhere.
 remember. Lowering a non-critical service's memory request let the database pod schedule; total
 deploy time was 12 minutes despite the incident.
 
-**Key Takeaway**: Terminal work through Claude Code isn't about typing faster — it's Claude reading
-exit codes and stderr correctly, and knowing when to background instead of blocking the
-conversation.
+**Key Takeaway**: Terminal work through Claude Code isn't about typing faster — it's reading exit
+codes and stderr correctly, and knowing when to background instead of blocking.
 
 ---
 

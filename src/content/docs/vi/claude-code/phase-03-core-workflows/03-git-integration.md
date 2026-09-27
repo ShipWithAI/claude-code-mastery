@@ -28,7 +28,7 @@ nhãn ai thật sự viết ra commit đó, và mở worktree để branch thứ
 Module này cho xem cơ chế thật, không phải lý thuyết.
 
 **Thực tế Việt Nam**: Team outsource thường maintain nhiều project client. Merge conflict là "cơm
-bữa" mỗi thứ Sáu khi 8 developer cùng merge feature branch vào develop.
+bữa" mỗi thứ Sáu khi 8 dev cùng merge branch vào develop.
 
 ---
 
@@ -49,20 +49,21 @@ graph LR
 
 ### Attribution là default, không phải Claude bịa
 
-Mỗi commit Claude tạo có trailer; mỗi PR có footer. Cả hai đều là **default có thể đổi**, không
-phải Claude tự nghĩ ra mỗi lần:
+Mỗi commit có trailer; mỗi PR có footer. Cả hai đều là **default có thể đổi**, không phải Claude tự
+nghĩ ra mỗi lần:
 
 - Commit trailer: `Co-Authored-By: <model> <noreply@anthropic.com>` — "tên là model đang chạy khi
   commit được tạo, ví dụ `Claude Sonnet 5`."
 - PR footer: `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
-- `attribution.commit` / `attribution.pr` trong settings override từng dòng; `attribution: false`
+- `attribution.commit` / `attribution.pr` trong settings override từng dòng — set chung cho cả team
+  từ [Module 10.2](../../phase-10-team-collaboration/02-git-conventions/). `attribution: false`
   (v2.1.281+) ẩn cả hai. `includeCoAuthoredBy` đã **deprecated từ v2.0.62** — vẫn được tôn trọng
   tới khi bạn set `attribution.commit` hoặc `attribution.pr`, sau đó bị bỏ qua.
 
-Claude Code nói với Claude rằng chỉ dẫn của bạn trong CLAUDE.md hoặc memory về attribution có ưu
-tiên cao hơn — **trừ khi** admin đã fix cứng trong managed settings. Đây là quy tắc chung cho mọi
-convention trong CLAUDE.md: advisory (gợi ý), không enforced (bắt buộc). Rule cần đúng 100% mọi
-lần phải nằm trong hook hoặc managed settings (Module 2.2), không phải prose.
+Claude Code nói với Claude rằng chỉ dẫn của bạn trong CLAUDE.md hoặc memory về attribution ưu tiên
+cao hơn — **trừ khi** admin đã fix cứng trong managed settings. Đây là quy tắc chung cho mọi
+convention trong CLAUDE.md: advisory, không enforced. Rule cần đúng 100% mọi lần phải nằm trong
+hook hoặc managed settings (Module 2.2), không phải prose.
 
 ### Atomic commit, qua prompt
 

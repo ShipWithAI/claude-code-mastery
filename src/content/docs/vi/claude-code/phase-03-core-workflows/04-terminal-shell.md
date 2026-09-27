@@ -20,11 +20,10 @@ claude_version: 2.1.283
 
 Bạn nhờ Claude cài dependencies, chạy build, rồi start dev server để check. Có lệnh mất vài giây,
 có lệnh mất vài phút, server thì không bao giờ trả về. Không biết Bash tool thật sự làm gì với
-lệnh chậm — đợi, timeout, chạy nền — bạn sẽ hoặc ngồi chờ vô ích, hoặc lặp lại hiểu lầm về cách
-chạy nền.
+lệnh chậm — đợi, timeout, chạy nền — bạn hoặc ngồi chờ vô ích, hoặc lặp lại hiểu lầm về chạy nền.
 
 Module này thay giả định bằng cơ chế đã document: timeout, giới hạn output, `run_in_background`,
-`/tasks`, và cú pháp permission rule quyết định lệnh nào chạy không cần hỏi.
+`/tasks`, và permission rule quyết định lệnh nào chạy không cần hỏi.
 
 ---
 
@@ -34,10 +33,11 @@ Module này thay giả định bằng cơ chế đã document: timeout, giới h
 
 `cd` **có** carry over sang các Bash call sau trong cùng session đang chạy — nhưng chỉ khi nó vẫn
 nằm trong project directory hoặc một `--add-dir` path, và chỉ trong một process đó. Ra ngoài phạm
-vi đó sẽ bị reset và Claude Code thêm dòng `Shell cwd was reset to <dir>`. Set
-`CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR=1` để buộc quay lại thư mục ban đầu sau mỗi lệnh thay vì
-carry-over. `export VAR=value` **không** persist, nhưng alias và function shell từ
-`~/.zshrc`/`~/.bashrc`/`~/.profile` được load một lần lúc session bắt đầu và áp dụng cho mọi lệnh.
+vi đó sẽ bị reset và Claude Code thêm dòng `Shell cwd was reset to <dir>`. **Session subagent không
+bao giờ carry over thay đổi working directory** — mỗi session bắt đầu lại từ đầu. Set
+`CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR=1` để buộc quay lại thư mục ban đầu sau mỗi lệnh. `export
+VAR=value` **không** persist, nhưng alias/function shell từ `~/.zshrc`/`~/.bashrc`/`~/.profile`
+load một lần lúc session bắt đầu và áp dụng cho mọi lệnh.
 
 ```mermaid
 graph TD
@@ -47,32 +47,32 @@ graph TD
 
 ### Timeout và chạy nền là ở cấp tool, không phải `&`
 
-Claude set `timeout` cho call khi nó dự đoán lệnh sẽ chạy lâu; default là **120.000 ms**, và Claude
-xin tối đa **600.000 ms** (`BASH_DEFAULT_TIMEOUT_MS`, `BASH_MAX_TIMEOUT_MS`). Nếu lệnh chạy quá
-timeout mà không có estimate trước, Claude Code tự chuyển nó sang chạy nền, trừ khi lệnh bắt đầu
-bằng `sleep`. Không còn tool `BashOutput`/`KillShell` nữa: lệnh chạy nền được quản lý bằng
-`run_in_background: true` trên call, và xem/dừng qua `/tasks` (alias `/bashes`), hoặc nhấn
-**Ctrl+B** trên lệnh đang chạy (tmux: nhấn hai lần). `cmd &` thô ở shell vẫn chạy nền trong một OS
-shell — nó không khiến Claude Code coi call đó là một task nền được quản lý.
+Claude set `timeout` cho call khi dự đoán lệnh sẽ chạy lâu; default **120.000 ms**, xin tối đa
+**600.000 ms** (`BASH_DEFAULT_TIMEOUT_MS`, `BASH_MAX_TIMEOUT_MS`). Nếu lệnh chạy quá timeout mà
+không có estimate trước, Claude Code tự chuyển nó sang chạy nền, trừ khi lệnh bắt đầu bằng `sleep`.
+Không còn tool `BashOutput`/`KillShell`: lệnh chạy nền quản lý bằng `run_in_background: true` trên
+call, xem/dừng qua `/tasks` (alias `/bashes`), hoặc nhấn **Ctrl+B** trên lệnh đang chạy (tmux: hai
+lần). `cmd &` thô ở shell vẫn chạy nền trong một OS shell — không phải task nền do Claude quản lý.
 
 ### Giới hạn output
 
 Lệnh thành công đọc lại khoảng **30.000 ký tự** inline theo mặc định (`BASH_MAX_OUTPUT_LENGTH`,
 tối đa 150.000; `bashOutputMaxChars` thay thế, tối đa 128.000) — quá mức đó, Claude nhận đường dẫn
 file đã lưu và preview 2.000 ký tự. Lệnh fail đọc lại khoảng 10.000 ký tự dạng head-and-tail.
-Output vượt 5 GB bị kill ngay.
+Vượt 5 GB bị kill ngay.
 
 ### Shell mode `!` chạy ngoài sandbox
 
-Gõ `!command` chạy lệnh trực tiếp và đưa output vào context — nhưng nó chạy **ngoài** sandbox của
+Gõ `!command` chạy lệnh trực tiếp và đưa output vào context — nhưng chạy **ngoài** sandbox của
 Claude Code kể cả khi sandbox đang bật, vì sandbox chỉ bọc lệnh Claude tự chạy, không phải lệnh bạn
-gõ. Claude tự động respond output như một turn bình thường, trừ khi `respondToBashCommands: false`.
+gõ. Claude tự respond như một turn bình thường, trừ khi `respondToBashCommands: false`.
 
 ### Permission rule cho Bash không phải security boundary
 
-`Bash(npm run build)` chỉ match đúng chuỗi literal đó. `Bash(npm run *)` (hoặc `Bash(npm run:*)`)
-match mọi thứ bắt đầu bằng `npm run ` — khoảng trắng trước wildcard là một phần của rule, nên
-`Bash(ls *)` không match `lsof` nhưng `Bash(ls*)` thì có. Wrapper như `timeout`, `time`, `nice`,
+`Bash(npm run build)` chỉ match đúng chuỗi literal đó. `Bash(npm run test *)` ≡
+`Bash(npm run test:*)` — cả hai match mọi thứ bắt đầu bằng `npm run test `; khoảng trắng trước
+wildcard là một phần của rule, nên `Bash(ls *)` không match `lsof` nhưng `Bash(ls*)` thì có.
+Wrapper như `timeout`, `time`, `nice`,
 `nohup` bị strip trước khi match, nên `Bash(npm test *)` vẫn bắt được `timeout 30 npm test`. Nhưng
 **deny** rule `Bash(rm *)` không chặn được `/bin/rm -rf` hay `bash -c 'rm -rf ...'` — Claude Code
 nói thẳng điều này "isn't a security boundary around the program". Coi deny rule như gờ giảm tốc;
@@ -186,26 +186,25 @@ Dùng hook (Module 2.3) nếu `rm` cần thật sự bị chặn.
 **Mục tiêu**: Trigger việc chuyển sang chạy nền và verify bằng `/tasks`.
 
 **Hướng dẫn**:
-1. Trong repo thử nghiệm, nhờ Claude chạy lệnh ~3 phút mà không nói trước mất bao lâu (một script,
-   không phải `sleep`).
+1. Nhờ Claude chạy lệnh ~3 phút mà không nói trước mất bao lâu (một script, không phải `sleep`).
 2. Quan sát điều gì xảy ra sau khoảng 120 giây.
 3. Chạy `/tasks` và đọc status của shell.
 
-**Kết quả mong đợi**: hoặc Claude tự set timeout dài hơn và chủ động chạy nền, hoặc lệnh tự chuyển
-nền với message "moved to the background" — cả hai đều đúng.
+**Kết quả mong đợi**: Claude tự set timeout dài hơn và chủ động chạy nền, hoặc lệnh tự chuyển nền
+với message "moved to the background" — cả hai đều đúng.
 
 <details>
 <summary>💡 Gợi ý</summary>
 
-Đừng dùng `sleep` — nó bị loại trừ khỏi auto-backgrounding.
+Đừng dùng `sleep` — bị loại trừ khỏi auto-backgrounding.
 
 </details>
 
 <details>
 <summary>✅ Đáp án</summary>
 
-`node -e "setTimeout(()=>{}, 180000)"` hoạt động tốt. Check message của Claude: nó tự set
-`timeout`, hay 120 giây đã trigger chuyển nền?
+`node -e "setTimeout(()=>{}, 180000)"` hoạt động tốt. Check message: Claude tự set `timeout`, hay
+120 giây trigger chuyển nền?
 
 </details>
 
@@ -293,8 +292,8 @@ deployment gần đây đã tăng memory request ở nơi khác.
 memory request một service không quan trọng để database pod schedule được; tổng deploy 12 phút dù
 gặp sự cố.
 
-**Bài Học Quan Trọng**: Làm việc terminal qua Claude Code không phải chuyện gõ nhanh hơn — đó là
-Claude đọc đúng exit code và stderr, và biết khi nào nên chạy nền thay vì block conversation.
+**Bài Học Quan Trọng**: Làm terminal qua Claude Code không phải chuyện gõ nhanh hơn — đó là đọc
+đúng exit code và stderr, và biết khi nào nên chạy nền thay vì block.
 
 ---
 
