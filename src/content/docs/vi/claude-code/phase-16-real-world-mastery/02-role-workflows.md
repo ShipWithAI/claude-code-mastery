@@ -1,6 +1,8 @@
 ---
 title: 'Workflow theo Role'
-description: 'Workflow Claude Code tối ưu cho từng vai trò: frontend, backend, mobile, DevOps và tech lead.'
+description: 'Build "role kit" — một command hoặc skill, một subagent, output style nếu hợp — cho security, infra, ML, design, và legal.'
+verified: 2026-09-28
+claude_version: 2.1.283
 ---
 
 # Module 16.2: Workflow theo Role
@@ -9,243 +11,186 @@ description: 'Workflow Claude Code tối ưu cho từng vai trò: frontend, back
 >
 > **Yêu cầu trước**: Module 16.1 (Case Studies)
 >
-> **Kết quả**: Customized Claude Code workflow optimized cho role của bạn.
+> **Kết quả**: Sau module này, bạn có "role kit" — command hoặc skill thật, subagent, và output
+> style nếu hợp — build cho role của bạn, dùng cùng pattern mà team engineering lẫn non-engineering
+> nội bộ Anthropic đang dùng.
 
 ---
 
 ## 1. WHY — Tại sao cần học
 
-Frontend developer và DevOps engineer dùng Claude Code rất khác. Frontend generate React component và CSS. DevOps viết Terraform và GitHub Actions.
-
-Generic workflow lãng phí thời gian. Role-specific workflow maximize impact — focus vào task BẠN làm hàng ngày, pattern của DOMAIN bạn, tool BẠN dùng. Customize Claude Code cho JOB của bạn.
+Security engineer giữa incident cần trace stack trace nhanh, không cần chat chung chung.
+Designer feed file Figma vào Claude Code cần autonomous build-test loop, không cần prompt một dòng.
+Legal team member không có background engineering cần Claude giải thích đang làm gì, không giả
+định họ đã biết sẵn. Lời khuyên chung chung ("dùng Claude Code cho role của bạn") lãng phí hai đòn
+bẩy thật Claude Code cho bạn: subagent với tool và system prompt đúng, và command/skill encode task
+thành `/name`, không phải đoạn văn bạn gõ lại mỗi lần.
 
 ---
 
 ## 2. CONCEPT — Khái niệm cốt lõi
 
-### Role-Based Workflow Design
+### "Role kit" có bốn phần
 
-```mermaid
-graph TB
-    A[Your Role] --> B[Common Tasks]
-    A --> C[Key Patterns]
-    A --> D[Primary Tools]
-    A --> E[Quality Focus]
-    A --> F[Collaboration]
-```
+1. **Command hoặc skill** — task lặp lại thành file thật (Module 15.2/15.3).
+2. **Subagent** — `.claude/agents/<role>.md`, tool scoped, system prompt riêng (Module 7.3).
+3. **Output style, nếu hợp** — `/output-style Learning` làm Claude chậm lại để giải thích từng
+   bước; dùng cho reader non-engineering, không dùng cho power user muốn tốc độ.
+4. **Story có số** — chứng minh đây không phải giả thuyết (§7).
 
-### Role Matrix
+### Năm kit, map theo usage pattern thật nội bộ Anthropic (S2)
 
-| Role | Task chính | Technique | Priority Phase |
-|------|------------|-----------|----------------|
-| **Frontend** | Component, UI | Template, image | 5, 15 |
-| **Backend** | API, database | Think mode, test | 6, 9 |
-| **Fullstack** | End-to-end | Task breakdown | 7, 14 |
-| **Tech Lead** | Review, arch | Quality, team | 10, 14 |
-| **DevOps** | CI/CD, infra | Automation | 11, 12 |
-| **Data** | Pipeline, analysis | Data analysis | 13 |
+| Role | Command / skill | Subagent | Output style |
+|---|---|---|---|
+| Security Engineer | `/triage-stacktrace` | `incident-responder` | — |
+| Data/Infra Engineer | `/diagnose-outage` (feed screenshot dashboard) | `infra-debugger` | — |
+| Inference/ML Engineer | `/explain-model-fn` | `ml-docs-explainer` | `Explanatory` |
+| Product Designer | `/figma-to-component` (skill; nhận Figma export) | `design-loop` | — |
+| Legal / non-engineering | `/prototype-tool` | không cần — command là đủ | `Learning` |
 
-### Xây Dựng Workflow
-
-1. List 10 task hàng ngày
-2. Map mỗi task → technique
-3. Tạo template cho task lặp lại
-4. Define quality criteria
-5. Build CLAUDE.md section
+Không cái nào là built-in — chọn tên không trùng danh sách built-in (Module 15.2).
 
 ---
 
 ## 3. DEMO — Từng bước cụ thể
 
-### Workflow 1: Frontend Developer
+Build và chạy Security kit; bốn kit còn lại theo đúng pattern này.
 
-**Daily Tasks**: Component, design từ Figma, styling, state
-
-**Key Techniques**:
-- Phase 5: Image context cho design
-- Phase 15: Component template
-- Phase 3: Read existing pattern
-
-**CLAUDE.md Section**:
+**Bước 1: Command**
 ```markdown
-## Frontend Standards
-- Components: Functional TypeScript
-- Styling: Tailwind CSS
-- State: Zustand global, useState local
-```
-
-**Templates**: `/component`, `/style`, `/a11y`
-
 ---
-
-### Workflow 2: Backend Developer
-
-**Daily Tasks**: API, database schema, auth, performance
-
-**Key Techniques**:
-- Phase 6: Think mode cho API design
-- Phase 9: Legacy refactoring
-- Phase 13: Log analysis
-
-**CLAUDE.md Section**:
-```markdown
-## Backend Standards
-- API: REST + OpenAPI
-- Database: PostgreSQL, migration
-- Auth: JWT token
-```
-
-**Templates**: `/api`, `/schema`, `/query`
-
+description: Trace a pasted stack trace through this codebase and propose the root cause
+argument-hint: [paste the stack trace after the command]
+allowed-tools: Read, Grep, Glob
 ---
+Stack trace:
+$ARGUMENTS
 
-### Workflow 3: Tech Lead
-
-**Daily Tasks**: Code review, architecture, mentoring
-
-**Key Techniques**:
-- Phase 10: Team CLAUDE.md
-- Phase 14: Quality optimization
-- Phase 6: Think mode architecture
-
-**CLAUDE.md Section**:
-```markdown
-## Tech Lead Focus
-- Review: Security, performance
-- Architecture: ADR document
-- Mentor: Explain WHY not WHAT
+Trace this stack trace through the codebase. Identify the exact `file:line` most likely
+responsible, explain why in 2-3 sentences, and propose a minimal fix. Do not edit any files.
 ```
+Lưu thành `.claude/commands/triage-stacktrace.md`.
 
-**Templates**: `/review`, `/arch`, `/mentor`
-
+**Bước 2: Subagent**
+```markdown
 ---
+name: incident-responder
+description: Traces a stack trace or crash log through the codebase to find the likely root
+  cause. Use during an active incident, or when triaging a bug report with an error trace.
+tools: Read, Grep, Glob
+model: sonnet
+---
+You are an incident-response specialist. Given a stack trace, trace it to the exact function and
+line that introduced the bad value or bad call. Report the root-cause file:line, a one-paragraph
+theory, and a minimal proposed fix. Do not speculate about files you have not read.
+```
+Lưu thành `.claude/agents/incident-responder.md` (docs: `code.claude.com/docs/en/sub-agents` —
+`name`/`description` bắt buộc, `tools` scope nó thành read-only).
 
-### Workflow 4: DevOps Engineer
-
-**Daily Tasks**: CI/CD, infrastructure, monitoring, incident
-
-**Key Techniques**:
-- Phase 11: GitHub Actions, hooks
-- Phase 12: n8n automation
-- Phase 13: Log analysis
-
-**CLAUDE.md Section**:
-```markdown
-## DevOps Standards
-- CI/CD: GitHub Actions
-- Infra: Terraform modules
-- Monitor: Prometheus + Grafana
+**Bước 3: Reproduce crash rồi chạy command**
+```bash
+node scripts/report.mjs
+```
+Expected output:
+```text
+# Output may vary
+RangeError: Invalid array length
+    at renderBar (file:///Users/you/cc-lab/scripts/report.mjs:4:10)
+    at file:///Users/you/cc-lab/scripts/report.mjs:8:13
 ```
 
-**Templates**: `/pipeline`, `/terraform`, `/incident`
+```bash
+claude -p "/triage-stacktrace RangeError: Invalid array length
+    at renderBar (scripts/report.mjs:4:10)
+    at scripts/report.mjs:8:13"
+```
+Expected output (rút gọn):
+```text
+# Output may vary
+Root cause: `src/math.js:4`, triggered by `scripts/report.mjs:7`
+Why: dividing by zero doesn't throw in JavaScript — `usage` becomes `Infinity`, and
+`new Array(Math.round(Infinity))` throws `RangeError: Invalid array length` two calls later.
+
+Proposed minimal fix: add a `whole === 0` check in `percentOf`, since that's where the bad
+value comes from. I didn't edit any files.
+```
+Cách này cũng chạy được qua natural language — "Use the incident-responder subagent to
+investigate this crash" — không cần gõ command; Claude ghi tên subagent đã dispatch trong
+transcript row (docs: `sub-agents.md`).
+
+Với kit của Product Designer, loop tương tự đóng lại bằng `claude --chrome` để mở component vừa
+render trong browser thật, so sánh với Figma export — confirmed trên `cli-reference.md`, không
+phải research-preview flag.
 
 ---
 
 ## 4. PRACTICE — Luyện tập
 
-### Bài 1: Define Your Role Workflow
+### Bài 1: Build role kit của bạn
 
-**Mục tiêu**: Tạo workflow customized cho role bạn.
+**Mục tiêu**: Ship cặp command + subagent cho task hàng ngày thật của bạn.
 
 **Hướng dẫn**:
-1. List 5 task hàng ngày của bạn
-2. Map mỗi task → technique từ course
-3. Identify 3 template cần tạo
-4. Draft CLAUDE.md section cho role
+1. Chọn row gần role của bạn nhất (hoặc viết row riêng).
+2. Tạo command file trước, test bằng `/name`.
+3. Tạo subagent, scope `tools` chỉ đúng thứ task đó cần.
+4. Quyết định: non-power-user có đọc output này không? Nếu có, ghi chú `/output-style Learning`
+   cho họ.
 
 <details>
 <summary>💡 Gợi ý</summary>
-Bắt đầu với task làm NHIỀU NHẤT. Map đến phase trực tiếp address task đó.
-</details>
-
-<details>
-<summary>✅ Giải pháp</summary>
-
-**Ví dụ: Mobile Developer**
-
-5 task:
-1. Build UI screen → Phase 15 template
-2. API integration → Phase 6 Think mode
-3. Debug crash → Phase 13 log
-4. Code review → Phase 10 team
-5. Performance → Phase 14
-
-Templates: `/screen`, `/api-call`, `/debug`
-
-CLAUDE.md:
-```markdown
-## Mobile Standards
-- UI: SwiftUI/Compose
-- Network: async/await
-- State: MVVM
-```
+Bắt đầu `tools` của subagent hẹp (`Read, Grep, Glob`) — chỉ thêm `Edit` hoặc `Bash` khi đã confirm
+bản read-only cho output hữu ích.
 </details>
 
 ---
 
 ## 5. CHEAT SHEET
 
-### Role Workflow Template
+| Role | Command / skill | Subagent | Output style | Phase |
+|---|---|---|---|---|
+| Security | `/triage-stacktrace` | `incident-responder` | — | 8, 13 |
+| Data/Infra | `/diagnose-outage` | `infra-debugger` | — | 5, 13 |
+| Inference/ML | `/explain-model-fn` | `ml-docs-explainer` | `Explanatory` | 4, 15 |
+| Product Design | `/figma-to-component` | `design-loop` | — | 5, 7 |
+| Legal/non-eng | `/prototype-tool` | — | `Learning` | 15, 16 |
 
-```markdown
-## [Role] Workflow
-
-### Daily Tasks
-1. [Task thường xuyên nhất]
-2. [Task thứ 2]
-
-### Key Techniques
-- Phase X: [Technique]
-
-### Templates
-/template — [Description]
-
-### Quality Criteria
-- [What "done" means]
-```
-
-### Role → Priority Phase
-
-| Role | Focus Phase |
-|------|-------------|
-| Frontend | 5, 15 |
-| Backend | 6, 9 |
-| Fullstack | 7, 14 |
-| Tech Lead | 10, 14 |
-| DevOps | 11, 12 |
-| Data | 13 |
+`claude --chrome` — verify UI render trực tiếp trong browser (`cli-reference.md`).
+`/output-style Learning` — case-sensitive; đổi theo session, không theo command.
 
 ---
 
 ## 6. PITFALLS — Sai lầm thường gặp
 
 | ❌ Sai | ✅ Đúng |
-|--------|---------|
-| Generic workflow cho all role | Customize cho task CỤ THỂ |
-| Quá nhiều template (10+) | Focus top 5 task |
-| Ignore team context | Align với team CLAUDE.md |
-| Không đo impact | Track time saved |
-| Static workflow mãi | Evolve khi role thay đổi |
+|---|---|
+| Một subagent chung chung cho mọi role | Scope `tools` theo role — reviewer không cần `Edit` |
+| Giả định `--chrome` có sẵn ở mọi bản cài | Confirm trên `cli-reference` docs/version trước |
+| `Learning` output style cho mọi session | Dành cho onboarding hoặc reader non-engineering — nó làm Claude chậm lại để giải thích |
+| Đưa command trơn cho đồng nghiệp non-eng | Kèm `/output-style Learning` hoặc giải thích một dòng |
+| Copy role kit nguyên văn từ bảng này | Tên tool chỉ là placeholder — build command/subagent cho repo và task thật của bạn |
 
 ---
 
 ## 7. REAL CASE — Câu chuyện thực tế
 
-**Scenario**: Tech company Việt Nam, 20 developer, 4 role. Mọi người dùng Claude Code generic — có người thích, có người thấy không helpful.
+Năm usage pattern nội bộ thật, có nguồn (S2, Anthropic, 07/2025):
 
-**Role Workflow Initiative**:
-- Tuần 1: Survey top task mỗi role
-- Tuần 2: Build role-specific workflow + template
-- Tuần 3: Training theo role
-- Tuần 4: Đo và iterate
-
-**Kết quả (1 tháng)**:
-- Frontend: 40% nhanh hơn component
-- Backend: 50% nhanh hơn API
-- DevOps: 60% nhanh hơn pipeline
-- Tech Lead: 30% nhanh hơn review
-
-**Quote**: "Generic training was okay. Role-specific workflow made Claude Code essential cho JOB của tôi."
+- **Security Engineering**: "During incidents, the Security Engineering team feeds Claude Code
+  stack traces and documentation to trace control flow through the codebase. Problems that
+  typically take 10-15 minutes of manual scanning now resolve 3x as quickly."
+- **Data Infrastructure**: khi Kubernetes ngừng schedule pod, team "fed it dashboard
+  screenshots, and Claude guided them menu-by-menu through Google Cloud's UI... saving them 20
+  minutes of valuable time during a system outage."
+- **Inference**: team member không có ML background dùng Claude giải thích model-specific
+  function — "What normally requires an hour of Google searching now takes 10-20 minutes—an 80%
+  reduction in research time."
+- **Product Design**: "would feed Figma design files to Claude Code and then set up autonomous
+  loops where Claude Code writes the code for the new feature, runs tests, and iterates
+  continuously."
+- **Legal**: "created prototype 'phone tree' systems to help team members connect with the right
+  lawyer at Anthropic, demonstrating how departments can build custom tools without traditional
+  development resources."
 
 ---
 
