@@ -1,11 +1,11 @@
 ---
-title: 'Code Review Protocol'
+title: 'Quy trình Code Review'
 description: 'Dùng /code-review và /security-review như một reviewer fresh-context, và giữ human gate ở mọi lần merge.'
 verified: 2026-09-27
 claude_version: 2.1.283
 ---
 
-# Module 10.3: Code Review Protocol
+# Module 10.3: Quy trình Code Review
 
 > **Thời gian học**: ~30 phút
 >
@@ -215,4 +215,4 @@ nhất trước khi merge.
 
 ---
 
-> **Next**: [Module 10.4: Knowledge Sharing](../04-knowledge-sharing/) →
+> **Tiếp theo**: [Module 10.4: Chia sẻ kiến thức](../04-knowledge-sharing/) →

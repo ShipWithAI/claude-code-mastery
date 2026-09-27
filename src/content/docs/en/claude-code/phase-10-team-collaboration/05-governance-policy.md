@@ -20,10 +20,10 @@ claude_version: 2.1.283
 ## 1. WHY — Why This Matters
 
 A policy document says "never send credentials to AI tools." It doesn't stop anyone — a `.env`
-file gets read into context anyway, because nothing enforces the sentence. This module is about
-the kind of governance that holds: settings a developer can't override, usage data an admin can
-actually see, and a data-retention guarantee with a precise scope — not a memo restating what
-everyone was supposed to already know.
+file gets read into context anyway, because nothing enforces the sentence. This module covers
+governance that holds: settings a developer can't override, usage data an admin can actually see,
+and a data-retention guarantee with a precise scope — not a memo restating what everyone already
+knew.
 
 ---
 
@@ -60,9 +60,8 @@ this module's lab):
 | Windows | `C:\Program Files\ClaudeCode\managed-settings.json` |
 
 An optional `managed-settings.d/` directory merges every `*.json` inside it, alphabetically, after
-the base file. Server-managed settings (admin console) are fetched at startup and polled hourly;
-across multiple admin sources, default order is remote → MDM/OS policy → managed file(s) →
-Windows HKCU registry (lowest).
+the base file. Server-managed settings are fetched at startup and polled hourly; across multiple
+admin sources, default order is remote → MDM/OS policy → managed file(s) → Windows HKCU registry.
 
 ### Managed-only keys
 
@@ -86,11 +85,10 @@ Verify a real managed file with `/status` under **Setting sources**.
 
 ### Simulating the top tier without touching system files
 
-Deploying a real managed-settings file needs admin rights on the machine — this module simulates
-it with `claude --settings <file>`, which sits at tier 2 (command line), **above** project and
-user settings but still below a real managed-settings file. It demonstrates a `deny` rule and
-`/status`'s output shape; it does not replace the real managed tier in production, where an
-ordinary developer can't override it at all.
+Deploying a real managed-settings file needs admin rights — this module simulates it with
+`claude --settings <file>`, tier 2 (command line), **above** project/user settings but still below
+a real managed-settings file. It demonstrates a `deny` rule and `/status`'s output shape; it does
+not replace the real managed tier in production, where a developer can't override it at all.
 
 ### OpenTelemetry — names to actually use
 
@@ -114,9 +112,9 @@ ZDR is available only to qualified accounts on Claude for Enterprise, and **enab
 after the account team confirms eligibility — not a toggle in your own admin console. When on,
 "prompts and model responses generated during Claude Code sessions are processed in real time and
 not stored by Anthropic after the response is returned." It also **disables** cloud sessions,
-Claude Tag, Artifacts, and feedback submission (`/feedback`/`/bug`/`/share`) — features needing
-server-side session storage to work at all. Claude Code Analytics (usage metadata only) is
-unaffected either way.
+Claude Tag, Artifacts, feedback submission (`/feedback`/`/bug`/`/share`), and Remote Control —
+five features needing server-side session storage to work at all. Claude Code Analytics (usage
+metadata only) is unaffected either way.
 
 ### Security classification (still the right mental model)
 
@@ -210,8 +208,15 @@ settings source — file, MDM, or server-managed — not just `.claude/settings.
 
 **Goal**: Know what to actually ask your account team.
 
-**Instructions**: Does your org qualify for ZDR today? If yes, which four features would you lose?
+**Instructions**: Does your org qualify for ZDR today? If yes, which five features would you lose?
 If you don't know, ask your Anthropic account team before promising ZDR in a policy document.
+
+<details>
+<summary>✅ Solution</summary>
+
+Cloud sessions, Claude Tag, Artifacts, feedback submission (`/feedback`/`/bug`/`/share`), and
+Remote Control — all five require server-side storage of session data, which ZDR removes.
+</details>
 
 ---
 
@@ -238,20 +243,19 @@ If you don't know, ask your Anthropic account team before promising ZDR in a pol
 | Assuming project `.claude/settings.json` is tamper-proof | Any developer can edit it — managed-only keys need a real managed source |
 | Confusing `--settings` with a real managed-settings file | It sits at the command-line tier; it simulates precedence, not the managed tier's enforcement |
 | Assuming OTel exports prompt text by default | Redacted by default — `OTEL_LOG_USER_PROMPTS=1` opts back in, deliberately |
-| Promising ZDR in a policy doc without checking eligibility | Enterprise-only, Anthropic-enabled — and it turns off cloud sessions, Artifacts, Claude Tag, and feedback submission |
+| Promising ZDR in a policy doc without checking eligibility | Enterprise-only, Anthropic-enabled — and it turns off cloud sessions, Artifacts, Claude Tag, feedback submission, and Remote Control |
 | Treating the classification table as self-enforcing | It's a human guide; enforcement is `permissions.deny`/sandbox |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
-Anthropic's own account of securing its AI-native SDLC states the same thesis this module teaches:
-"Give every agent a single-purpose identity with the minimum permissions for its job," and "Every
-automated approval, tool call, and agent-to-agent message is logged… and lands in our SIEM" (S4,
-07/2026). The same source reports Claude authors "about 80% of the code merged into our codebase
-today," and teams "ship 8x as much code per quarter as they did from 2021 to 2025" (S4) — numbers
-that hold up because the guardrails are enforced infrastructure, not a policy PDF employees are
-trusted to remember. The lesson at any scale: the guardrail is what lets you move that fast.
+Anthropic's own account of securing its AI-native SDLC states this module's thesis: "Give every
+agent a single-purpose identity with the minimum permissions for its job," and "Every automated
+approval, tool call, and agent-to-agent message is logged… and lands in our SIEM" (S4, 07/2026).
+The same source reports Claude authors "about 80% of the code merged into our codebase today," and
+teams "ship 8x as much code per quarter as they did from 2021 to 2025" (S4) — numbers that hold up
+because the guardrails are enforced infrastructure, not a PDF employees are trusted to remember.
 
 ---
 

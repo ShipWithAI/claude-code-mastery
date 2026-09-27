@@ -61,8 +61,8 @@ graph TD
 | `.claude/rules/*.md` có `paths:` | "Khi Claude đọc file khớp pattern, không phải mỗi lần gọi tool" | Như trên |
 | `.claude/rules/*.md` **không có** `paths:` | Lúc khởi động, priority ngang `.claude/CLAUDE.md` | Như trên |
 
-`paths:` là field duy nhất trong frontmatter Claude Code đọc ở rule file (budget: 1.000 glob
-pattern đã expand / 4 MiB). Đây là cách team giữ cho convention chỉ áp dụng `apps/web/**` không
+`paths:` là field duy nhất trong frontmatter Claude Code đọc ở rule file (budget: 1.000 glob đã
+expand / 4 MiB). Đây là cách team giữ cho convention chỉ áp dụng `apps/web/**` không
 bao giờ vào context khi ai đó đang làm `apps/api/`.
 
 ### Cấp org: managed policy CLAUDE.md
@@ -247,4 +247,4 @@ document lớn.
 
 ---
 
-> **Next**: [Module 10.2: Quy ước Git](../02-git-conventions/) →
+> **Tiếp theo**: [Module 10.2: Quy ước Git](../02-git-conventions/) →

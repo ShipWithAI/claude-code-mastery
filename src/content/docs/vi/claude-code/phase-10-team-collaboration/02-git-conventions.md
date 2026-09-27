@@ -238,4 +238,4 @@ hình.
 
 ---
 
-> **Next**: [Module 10.3: Code Review Protocol](../03-code-review-protocol/) →
+> **Tiếp theo**: [Module 10.3: Quy trình Code Review](../03-code-review-protocol/) →

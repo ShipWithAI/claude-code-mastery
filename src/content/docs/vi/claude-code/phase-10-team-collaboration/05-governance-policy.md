@@ -1,15 +1,15 @@
 ---
-title: 'Governance & Policy'
+title: 'Quản trị & Chính sách'
 description: 'Chuyển AI governance từ một document chính sách sang managed settings enforced, OTel visibility, và ZDR.'
 verified: 2026-09-27
 claude_version: 2.1.283
 ---
 
-# Module 10.5: Governance & Policy
+# Module 10.5: Quản trị & Chính sách
 
 > **Thời gian học**: ~35 phút
 >
-> **Yêu cầu trước**: Module 10.4 (Knowledge Sharing)
+> **Yêu cầu trước**: Module 10.4 (Chia sẻ kiến thức)
 >
 > **Kết quả**: Sau module này, bạn biết cách enforce AI governance bằng managed settings thay vì
 > chỉ một policy document, monitor usage bằng OpenTelemetry, và biết Zero Data Retention che phủ
@@ -20,10 +20,10 @@ claude_version: 2.1.283
 ## 1. WHY — Tại Sao Cần Quan Tâm
 
 Một policy document ghi "không bao giờ gửi credential cho AI tool." Nó không chặn được ai — một
-file `.env` vẫn bị đọc vào context như thường, vì không có gì enforce câu đó. Module này dạy loại
-governance thật sự giữ được: setting mà developer không override được, dữ liệu usage admin thật sự
-xem được, và một cam kết retention có phạm vi rõ ràng — không phải một memo nhắc lại điều ai cũng
-"đáng lẽ" đã biết.
+file `.env` vẫn bị đọc vào context như thường, vì không có gì enforce câu đó. Module này dạy
+governance thật sự giữ được: setting developer không override được, dữ liệu usage admin thật sự
+xem được, và một cam kết retention có phạm vi rõ ràng — không phải memo nhắc lại điều ai cũng đã
+biết.
 
 ---
 
@@ -86,11 +86,10 @@ Xác nhận một managed file thật với `/status`, dưới mục **Setting s
 
 ### Mô phỏng tầng cao nhất mà không đụng system file
 
-Deploy một managed-settings file thật cần quyền admin trên máy — module này mô phỏng bằng
-`claude --settings <file>`, nằm ở tầng 2 (command line), **cao hơn** project và user settings
-nhưng vẫn thấp hơn managed-settings file thật. Nó minh hoạ được `deny` rule và output shape của
-`/status`; nó không thay thế tầng managed thật trong production, nơi một developer bình thường
-không override được gì.
+Deploy một managed-settings file thật cần quyền admin — module này mô phỏng bằng
+`claude --settings <file>`, tầng 2 (command line), **cao hơn** project/user settings nhưng vẫn
+thấp hơn managed-settings file thật. Nó minh hoạ `deny` rule và output shape của `/status`; nó
+không thay thế tầng managed thật trong production, nơi một developer không override được gì.
 
 ### OpenTelemetry — tên chính xác cần dùng
 
@@ -113,8 +112,9 @@ ZDR chỉ dành cho account đủ điều kiện trên Claude for Enterprise, v�
 account team xác nhận eligibility — không phải một toggle trong admin console của bạn. Khi bật,
 "prompts and model responses generated during Claude Code sessions are processed in real time and
 not stored by Anthropic after the response is returned." Nó cũng **tắt** cloud session, Claude Tag,
-Artifact, và feedback submission (`/feedback`/`/bug`/`/share`) — tính năng cần server-side session
-storage mới hoạt động được. Claude Code Analytics (chỉ metadata usage) không bị ảnh hưởng.
+Artifact, feedback submission (`/feedback`/`/bug`/`/share`), và Remote Control — năm tính năng cần
+server-side session storage mới hoạt động được. Claude Code Analytics (chỉ metadata usage) không
+bị ảnh hưởng.
 
 ### Security classification (vẫn đúng mental model)
 
@@ -208,8 +208,15 @@ MDM, hoặc server-managed — không chỉ `.claude/settings.json`.
 
 **Goal**: Biết chính xác cần hỏi account team điều gì.
 
-**Instructions**: Tổ chức bạn có đủ điều kiện ZDR hôm nay không? Nếu có, bạn mất bốn tính năng nào?
+**Instructions**: Tổ chức bạn có đủ điều kiện ZDR hôm nay không? Nếu có, bạn mất năm tính năng nào?
 Nếu không biết, hỏi account team Anthropic trước khi hứa ZDR trong một policy document.
+
+<details>
+<summary>✅ Solution</summary>
+
+Cloud session, Claude Tag, Artifact, feedback submission (`/feedback`/`/bug`/`/share`), và Remote
+Control — cả năm đều cần server-side storage của session data, thứ ZDR loại bỏ.
+</details>
 
 ---
 
@@ -236,26 +243,24 @@ Nếu không biết, hỏi account team Anthropic trước khi hứa ZDR trong m
 | Tưởng `.claude/settings.json` của project không sửa được | Developer nào cũng sửa được — managed-only key cần một nguồn managed thật |
 | Nhầm `--settings` với managed-settings file thật | Nó nằm ở tầng command-line; mô phỏng precedence, không phải enforcement của tầng managed |
 | Tưởng OTel export prompt text mặc định | Redact mặc định — `OTEL_LOG_USER_PROMPTS=1` opt back in, có chủ đích |
-| Hứa ZDR trong policy doc mà chưa kiểm tra eligibility | Chỉ Enterprise, Anthropic bật — và nó tắt cloud session, Artifact, Claude Tag, feedback submission |
+| Hứa ZDR trong policy doc mà chưa kiểm tra eligibility | Chỉ Enterprise, Anthropic bật — và nó tắt cloud session, Artifact, Claude Tag, feedback submission, và Remote Control |
 | Coi bảng classification là tự enforce | Đó là hướng dẫn cho con người; enforcement là `permissions.deny`/sandbox |
 
 ---
 
 ## 7. REAL CASE — Câu Chuyện Thực Tế
 
-Chính bài viết của Anthropic về bảo mật AI-native SDLC nêu đúng thesis governance module này dạy:
-"Give every agent a single-purpose identity with the minimum permissions for its job," và "Every
-automated approval, tool call, and agent-to-agent message is logged… and lands in our SIEM" (S4,
-07/2026). Cùng nguồn đó báo cáo Claude viết "about 80% of the code merged into our codebase
-today," và team "ship 8x as much code per quarter as they did from 2021 to 2025" (S4) — những con
-số này chỉ đứng vững vì guardrail là infrastructure enforced, không phải một PDF chính sách nhân
-viên được tin là sẽ nhớ. Bài học ở mọi quy mô đều giống nhau: guardrail là thứ cho phép bạn đi
-nhanh đến vậy.
+Bài viết của Anthropic về bảo mật AI-native SDLC nêu đúng thesis module này dạy: "Give every agent
+a single-purpose identity with the minimum permissions for its job," và "Every automated approval,
+tool call, and agent-to-agent message is logged… and lands in our SIEM" (S4, 07/2026). Cùng nguồn
+đó báo cáo Claude viết "about 80% of the code merged into our codebase today," và team "ship 8x as
+much code per quarter as they did from 2021 to 2025" (S4) — con số này đứng vững vì guardrail là
+infrastructure enforced, không phải một PDF nhân viên được tin là sẽ nhớ.
 
 ---
 
-> **Phase 10 Complete!** Bạn giờ có bộ convention enforced cho team collaboration với Claude Code
+> **Phase 10 Hoàn Thành!** Bạn giờ có bộ convention enforced cho team collaboration với Claude Code
 > — từ phân phối CLAUDE.md scoped, đến attribution có tài liệu, đến review gate thật, đến
 > governance dựa trên setting thay vì một memo.
 >
-> **Next Phase**: [Phase 11: Automation & Headless](../../phase-11-automation-headless/01-headless-mode/) — Chạy Claude Code không cần tương tác con người.
+> **Phase Tiếp Theo**: [Phase 11: Automation & Headless](../../phase-11-automation-headless/01-headless-mode/) — Chạy Claude Code không cần tương tác con người.
