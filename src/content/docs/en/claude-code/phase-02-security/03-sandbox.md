@@ -11,22 +11,20 @@ claude_version: 2.1.283
 >
 > **Prerequisite**: Module 2.2 (Permission System)
 >
-> **Outcome**: Turn on the built-in sandbox, restrict Bash filesystem/network access with
-> `sandbox.*` settings, run the official devcontainer firewall, and verify each control blocks.
+> **Outcome**: Turn on the built-in sandbox, restrict Bash filesystem/network with `sandbox.*`
+> settings, run the devcontainer firewall, and verify each control blocks.
 
 ---
 
 ## 1. WHY — Why This Matters
 
-Module 2.2's deny rules match **command text** — they don't stop a subprocess a script spawns on
-its own, and they don't cover Read/Edit/Write at all. A prompt-injected script that shells out, or
-a tool that reads `~/.aws/credentials` directly, slips past a rule never designed to catch it.
+Module 2.2's deny rules match **command text** — they don't stop a subprocess a script spawns, and
+don't cover Read/Edit/Write. A tool reading `~/.aws/credentials` directly slips past a rule never
+designed to catch it.
 
-Sandboxing moves containment down a layer: the operating system enforces what a process can
-touch, regardless of what the model decided to run. Anthropic's containment work puts this order
-plainly — environment layer first, model layer second (S13). This module covers the three
-environment-layer options Claude Code ships: the built-in sandbox, the official devcontainer, and
-cloud sessions.
+Sandboxing moves containment down a layer: the OS enforces what a process can touch, regardless of
+what the model decided to run — environment layer first, model layer second (S13). This module
+covers three options: built-in sandbox, devcontainer, cloud session.
 
 ---
 
@@ -36,11 +34,12 @@ cloud sessions.
 
 | Status | Claim |
 |---|---|
-| **VERIFIED** | Sandbox runs on macOS (Seatbelt), Linux/WSL2 (bubblewrap); **"Native Windows is not supported. On Windows, run Claude Code inside a WSL2 distribution."** |
-| **VERIFIED** | "Applies only to Bash, PowerShell, and Monitor commands and their child processes" — Read, Edit, Write, WebFetch, MCP servers, hooks are **not** covered; they use the ordinary permission system |
+| **VERIFIED** | Sandbox: macOS (Seatbelt), Linux/WSL2 (bubblewrap); **"Native Windows is not supported. On Windows, run Claude Code inside a WSL2 distribution."** |
+| **VERIFIED** | "Applies only to Bash, PowerShell, and Monitor commands." Read/Edit/WebFetch are gated by permission rules instead; MCP servers and hooks "run unconstrained on the host" |
 | **VERIFIED** | Default read access is "the entire computer, except certain denied directories… this default still allows reading credential files such as `~/.aws/credentials` and `~/.ssh/`" unless you add `denyRead` |
-| **RECOMMENDED** | Use filesystem *and* network restrictions together — see below |
-| **ASSUMED RISK** | Any environment with egress can still leak whatever the agent can read; a sandbox shrinks the blast radius, it doesn't remove it |
+| **VERIFIED** | `network.allowedDomains` alone doesn't deny: "the first time a command needs a new domain, Claude Code prompts for approval." Hard deny needs `strictAllowlist: true` (user/managed/`--settings` only, v2.1.219+) |
+| **RECOMMENDED** | Filesystem *and* network restrictions together — see below |
+| **ASSUMED RISK** | Any egress can leak whatever the agent can read; a sandbox shrinks blast radius, it doesn't remove it |
 
 ### Sandboxing needs both layers
 
@@ -52,44 +51,36 @@ cloud sessions.
 
 ```mermaid
 graph LR
-    A["Built-in sandbox\nBash/PowerShell/Monitor only\n/sandbox"] --> B["Devcontainer\nwhole process, non-root\ninit-firewall.sh"] --> C["Cloud session\nisolated Anthropic-managed VM"]
+    A["Built-in sandbox<br/>Bash/PowerShell/Monitor only<br/>/sandbox"] --> B["Devcontainer<br/>whole process, non-root<br/>init-firewall.sh"] --> C["Cloud session<br/>isolated Anthropic-managed VM"]
 ```
 
-1. **Built-in sandbox** (`/sandbox`) — OS-enforced, Bash-only, zero install on macOS. **Auto-allow**
-   skips the prompt; **regular permissions** still prompts. Both still respect explicit deny rules
-   and `rm`/`rmdir` on critical paths.
-2. **Devcontainer** — the whole process, MCP servers, and hooks run inside Docker as a non-root
-   user. The reference container adds a default-deny firewall.
-3. **Cloud session** (`claude --cloud`) — an isolated, Anthropic-managed VM; network access is
-   "limited by default and can be disabled."
+1. **Built-in sandbox** (`/sandbox`) — OS-enforced, Bash-only, zero install on macOS.
+2. **Devcontainer** — the whole process, MCP servers, hooks run inside Docker as non-root; the
+   reference container adds a default-deny firewall.
+3. **Cloud session** (`claude --cloud`) — isolated, Anthropic-managed VM; "network access is
+   limited by default and can be configured to be disabled or allow only specific domains."
 
-### Documented limitations (quote directly, don't soften)
+### Documented limitations
 
-- **TLS isn't inspected by default**: the proxy "does not terminate or inspect TLS traffic," so
-  "allowing broad domains such as `github.com` can create paths for data exfiltration… via domain
-  fronting."
-- **Unix sockets bypass the boundary**: "allowing access to `/var/run/docker.sock` effectively
-  grants access to the host system through the Docker socket."
-- **The escape hatch can be disabled**: Claude "may retry the command with the
-  `dangerouslyDisableSandbox` parameter," running "outside the sandbox." Set
-  `"allowUnsandboxedCommands": false` and Claude Code "ignores" that parameter.
-- **Devcontainer + `--dangerously-skip-permissions` still exfiltrates**: "dev containers do not
-  prevent a malicious project from exfiltrating anything accessible inside the container,
-  including the Claude Code credentials stored in `~/.claude`."
+- **No TLS inspection**: broad domains "can create paths for data exfiltration… via domain
+  fronting"; `allowUnixSockets` + `/var/run/docker.sock` "effectively grants access to the host
+  system through the Docker socket."
+- **Escape hatch**: Claude may retry blocked commands "outside the sandbox" via
+  `dangerouslyDisableSandbox`; `"allowUnsandboxedCommands": false` makes Claude Code ignore it.
+- **Devcontainer + `--dangerously-skip-permissions`**: still exfiltrates "the Claude Code
+  credentials stored in `~/.claude`."
 
 ### Data handling — no overclaim
 
-Isolation isn't a retention control: "the files Claude reads are transmitted to the Anthropic API
-… with or without a sandbox." What happens after depends on your account: commercial plans (Team,
-Enterprise, API) aren't used to train models unless you opt in (30-day retention); consumer plans
-choose, 5-year retention if opted in, 30 days if not.
+Isolation isn't retention: files Claude reads "are transmitted to the Anthropic API … with or
+without a sandbox." After that: commercial plans aren't trained on unless you opt in (30-day
+retention); consumer plans choose — 5 years opted in, 30 days if not.
 
 ---
 
 ## 3. DEMO — Step by Step
 
-Lab: macOS, Claude Code v2.1.283, project `~/cc-lab`. Merge this into `.claude/settings.local.json`
-so it never leaves the lab:
+Lab: macOS, Claude Code v2.1.283, `~/cc-lab`. Merge into `.claude/settings.local.json`:
 
 ```json
 // docs: sandboxing#configure-sandboxing
@@ -104,11 +95,11 @@ so it never leaves the lab:
 }
 ```
 
-We point `denyRead` at a throwaway `~/cc-lab-fake-ssh/config` (fake string
-`sk-FAKE-DO-NOT-USE-xxxxxxxxxxxx`), not real `~/.ssh` — in your own settings, list `~/.ssh` and
-`~/.aws` there instead.
+`denyRead` points at a throwaway `~/cc-lab-fake-ssh/config` (fake string
+`sk-FAKE-DO-NOT-USE-xxxxxxxxxxxx`), not real `~/.ssh` — list `~/.ssh` and `~/.aws` in your own
+settings.
 
-**Step 1 — inspect the panel**: run `/sandbox`.
+**Step 1**: run `/sandbox`.
 
 ```text
 # Output may vary
@@ -122,22 +113,34 @@ We point `denyRead` at a throwaway `~/cc-lab-fake-ssh/config` (fake string
 
 Overrides confirms `allowUnsandboxedCommands: false` as **"Strict sandbox mode (current)"**;
 Config lists `Network Restrictions: Allowed: registry.npmjs.org` and `Filesystem Read
-Restrictions: Denied: … ~/cc-lab-fake-ssh` (plus internal protected paths — depends on your OS).
+Restrictions: Denied: … ~/cc-lab-fake-ssh` (plus internal protected paths).
 
-**Step 2 — network block**: ask Claude to run `curl -sI --max-time 5 https://example.com`.
+**Step 2 — network block**: `allowedDomains` alone only pre-approves listed hosts — an unlisted one
+still prompts, so a scripted run just hangs. For a deterministic deny, start with `--settings` (no
+effect from `.claude/settings.local.json`):
+
+```bash
+# docs: sandboxing#network-isolation
+claude --settings '{"sandbox": {"network": {"strictAllowlist": true}}}'
+```
+
+Then ask Claude to run `curl -sI --max-time 5 https://example.com`.
 
 ```text
 # Output may vary
 ⏺ Bash(curl -sI --max-time 5 https://example.com)
-  ⎿  Error: Exit code 28
+  ⎿  Error: Exit code 56
+     HTTP/1.1 403 Forbidden
+     X-Proxy-Error: blocked-by-allowlist
+The sandbox also reported this violation:
+deny network-outbound example.com:443 (host is not on the allow list)
 ```
 
-Exit 28 is curl's timeout: the sandbox proxy never forwarded the connection since `example.com`
-isn't allowlisted.
+The proxy denies it outright, instead of curl timing out.
 
 **Step 3 — network allow**: ask for `npm view left-pad version --cache "$TMPDIR/npm-cache-demo"`
-(plain `npm view` fails first on an unrelated sandbox *write* restriction — only the working
-directory and `$TMPDIR` are writable, not npm's default `~/.npm/_cacache`).
+(plain `npm view` fails first on an unrelated sandbox *write* restriction — only the working dir
+and `$TMPDIR` are writable, not `~/.npm/_cacache`).
 
 ```text
 # Output may vary
@@ -145,7 +148,7 @@ directory and `$TMPDIR` are writable, not npm's default `~/.npm/_cacache`).
   ⎿  1.3.0
 ```
 
-The same sandbox lets this through: `registry.npmjs.org` is allowlisted.
+Same session: `registry.npmjs.org` is listed, so it goes through.
 
 **Step 4 — filesystem block**: `cat ~/cc-lab-fake-ssh/config`.
 
@@ -168,12 +171,22 @@ The same sandbox lets this through: `registry.npmjs.org` is allowlisted.
    3. No
 ```
 
-Approve it — Claude reads the file and explains why: "This session's sandbox blocks Bash from
-reading that directory... The Read tool isn't covered by that sandbox rule." Live proof of scope:
-Bash only.
+Approve it — Claude explains why: "This session's sandbox blocks Bash from reading that
+directory... The Read tool isn't covered by that sandbox rule." Live proof of scope: Bash only.
+(The prompt appears because the lab pins Manual mode; under auto mode — default since v2.1.283 —
+the classifier decides instead.)
 
-**Step 6 — devcontainer firewall**. No Docker running? Read this as docs output. If it's running,
-build the reference image and run its firewall:
+Close the gap with a 2.2 permission rule on the same path — "paths and domains from both sandbox
+settings and permission rules are merged":
+
+```json
+{ "permissions": { "deny": ["Read(~/cc-lab-fake-ssh/**)"] } }
+```
+
+Ask again: Read refuses outright, "File is in a directory that is denied by your permission
+settings."
+
+**Step 6 — devcontainer firewall** (real run, Docker was on for this lab):
 
 ```bash
 # docs: devcontainer#restrict-network-egress
@@ -191,12 +204,12 @@ Firewall verification passed - able to reach https://api.github.com as expected
 exit:7
 ```
 
-The script's self-test confirms the block; `claude --version` proves the CLI still runs. Its fixed
-allowlist: `registry.npmjs.org`, `api.anthropic.com`, `sentry.io`, `statsig.com`,
-`marketplace.visualstudio.com`, `vscode.blob.core.windows.net`, `update.code.visualstudio.com`,
-plus live-fetched GitHub IP ranges and the host's `/24`.
+The script's self-test confirms the block; `claude --version` only confirms the binary runs in the
+locked-down container — it makes no API call, so it doesn't prove the allowlist reaches
+`api.anthropic.com`. Fixed allowlist: `registry.npmjs.org`, `api.anthropic.com`, five more named
+domains, plus live GitHub IP ranges and the host's `/24`.
 
-Clean up: `docker rmi cc-devcontainer-demo`, delete `~/cc-lab-fake-ssh`, restore
+Clean up: `docker rmi cc-devcontainer-demo`, `rm -rf /tmp/cc`, delete `~/cc-lab-fake-ssh`, restore
 `.claude/settings.local.json` to `{"permissions": {"defaultMode": "default"}}`.
 
 ---
@@ -205,21 +218,24 @@ Clean up: `docker rmi cc-devcontainer-demo`, delete `~/cc-lab-fake-ssh`, restore
 
 ### Exercise 1: Allowlist for an Android project
 
-**Goal**: let Gradle/Maven resolve while everything else stays blocked.
+**Goal**: let Gradle/Maven resolve, deny everything else outright.
 
 **Instructions**: add `allowedDomains` for `dl.google.com`, `repo.maven.apache.org`,
-`*.gradle.org`; verify with a Gradle sync and a blocked domain.
+`*.gradle.org`, a write grant for Gradle's cache, and `strictAllowlist` (project settings can't set
+it — use `--settings` or user settings). Expected: `./gradlew dependencies` succeeds; `curl -sI
+https://example.com` gets a 403.
 
 <details>
 <summary>✅ Solution</summary>
 
 ```json
-{ "sandbox": { "enabled": true, "network": { "allowedDomains":
-  ["dl.google.com", "repo.maven.apache.org", "*.gradle.org"] } } }
+{ "sandbox": { "enabled": true, "network": {
+  "allowedDomains": ["dl.google.com", "repo.maven.apache.org", "*.gradle.org"],
+  "strictAllowlist": true },
+  "filesystem": { "allowWrite": ["~/.gradle"] } } }
 ```
 
-Confirm with a command that must fail: `curl -sI https://example.com` still times out; `./gradlew
-dependencies` reaches its repositories.
+Gradle's cache lives under `~/.gradle`, hence the grant.
 
 </details>
 
@@ -227,19 +243,21 @@ dependencies` reaches its repositories.
 
 ### Exercise 2: Block AWS credentials
 
-**Goal**: stop sandboxed Bash from reading `~/.aws/credentials` (default read policy allows it).
+**Goal**: stop sandboxed Bash *and* the Read tool from reading `~/.aws/credentials` (default read
+policy allows it). Expected: `cat ~/.aws/credentials` fails under Bash; Read on the same path is
+refused outright, not just prompted.
 
 <details>
 <summary>✅ Solution</summary>
 
 ```json
 { "sandbox": { "enabled": true, "credentials": {
-  "files": [{ "path": "~/.aws/credentials", "mode": "deny" }] } } }
+  "files": [{ "path": "~/.aws/credentials", "mode": "deny" }] } },
+  "permissions": { "deny": ["Read(~/.aws/credentials)"] } }
 ```
 
-`denyRead: ["~/.aws"]` works too; `credentials.files` keeps credential rules grouped. Verify: Bash
-`cat ~/.aws/credentials` is blocked; the Read tool on the same path is still a permission prompt,
-not a sandbox block (same lesson as Step 5).
+Without `permissions.deny`, Read still reaches a prompt — one distracted "Yes" and the key is in
+context and the transcript.
 
 </details>
 
@@ -247,7 +265,7 @@ not a sandbox block (same lesson as Step 5).
 
 ### Exercise 3: Managed enforcement
 
-**Goal**: require the sandbox org-wide, no local opt-out.
+**Goal**: require the sandbox org-wide.
 
 <details>
 <summary>✅ Solution</summary>
@@ -256,9 +274,9 @@ not a sandbox block (same lesson as Step 5).
 { "sandbox": { "enabled": true, "failIfUnavailable": true, "allowUnsandboxedCommands": false } }
 ```
 
-Deploy through managed settings — `/Library/Application Support/ClaudeCode/managed-settings.json`
-(macOS) or `/etc/claude-code/managed-settings.json` (Linux/WSL), not a project file: managed
-`enabled` overrides anything set locally (Module 10.5).
+Deploy via managed settings (macOS: `/Library/Application Support/ClaudeCode/managed-settings.json`;
+Linux/WSL: `/etc/claude-code/managed-settings.json`), not a project file — managed `enabled`
+overrides local settings (Module 10.5).
 
 </details>
 
@@ -271,11 +289,12 @@ Deploy through managed settings — `/Library/Application Support/ClaudeCode/man
 | `/sandbox` | Open panel (Mode/Overrides/Config) | Config tab shows resolved rules |
 | `sandbox.enabled` | Turn sandbox on | Config tab non-empty |
 | `allowUnsandboxedCommands: false` | Disable escape hatch | Overrides → "Strict sandbox mode" |
-| `network.allowedDomains` | Egress allowlist for Bash | Allowed domain reaches; others time out |
-| `filesystem.denyRead` / `credentials.files` | Block reads of a path | `cat <path>` → `Operation not permitted` |
+| `network.allowedDomains` | Pre-approve domains; others prompt | Allowed reaches; others prompt |
+| `network.strictAllowlist: true` | Hard-deny unlisted (user/managed/`--settings`) | `403` / `blocked-by-allowlist` |
+| `filesystem.denyRead` + `permissions.deny: ["Read(path/**)"]` | Block a path for Bash *and* Read | `Operation not permitted`; Read refused, no prompt |
 | `failIfUnavailable` | Refuse unsandboxed start | Missing dep on Linux blocks startup |
 | `init-firewall.sh` | Default-deny iptables + allowlist | Self-test prints "verification passed" |
-| `permissions.disableBypassPermissionsMode` | Block `--dangerously-skip-permissions` | `/status` → managed settings source |
+| `disableBypassPermissionsMode: "disable"` | Block `--dangerously-skip-permissions` | `/status` → managed source |
 
 ---
 
@@ -283,32 +302,32 @@ Deploy through managed settings — `/Library/Application Support/ClaudeCode/man
 
 | ❌ Mistake | ✅ Correct Approach |
 |---|---|
-| Cutting Docker's network (`--network` set `none`) | Claude Code needs `api.anthropic.com`; that breaks the session |
-| Assuming the sandbox covers Read/Edit | Bash, PowerShell, Monitor only — Read/Edit/Write/WebFetch/MCP use the permission system |
-| Allowlisting `github.com` broadly for "convenience" | No TLS inspection, so a broad domain "can create paths for data exfiltration" via domain fronting |
-| Adding `/var/run/docker.sock` to `allowUnixSockets` | "Effectively grants access to the host system through the Docker socket" |
+| Cutting Docker's network (`--network` set `none`) | Claude Code needs `api.anthropic.com` — allowlist egress instead |
+| Assuming `allowedDomains` denies unlisted hosts, or the sandbox covers Read/Edit | It only pre-approves; add `strictAllowlist` for a real deny. Sandbox = Bash/PowerShell/Monitor — Read/Edit/WebFetch use permission rules, MCP/hooks run unconstrained |
+| Allowlisting `github.com` broadly, or adding `/var/run/docker.sock` to `allowUnixSockets` | No TLS inspection enables domain fronting; the socket "effectively grants access to the host system" |
 | Mounting `~/.ssh` into a devcontainer | Docs: "prefer repository-scoped or short-lived tokens" instead |
-| "Anthropic logs and trains on your code" | Depends on account: commercial isn't trained on unless opted in. Cite data-usage, not a blanket claim |
+| "Anthropic logs and trains on your code" | Depends on account: commercial isn't trained on unless opted in |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
 A Vietnamese fintech runs an unattended overnight agent (dependency bumps, changelog drafts) in
-the reference devcontainer with `--dangerously-skip-permissions`, since it runs as a non-root user.
-Its `init-firewall.sh` allowlist adds only `registry.npmjs.org` and an internal GitHub Enterprise
-host on top of the defaults.
+the reference devcontainer with `--dangerously-skip-permissions` — safe only because it's non-root.
+Its firewall allowlist is the reference defaults plus one addition: an internal GitHub Enterprise
+host.
 
-**Blast radius if the firewall fails**: "dev containers do not prevent a malicious project from
-exfiltrating anything accessible inside the container, including the Claude Code credentials
-stored in `~/.claude`." A compromised dependency reaching an unlisted host exposes the mounted
-workspace and any credentials the container can see — the firewall is the only thing between
-"contained to this repo" and "host reachable." The team pins `NET_ADMIN`/`NET_RAW` via `runArgs`,
-reviews `init-firewall.sh` on every base-image bump, and never mounts `~/.ssh` — cloud credentials
-go in as scoped, short-lived env vars instead.
+**Blast radius, and the firewall doesn't need to fail**: "Only use dev containers when developing
+with trusted repositories, and monitor Claude's activities" — because "dev containers do not
+prevent a malicious project from exfiltrating anything accessible inside the container, including
+the Claude Code credentials stored in `~/.claude`." The allowlist resolves every GitHub IP range
+live, so a *working* firewall still lets a compromised dependency push data to any public repo or
+gist on `github.com` — the exfiltration path, not a misconfiguration. The team reviews the script
+on every base-image bump and never mounts `~/.ssh` — cloud credentials go in as scoped, short-lived
+env vars.
 
-**Result**: jobs run unattended; a monthly review of the allowlist and mounted volumes is the
-actual control, not a hope that the agent "wouldn't do that."
+**Result**: jobs run unattended on trusted repos only; a monthly allowlist review is the real
+control, not a hope the agent "wouldn't do that."
 
 ---
 
