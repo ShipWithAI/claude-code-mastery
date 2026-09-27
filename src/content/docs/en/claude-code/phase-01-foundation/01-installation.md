@@ -1,185 +1,225 @@
 ---
 title: 'Installation & Configuration'
-description: 'Install Claude Code CLI, configure API keys, authenticate, and run your first command.'
+description: 'Install Claude Code with the native installer or a package manager, sign in, and verify the setup with claude doctor and /status.'
+verified: 2026-09-27
+claude_version: 2.1.283
 ---
 
 # Module 1.1: Installation & Configuration
 
-> **Estimated time**: ~20 minutes
+> **Estimated time**: ~25 minutes
 >
 > **Prerequisite**: None
 >
-> **Outcome**: After this module, you will be able to install Claude Code,
-> authenticate, and run your first command
+> **Outcome**: Install Claude Code with the native installer (or Homebrew/WinGet/apt), sign in
+> with a subscription, Console key or cloud provider, and verify with `claude doctor`/`/status`
 
 ---
 
 ## 1. WHY — Why This Matters
 
-Setting up a new development tool should be straightforward, but many AI coding
-assistants create friction: version mismatches, unclear authentication, outdated
-docs, or confusing setup paths. You end up with a broken installation three
-months later because your package manager didn't auto-update. Claude Code offers
-multiple installation methods, but only if you know which one fits your workflow.
-This module gets you to "ready to code" quickly instead of wrestling with package
-managers.
+A senior dev on your team follows a two-year-old blog post: `npm install -g
+@anthropic-ai/claude-code`. Node is 18, so npm prints an `EBADENGINE` warning and installs
+anyway — landing on what Anthropic now calls "Advanced installation options," not the default
+path. Months later a teammate's install auto-updates in the background while this one doesn't,
+`which -a claude` lists two binaries, and nobody can say which one a fresh terminal runs. The
+native installer avoids all three problems — installed on purpose, not by habit.
 
 ---
 
 ## 2. CONCEPT — Core Ideas
 
-Claude Code is a command-line interface (CLI) that connects your local terminal
-to Anthropic's Claude AI backend. When you type a command, Claude Code sends
-your code context to the API, processes the response, and returns results
-directly to your terminal.
+Claude Code ships four install channels, with npm as a documented fallback (docs: `setup`):
 
-The installation flow follows a three-step pattern:
+| Channel | Command | Auto-update |
+|---|---|---|
+| Native (recommended) | `curl -fsSL https://claude.ai/install.sh \| bash` (macOS/Linux/WSL) | Background, on every launch |
+| Homebrew | `brew install --cask claude-code` (or `claude-code@latest` for the newest build) | None — run `brew upgrade` |
+| WinGet | `winget install Anthropic.ClaudeCode` | None — run `winget upgrade` |
+| apt / dnf / apk | Anthropic's own signed repo, then `apt`/`dnf install claude-code` or `apk add claude-code` | Through your system's package upgrade |
+| npm ("Advanced installation options") | `npm install -g @anthropic-ai/claude-code` | Manual: `npm install -g …@latest` |
 
-1. **Install the CLI** — Get the `claude` command available globally
-2. **Authenticate** — Connect to your Anthropic account (OAuth or API key)
-3. **Configure** — Set preferences like default model and project settings
-
-Here's how the architecture flows:
+The native installer places a launcher at `~/.local/bin/claude`, symlinked into
+`~/.local/share/claude/versions/` — that binary skips Node.js at runtime. npm still works, but
+"as of v2.1.198, the npm package requires Node.js 22 or later" (older Node: `EBADENGINE`
+warning, install still finishes). System requirements: macOS 13.0+, Windows 10 1809+, Ubuntu
+20.04+, Debian 10+, or Alpine 3.19+; 4 GB+ RAM, x64/ARM64.
 
 ```mermaid
 graph LR
-    A["Your Terminal<br/>$ claude"] --> B["Claude Code CLI"] --> C["Anthropic API<br/>auth required"] --> D["Claude Model<br/>Process Request"] --> E["Response<br/>Back to Terminal"]
-    style B fill:#e1f5ff
-    style C fill:#fff3e0
+    A[Install] --> B["claude<br/>(browser login)"] --> C["/status"] --> D["claude doctor"] --> E[First prompt]
 ```
+
+Seven credential sources compete, checked in this order (docs:
+`authentication#authentication-precedence`): cloud provider env vars
+(`CLAUDE_CODE_USE_BEDROCK`/`_VERTEX`/`_FOUNDRY`) → `ANTHROPIC_AUTH_TOKEN` →
+`ANTHROPIC_API_KEY` → `apiKeyHelper` output → `CLAUDE_CODE_OAUTH_TOKEN` → Anthropic
+profile/federation credentials → subscription OAuth from `/login` (default for
+Pro/Max/Team/Enterprise).
+
+| Account type | Sign in |
+|---|---|
+| Pro/Max/Team/Enterprise | `claude` → browser login, or `/login` |
+| Claude Console (API billing) | `claude auth login --console` |
+| Amazon Bedrock | `CLAUDE_CODE_USE_BEDROCK=1` |
+| Google Vertex AI (Google Cloud's Agent Platform) | `CLAUDE_CODE_USE_VERTEX=1` + `CLOUD_ML_REGION` + `ANTHROPIC_VERTEX_PROJECT_ID` |
+| Microsoft Foundry | `CLAUDE_CODE_USE_FOUNDRY=1` |
+
+Credentials land in the macOS Keychain, or `~/.claude/.credentials.json` (mode `0600`) on
+Linux/Windows. `claude update` applies one on demand; `autoUpdatesChannel` in `settings.json`
+(or `/config`) picks `"latest"` (default) or `"stable"` (~1 week behind, skips regressions);
+`DISABLE_AUTOUPDATER=1` stops only the background check, `DISABLE_UPDATES` blocks every path.
 
 ---
 
 ## 3. DEMO — Step by Step
 
-**Step 0: Check Node.js Version (Prerequisite)**
+*Tested with: Claude Max subscription, v2.1.283, macOS 27.0.*
 
-Before installing, verify you have Node.js 18 or higher:
+**Step 1: Find every `claude` on your PATH**
 
 ```bash
-$ node --version
+# docs: troubleshoot-install#check-for-conflicting-installations
+which -a claude
+claude --version
 ```
 
-Expected output:
-```text
-v18.0.0   # or higher
-```
-
-If Node.js is not installed or is below version 18, install it from
-https://nodejs.org (LTS version recommended).
-
-**Step 1: Install Claude Code**
-
-There are multiple installation methods. Choose the one that fits your system.
-
-**Option A: npm (Node.js required)**
-```bash
-$ npm install -g @anthropic-ai/claude-code
-```
-
-Expected output:
 ```text
 # Output may vary
-added 1 package in Xs
+/Users/you/.local/bin/claude
+/Users/you/.local/bin/claude
+/Users/you/.local/bin/claude
+2.1.283 (Claude Code)
 ```
 
-⚠️ Requires Node.js 18+. Check Anthropic's official documentation for the
-current recommended installation method, as this may change.
+Three identical lines usually mean duplicate `PATH` entries for one native binary, not three
+installs. Also check `~/.claude/local/` (legacy local npm install) and
+`npm -g ls @anthropic-ai/claude-code` (global npm) before assuming one copy is stale.
 
-**Option B: Homebrew (macOS)** ⚠️ Needs verification
-```bash
-$ brew install --cask claude-code
-```
-
-⚠️ The exact Homebrew formula name needs verification. Check `brew search claude`
-for available options.
-
-**Option C: Native installer** ⚠️ Needs verification
-
-Anthropic may offer a native installer script. Check the official Claude Code
-documentation at https://docs.anthropic.com for current installation instructions.
-
-**Step 2: Verify Installation**
-
-Check that the `claude` command is available:
+**Step 2: Install (native)**
 
 ```bash
-$ claude --version
+# docs: setup#install-claude-code
+curl -fsSL https://claude.ai/install.sh | bash
 ```
 
-Expected output:
+Windows PowerShell: `irm https://claude.ai/install.ps1 | iex`. Windows CMD:
+`curl -fsSL https://claude.ai/install.cmd -o install.cmd && install.cmd && del install.cmd`.
+Re-running this on an already-installed machine is also the documented fix for a broken install
+(docs: `troubleshoot-install#raw-mode-is-not-supported-during-install`). Verify with **Step 1**'s
+command:
+
 ```text
 # Output may vary
-claude version X.Y.Z
+2.1.283 (Claude Code)
 ```
 
-If you see a version number, installation succeeded.
-
-**Step 3: Run Claude Code for the First Time**
-
-Execute the `claude` command without arguments to start an interactive session:
+**Step 3: Run diagnostics** — `claude doctor` prints read-only install/settings diagnostics
+without starting a session (docs: `cli-reference`).
 
 ```bash
-$ claude
+# docs: setup#verify-your-installation
+claude doctor
 ```
-
-On first run, Claude Code will prompt you to authenticate. Follow the prompts
-to connect your Anthropic account. Authentication methods include:
-- OAuth login (browser-based)
-- API key via environment variable: `export ANTHROPIC_API_KEY="your-key"`
-
-You can also start with a specific model:
-```bash
-$ claude --model sonnet    # Fast and capable (recommended for most work)
-$ claude --model opus      # Most capable (complex reasoning)
-```
-
-**Step 4: Verify Authentication**
-
-Once authenticated, verify your setup by running the help command inside the
-session:
-
-```bash
-/help
-```
-
-This displays all available slash commands. You should see commands like
-`/compact`, `/clear`, `/cost`, and others.
-
-**Step 5: Run Your First Query**
-
-Inside the Claude Code session, ask a simple question to verify everything
-works:
 
 ```text
-> What's the best practice for error handling in Go?
+# Output may vary
+Claude Code doctor
+
+Running: native (2.1.283)
+Commit: 4631ccd7cfe4
+Platform: darwin-arm64
+Path: /Users/you/.local/share/claude/versions/2.1.283
+Config install method: native
+Search: OK (bundled)
+Auto-updates: enabled
+Auto-update channel: latest
+Last update attempt: success → 2.1.283 (2026-09-26)
+Managed settings (remote): not fetched — requires an Enterprise or Team subscription
+Organization policy: not applicable to Pro and Max accounts
+
+No installation issues found.
+
+For a full setup checkup that can also fix issues, run /doctor in a Claude Code session.
 ```
 
-Claude will respond with a detailed answer. You're ready to code.
+**Step 4: Check who you're signed in as**
+
+```bash
+# docs: cli-reference
+claude auth status --text
+```
+
+```text
+# Output may vary
+Login method: Claude Max account
+Organization: you@example.com's Organization
+Email: you@example.com
+```
+
+**Step 5: Same thing, inside a session** — run `/status` and read the **Login** and
+**Setting sources** rows.
+
+```text
+# Output may vary
+Login method:       Claude Max account
+Organization:       …
+Email:              you@example.com
+Setting sources:    User settings, Project local settings
+```
+
+**Step 6: Update on demand**
+
+```bash
+# docs: setup#update-manually
+claude update
+```
+
+```text
+# Example from docs: https://code.claude.com/docs/en/setup#update-manually
+Successfully updated from 2.1.270 to version 2.1.283
+```
+
+Already current: `Claude Code is up to date (<version>)`. Homebrew/WinGet/apk report
+`Claude is up to date!` instead — they update through their own package manager.
+
+**Step 7: Prove it can answer, headlessly**
+
+```bash
+# docs: cli-reference
+claude -p "Reply with exactly: INSTALL OK" --output-format json | jq -r .result
+```
+
+```text
+# Output may vary
+INSTALL OK
+```
+
+**Other surfaces** (Module 1.4 has full walkthroughs): **VS Code**'s extension bundles its own
+CLI and "does not put `claude` on your shell PATH" — install the standalone CLI too.
+**JetBrains** (Beta) needs the CLI on `PATH` first; file reference `Cmd+Option+K`/`Alt+Ctrl+K`.
+**Desktop**'s Code tab runs the same engine and shares `~/.claude/settings.json`.
+`claude --cloud "<task>"` starts a managed cloud session.
 
 ---
 
 ## 4. PRACTICE — Try It Yourself
 
-### Exercise 1: Install and Verify
+### Exercise 1: Install on a second machine with a different channel
 
-**Goal**: Complete the installation and confirm the `claude` command works.
+**Goal**: install on a machine that has nothing yet, via Homebrew (macOS) or WinGet (Windows),
+then confirm with `claude doctor`.
 
-**Instructions**:
-1. Open a terminal
-2. Install using npm: `npm install -g @anthropic-ai/claude-code`
-3. Verify installation: `claude --version`
-4. Check that output shows a version number
+**Instructions**: `brew install --cask claude-code` or `winget install Anthropic.ClaudeCode`, then
+`claude --version` and `claude doctor`.
 
-**Expected result**: The `claude` command is available globally and shows a
-version number without errors.
+**Expected result**: a version number, and `Config install method` reading something other than
+`native`.
 
 <details>
 <summary>💡 Hint</summary>
 
-If the command is not found after installation, you may need to reload your
-shell. Try `source ~/.bashrc` (bash) or `source ~/.zshrc` (zsh), or just open
-a new terminal window.
+Read `Config install method` and `Auto-updates`, not just "no issues found."
 
 </details>
 
@@ -187,39 +227,33 @@ a new terminal window.
 <summary>✅ Solution</summary>
 
 ```bash
-$ npm install -g @anthropic-ai/claude-code
-$ claude --version
-# Output may vary - you should see a version number like X.Y.Z
+brew install --cask claude-code
+claude --version
+claude doctor
 ```
 
-If you see a version number, installation succeeded.
+Homebrew and WinGet never auto-update in the background — expected, not an error. Run
+`brew upgrade claude-code` (or `winget upgrade Anthropic.ClaudeCode`) yourself, or set
+`CLAUDE_CODE_PACKAGE_MANAGER_AUTO_UPDATE=1` to have Claude Code do it for you.
 
 </details>
 
 ---
 
-### Exercise 2: Authenticate, Explore Commands, and Check Cost
+### Exercise 2: Migrate from npm to the native installer
 
-**Goal**: Log in to Claude Code, explore available commands, and monitor usage.
+**Goal**: remove an npm install and replace it with the native one, ending with exactly one
+`claude` on `PATH`.
 
-**Instructions**:
-1. Run `claude` to start an interactive session
-2. Follow the authentication prompts (OAuth or API key)
-3. Inside the session, type `/help` and review available commands
-4. Ask Claude a simple question: `What is dependency injection?`
-5. After receiving the response, run `/cost` to see your token usage
+**Instructions**: `npm uninstall -g @anthropic-ai/claude-code`, then
+`curl -fsSL https://claude.ai/install.sh | bash`, then `which -a claude`.
 
-**Expected result**: You see a list of commands from `/help`, get an answer to
-your question, and `/cost` shows the tokens used for that query.
+**Expected result**: `which -a claude` prints one line, at `~/.local/bin/claude`.
 
 <details>
 <summary>💡 Hint</summary>
 
-If OAuth doesn't open a browser automatically, you can set an API key instead:
-`export ANTHROPIC_API_KEY="your-key"` before running `claude`.
-
-The `/cost` command shows input tokens, output tokens, and estimated cost for
-the current session.
+Still two lines? Check `~/.claude/local/` too — a legacy local npm install, separate from `-g`.
 
 </details>
 
@@ -227,53 +261,47 @@ the current session.
 <summary>✅ Solution</summary>
 
 ```bash
-$ claude
-# Follow authentication prompts
-# Then inside the session:
-/help
-# Review the list of commands
-
-> What is dependency injection?
-# Claude explains the concept
-
-/cost
-# Output shows token usage, e.g.:
-# Input: 150 tokens, Output: 420 tokens
-# Session cost: $0.002 (may vary)
+npm uninstall -g @anthropic-ai/claude-code
+curl -fsSL https://claude.ai/install.sh | bash
+which -a claude
 ```
+
+```text
+# Output may vary
+/Users/you/.local/bin/claude
+```
+
+One line confirms there's no leftover npm install competing for `PATH` priority.
 
 </details>
 
 ---
 
-### Exercise 3: Run a Query
+### Exercise 3: Pin the release channel to stable
 
-**Goal**: Run your first Claude Code query.
+**Goal**: set `autoUpdatesChannel` so this machine stays about a week behind, and confirm it.
 
-**Instructions**:
-1. Inside the Claude Code session, ask a question
-2. Example: `What is the difference between REST and GraphQL?`
-3. Wait for the full response
+**Instructions**: add `{"autoUpdatesChannel": "stable"}` to `~/.claude/settings.json`; run
+`claude`; check `/config` → **Auto-update channel**.
 
-**Expected result**: Claude responds with a detailed explanation.
-
-<details>
-<summary>💡 Hint</summary>
-
-If you're not in a session, type `claude` first to start one.
-
-</details>
+**Expected result**: `/config` shows **Auto-update channel: stable**.
 
 <details>
 <summary>✅ Solution</summary>
 
 ```bash
-$ claude
-# Inside the session:
-> What is the difference between REST and GraphQL?
-
-# Claude provides a detailed comparison
+mkdir -p ~/.claude
+cat > ~/.claude/settings.json << 'EOF'
+{
+  "autoUpdatesChannel": "stable"
+}
+EOF
+claude
+# then inside the session: /config
 ```
+
+`autoUpdatesChannel` is a top-level `settings.json` key, not nested under `permissions`. Managed
+settings can enforce the same key organization-wide.
 
 </details>
 
@@ -281,66 +309,56 @@ $ claude
 
 ## 5. CHEAT SHEET
 
-| Task | Command | Notes |
-|------|---------|-------|
-| **Install (npm)** | `npm install -g @anthropic-ai/claude-code` | Requires Node.js 18+ |
-| **Install (Homebrew)** | `brew install --cask claude-code` | ⚠️ Verify formula name |
-| **Check Version** | `claude --version` | Verify installation works |
-| **Start Session** | `claude` | Opens interactive mode |
-| **One-shot Mode** | `claude -p "prompt"` | Single query, no session |
-| **View Help** | `/help` | Inside session; lists all commands |
-| **Compress Context** | `/compact` | Inside session; reduces token usage |
-| **Clear Context** | `/clear` | Inside session; resets conversation |
-| **Show Cost** | `/cost` | Inside session; shows token usage |
-| **Init Project** | `/init` | Inside session; creates CLAUDE.md |
-| **Exit Session** | `/exit`, or Ctrl+C twice (or Ctrl+D) | Leave Claude Code |
-| **Set API Key** | `export ANTHROPIC_API_KEY="sk-..."` | Alternative to OAuth |
-| **Configuration** | `claude config` | Manage settings |
-
-**Commands needing verification:**
-- `/status` — ⚠️ May or may not exist
-- `/model` — ⚠️ Model selection method unclear; check `/help` output
+| Task | Command |
+|---|---|
+| Install (macOS/Linux/WSL) | `curl -fsSL https://claude.ai/install.sh \| bash` |
+| Install (Windows PowerShell) | `irm https://claude.ai/install.ps1 \| iex` |
+| Install (Homebrew) | `brew install --cask claude-code` |
+| Install (WinGet) | `winget install Anthropic.ClaudeCode` |
+| Update now | `claude update` |
+| Diagnose from the shell | `claude doctor` |
+| Sign in (Console) | `claude auth login --console` |
+| Sign out (shell) | `claude auth logout` |
+| Auth status (JSON / text) | `claude auth status` / `claude auth status --text` |
+| One-year CI token | `claude setup-token` |
+| Sign in / out (in-session) | `/login` / `/logout` |
+| Full status (in-session) | `/status` |
+| In-session checkup + fixes | `/doctor` |
+| Exit session | `/exit`, or `Ctrl+D` twice |
+| Interrupt / then exit | `Ctrl+C` once interrupts (or clears input); twice exits |
 
 ---
 
 ## 6. PITFALLS — Common Mistakes
 
 | ❌ Mistake | ✅ Correct Approach |
-|-----------|-------------------|
-| Not checking Node.js version | npm install requires Node.js 18+. Run `node --version` first. |
-| Assuming commands without checking | Always run `/help` inside a session to see actual available commands. |
-| Not reloading shell after install | After installation, run `source ~/.zshrc` (or `~/.bashrc`) or open a new terminal window. |
-| Putting API key in code | Store API key in environment variables: `export ANTHROPIC_API_KEY="..."` in your shell profile, never in source files. |
-| Using outdated documentation | Installation methods may change. Always check official Anthropic docs for current instructions. |
+|---|---|
+| `sudo npm install -g @anthropic-ai/claude-code` | Use the native installer; never `sudo` an npm install |
+| `brew install claude-code` | Missing `--cask` — it ships as a Homebrew cask, not a formula |
+| `npm update -g` to refresh an npm install | Docs say avoid it; run `npm install -g @anthropic-ai/claude-code@latest` |
+| Assuming Homebrew/WinGet auto-updates like native | They don't — run `brew upgrade` / `winget upgrade`, or set `CLAUDE_CODE_PACKAGE_MANAGER_AUTO_UPDATE=1` |
+| A leftover `ANTHROPIC_API_KEY` in your shell profile | Outranks subscription login in `-p` mode; `env \| grep ANTHROPIC` if login looks wrong |
+| Confusing `claude doctor` with `/doctor` | `claude doctor`: shell command for an install that won't start. `/doctor`: in-session, can apply fixes |
+| Assuming the VS Code extension puts `claude` on `PATH` | It bundles a private CLI for its own panel; install the standalone CLI too |
+| Expecting `/logout` to work on Bedrock or Vertex | Unavailable there — auth is via AWS/Google Cloud credentials |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: Susan, a backend engineer at a fintech startup in Hanoi, just
-joined a new team building a payment processing service in Go. On day one, her
-new MacBook Pro arrives and she needs to set up Claude Code to help with code
-reviews and architecture decisions.
+**Scenario**: a 6-developer mobile team in Vietnam building a Kotlin Multiplatform (KMP) app —
+half on macOS, half on Windows — kept hitting "works on my machine" install drift: some had npm
+installs from a year-old wiki page, others a Homebrew install missing `--cask`.
 
-**Problem**: Susan found multiple installation methods online but wasn't sure
-which one was current. She was worried about version drift causing issues with
-her team's standardized setup.
+**Problem**: onboarding a new hire took a whole morning of Slack messages before Claude Code
+even started, and a bug report was as likely to be a stale local install as a real issue.
 
-**Solution**: Susan checked the official Anthropic documentation first, then
-installed via npm:
-```bash
-npm install -g @anthropic-ai/claude-code
-```
+**Solution**: onboarding now requires the native installer on both platforms, a shared
+`~/.claude/settings.json` pinning `autoUpdatesChannel: "stable"`, and `claude doctor` as the
+last step — done only once it prints "No installation issues found."
 
-She authenticated using her company's Anthropic account, then ran `/help` to
-see all available commands. She created a project `CLAUDE.md` file using `/init`
-to standardize context across her team.
-
-**Result**: Within 15 minutes, Susan was reviewing Go code with Claude Code,
-getting architectural suggestions for the payment service's error handling, and
-asking about best practices for the `context` package. By documenting the exact
-installation steps in her team's wiki, she ensured everyone used the same setup
-process.
+**Result**: `which -a claude` on every machine resolves to one binary, everyone tracks the same
+release channel, and "reproduce this bug" stopped starting with "what version are you on?"
 
 ---
 
