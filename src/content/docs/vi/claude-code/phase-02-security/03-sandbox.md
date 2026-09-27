@@ -24,7 +24,7 @@ không được thiết kế để bắt nó.
 
 Sandboxing đẩy containment xuống một lớp thấp hơn: hệ điều hành enforce những gì một process được
 chạm vào, bất kể model quyết định chạy gì — environment layer trước, model layer sau (S13). Module
-này bàn ba lựa chọn: built-in sandbox, devcontainer, cloud session.
+này bàn ba lựa chọn: sandbox, devcontainer, cloud session.
 
 ---
 
@@ -324,8 +324,8 @@ gist công khai nào trên `github.com` — đó là đường exfiltration, kh�
 review script mỗi lần đổi base image và không bao giờ mount `~/.ssh` — credential cloud đưa vào
 dưới dạng biến môi trường scoped, sống ngắn hạn.
 
-**Kết quả**: job chạy qua đêm trên repo tin cậy; review allowlist hàng tháng là control thật sự,
-không phải niềm tin agent "sẽ không làm vậy."
+**Kết quả**: job chạy qua đêm trên repo tin cậy; review allowlist hàng tháng là control, không phải
+niềm tin agent "sẽ không làm vậy."
 
 ---
 

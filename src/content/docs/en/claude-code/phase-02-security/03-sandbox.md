@@ -24,7 +24,7 @@ designed to catch it.
 
 Sandboxing moves containment down a layer: the OS enforces what a process can touch, regardless of
 what the model decided to run — environment layer first, model layer second (S13). This module
-covers three options: built-in sandbox, devcontainer, cloud session.
+covers three options: sandbox, devcontainer, cloud session.
 
 ---
 
@@ -291,7 +291,7 @@ overrides local settings (Module 10.5).
 | `allowUnsandboxedCommands: false` | Disable escape hatch | Overrides → "Strict sandbox mode" |
 | `network.allowedDomains` | Pre-approve; others prompt | Allowed reaches, others prompt |
 | `network.strictAllowlist: true` | Hard-deny unlisted (user/managed/`--settings`) | `403 blocked-by-allowlist` |
-| `filesystem.denyRead` + `permissions.deny` | Block a path for Bash *and* Read | `Operation not permitted`; Read refused |
+| `filesystem.denyRead` + `permissions.deny: ["Read(path/**)"]` | Block a path for Bash *and* Read | `Operation not permitted`; Read refused, no prompt |
 | `failIfUnavailable` | Refuse unsandboxed start | Missing dep on Linux blocks startup |
 | `init-firewall.sh` | Default-deny iptables + allowlist | Self-test prints "verification passed" |
 | `disableBypassPermissionsMode: "disable"` | Block `--dangerously-skip-permissions` | `/status` → managed source |
@@ -323,10 +323,11 @@ prevent a malicious project from exfiltrating anything accessible inside the con
 the Claude Code credentials stored in `~/.claude`." The allowlist resolves every GitHub IP range
 live, so a *working* firewall still lets a compromised dependency push data to any public repo or
 gist on `github.com` — the exfiltration path, not a misconfiguration. The team reviews the script
-on every base-image bump and never mounts `~/.ssh` — cloud credentials go in as scoped env vars.
+on every base-image bump and never mounts `~/.ssh` — cloud credentials go in as scoped,
+short-lived env vars.
 
-**Result**: jobs run unattended on trusted repos only; a monthly allowlist review is the real
-control, not a hope the agent "wouldn't do that."
+**Result**: jobs run unattended on trusted repos only; a monthly allowlist review is the control,
+not a hope the agent "wouldn't do that."
 
 ---
 
