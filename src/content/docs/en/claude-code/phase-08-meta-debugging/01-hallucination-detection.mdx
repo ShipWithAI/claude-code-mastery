@@ -1,156 +1,180 @@
 ---
 title: 'Hallucination Detection & Prevention'
 description: 'Detect and prevent AI hallucinations in Claude Code output to protect your projects from incorrect code.'
+verified: 2026-09-28
+claude_version: 2.1.283
 ---
 
 # Module 8.1: Hallucination Detection & Prevention
 
-> **Estimated time**: ~35 minutes
+> **Estimated time**: ~30 minutes
 >
 > **Prerequisite**: Module 7.5 (Multi-Agent Orchestration Tools)
 >
-> **Outcome**: After this module, you will be able to systematically detect and prevent AI hallucinations in Claude's outputs, protecting your projects from plausible but incorrect information.
+> **Outcome**: After this module, you will recognize hallucination patterns, know the verification
+> commands that catch them, and build the habit of checking before you trust.
 
 ---
 
 ## 1. WHY — Why This Matters
 
-You're building a React Native app. Claude confidently suggests installing `react-native-fast-image-loader` to optimize image loading. The package name looks professional, follows naming conventions, and Claude provides detailed usage examples. You run `npm install react-native-fast-image-loader`, wait through the installation, add the import, configure your app, and... "Module not found."
+Claude confidently tells you: "Install `npm install vnpay-nodejs`, then call
+`VNPay.createPaymentUrl(params)`." You implement it. Build fails. Thirty minutes of debugging later,
+the package doesn't exist.
 
-Thirty minutes later, you discover the package doesn't exist. Claude hallucinated it. The confidence in its tone made you skip verification. This happens constantly — not just with packages, but with API methods, CLI flags, configuration syntax, and even security settings. **AI hallucinations are the silent time-sink in AI-assisted development.** The cost isn't just lost time; it's misplaced trust that can lead to production bugs, security vulnerabilities, or architectural decisions based on features that don't exist.
+Or worse: Claude suggests a method name that sounds exactly right. It compiles. It ships. Production
+breaks because the method never existed.
+
+Claude doesn't signal uncertainty. A wrong answer sounds just as confident as a right one.
+Hallucination detection is YOUR job, not Claude's.
 
 ---
 
 ## 2. CONCEPT — Core Ideas
 
-**Hallucination** in AI systems means generating plausible but factually incorrect information. Claude (and all large language models) predict the most likely next tokens based on patterns in training data, not by looking up verified facts in real-time databases. This fundamental architecture means Claude can be confidently wrong.
+### What Is a Hallucination?
 
-### Why Hallucinations Happen
+**Hallucination** = the model generates plausible-sounding but incorrect information. Claude isn't
+"lying" — it genuinely predicts the most likely next tokens based on patterns in training data, not
+by looking anything up in a live database. That's why a fake package name can look identical to a
+real one: not malicious, just a structural limitation.
 
-LLMs are pattern-completion engines, not search engines. When Claude sees "react-native-" it knows hundreds of real packages start that way. If it hasn't seen the exact package you need in training data, it constructs a plausible name following the pattern. To Claude, `react-native-fast-image-loader` looks just as valid as `react-native-fast-image` (which is real).
+### Hallucination Categories
 
-### Common Hallucination Categories
+| Category | Example | Risk |
+|----------|---------|------|
+| Package names | `npm install vnpay-nodejs` (real: `vnpay`) | High |
+| API methods | `array.flattenDeep()` (native `Array` has no such method — that's lodash) | High |
+| CLI flags | `git commit --auto-stage` (invented) | Medium |
+| File paths | `src/utils/helpers.ts` that doesn't exist in this repo | Medium |
+| Version claims | "Added in v2.3.4" (fabricated history) | High |
+| Config syntax | A `tsconfig` option that was never real | High |
 
-1. **Package/Library Names**: `awesome-react-hooks`, `python-json-validator-plus` — sound real, don't exist
-2. **API Methods**: `fs.readFileAsync()` (Node.js fs is callback-based), `Array.findLast()` (older JS)
-3. **CLI Flags**: `git commit --auto-stage`, `docker run --safe-mode` — invented flags
-4. **File Paths**: `~/.claude/cache/sessions/`, `/usr/local/share/claude/` — may not exist
-5. **Version Numbers**: "Added in v2.3.4", "Deprecated in v3.1.0" — manufactured history
-6. **Configuration Syntax**: Wrong YAML indentation, non-existent config keys
+### Why Claude Hallucinates
 
-### Risk Levels
+Training data is full of similar-looking names and patterns, and Claude interpolates between them.
+It has no live connection to npm's registry baked into its weights — even when it **does** have
+tools that can check (see below), it still has to actually use them. A name that "fits the pattern"
+of hundreds of real packages looks just as valid to the model as one it has actually seen.
 
-| Risk | Scenario | Impact |
-|------|----------|--------|
-| **Low** | Wrong comment or variable name | Easy to spot during review |
-| **Medium** | Wrong API method | Compile error or runtime crash |
-| **High** | Wrong security configuration | Silent vulnerability in production |
-| **Critical** | Wrong package name from malicious registry | Supply chain attack vector |
+**Correction**: Claude Code is not blind to the internet — it has `WebFetch`/`WebSearch` and can run
+`npm view` or `curl` itself when asked. The risk isn't "Claude can't check," it's that **it often
+doesn't check unless verification is part of the request**.
 
-The danger isn't just wasted time — it's that plausible-sounding errors bypass your mental red flags.
+### Trust But Verify
 
-### Verification Mental Model
+**Trust** Claude's reasoning and general approach — it's usually excellent there.
+**Verify** every specific, checkable claim: a package name, a method name, a path, a version.
+
+Rule of thumb: the more specific and checkable the claim, the more it needs verification.
+
+### Red Flags
+
+Be extra suspicious when you see:
+- A package/method name that sounds "too perfect" for your exact use case
+- A specific version number ("added in v2.3.4")
+- A file path Claude never actually read
+- A CLI flag Claude hasn't run `--help` to confirm
 
 ```mermaid
 graph LR
-    A[User Request] --> B[Claude Processes]
-    B --> C[Claude Output]
-    C --> D{Verify}
-    D -->|Official Source| E{Matches?}
-    E -->|Yes| F[Trust & Use]
-    E -->|No| G[Reject & Ask Again]
-    D -->|Skip Verification| H[⚠️ Risk Zone]
-    style H fill:#ffcccc
-    style F fill:#ccffcc
-```
+    A[Claude Output] --> B{Specific Claim?}
+    B -->|Yes| C[VERIFY]
+    B -->|No| D[Trust Reasoning]
+    C --> E{Matches Source?}
+    E -->|Yes| F[Use It]
+    E -->|No| G[Ask For Correction]
+    G --> C
 
-**Core principle**: Confidence doesn't equal accuracy. Always verify against authoritative sources.
+    style C fill:#ffcc00
+    style F fill:#90EE90
+```
 
 ---
 
 ## 3. DEMO — Step by Step
 
-**Scenario**: You're optimizing image loading in a React Native app. Claude suggests a package that sounds perfect but might not exist.
+**Scenario**: You're integrating VNPay for a Vietnamese e-commerce checkout. You ask Claude for the
+right npm package.
 
-### Step 1: Suspect — Receive the Suggestion
-
-You ask Claude: "What's the best package for fast image loading in React Native?"
+### Step 1: Receive the Suggestion
 
 Claude responds:
 ```text
-I recommend using `react-native-fast-image-loader`. It provides
-automatic caching, lazy loading, and placeholder support.
+Use the `vnpay-nodejs` package:
+npm install vnpay-nodejs
 
-Install it with:
-npm install react-native-fast-image-loader
+import VNPay from 'vnpay-nodejs';
+const url = VNPay.createPaymentUrl(params);
 ```
 
-**Red flag check**: Generic descriptive name, no GitHub link provided, too-perfect feature match.
+**Red flag**: `<provider>-nodejs` and `createPaymentUrl` are both generic guesses, not verified facts.
 
-### Step 2: Verify — Check Official Registry
-
-Before running the install command, verify the package exists:
+### Step 2: Verify the Package
 
 ```bash
-$ npm view react-native-fast-image-loader
+$ npm view vnpay-nodejs
 ```
 
-Expected output if it doesn't exist:
+Real output (run 2026-09-28):
 ```text
+# Output may vary
 npm error code E404
-npm error 404 Not Found - GET https://registry.npmjs.org/react-native-fast-image-loader
-npm error 404 'react-native-fast-image-loader@latest' is not in this registry.
+npm error 404 Not Found - GET https://registry.npmjs.org/vnpay-nodejs - Not found
+npm error 404
+npm error 404  'vnpay-nodejs@*' is not in this registry.
+npm error 404
+npm error 404 Note that you can also install from a
+npm error 404 tarball, folder, http url, or git url.
+npm error A complete log of this run can be found in: …
 ```
 
-**Why this matters**: You just saved 30+ minutes of debugging why your import isn't working.
+**Confirmed: hallucination.** You just avoided 30+ minutes of debugging a broken import.
 
-### Step 3: Correct — Request Verified Alternatives
-
-Go back to Claude with evidence:
+### Step 3: Ask for a Verified Correction
 
 ```text
-That package doesn't exist in npm (I verified with `npm view`).
-What are REAL alternatives? Provide the exact npm package names
-that I can verify exist.
+`vnpay-nodejs` doesn't exist — npm view returned a 404. Search npmjs.com for the
+real VNPay library and give me the exact package name so I can verify it myself.
 ```
 
-Claude's corrected response might be:
+Claude's corrected response:
 ```text
-You're right, I apologize. Here are real alternatives:
-
-1. `react-native-fast-image` - Most popular option
-2. `react-native-cached-image` - Good caching support
-3. `expo-image` - If using Expo
-
-Verify each with `npm view <package-name>` before installing.
+You're right, sorry. The real package is `vnpay`:
+npm install vnpay
 ```
 
-### Step 4: Re-Verify Each Suggestion
-
-Check EACH suggested package:
+### Step 4: Re-Verify
 
 ```bash
-$ npm view react-native-fast-image
-# Output shows package details = EXISTS ✓
-
-$ npm view react-native-cached-image
-# Output shows package details = EXISTS ✓
-
-$ npm view expo-image
-# Output shows package details = EXISTS ✓
+$ npm view vnpay
 ```
 
-### Step 5: Trust — Use Only After Verification
+Real output:
+```text
+# Output may vary
+vnpay@2.5.0 | MIT | deps: 1 | versions: 53
+An open-source nodejs library support to payment with VNPay
+https://vnpay.js.org
 
-Now you can safely install:
+dependencies:
+dayjs: ^1.11.13
+```
+
+**Confirmed: real.** Now check the API too — don't trust the method name yet:
 
 ```bash
-$ npm install react-native-fast-image
+$ npm install vnpay
+$ cat node_modules/vnpay/README.md | head -60
 ```
 
-**Verification time**: 2 minutes
-**Debugging time saved**: 30+ minutes
-**Return on investment**: 15x
+The README shows the real method is `buildPaymentUrl()`, not `createPaymentUrl()` as guessed.
+
+### Step 5: Trust — Now You Can Use It
+
+**Verification workflow**: Suspect → Verify → Correct → Re-verify → Trust. Two minutes of `npm
+view` saved a debugging session and, in this case, saved shipping a call to a method that doesn't
+exist.
 
 ---
 
@@ -158,179 +182,104 @@ $ npm install react-native-fast-image
 
 ### Exercise 1: Hallucination Hunting
 
-**Goal**: Develop a suspicious eye for potential hallucinations.
+**Goal**: Build a suspicious eye for AI suggestions.
 
 **Instructions**:
-1. Ask Claude to recommend 3 libraries for data validation in Python
-2. Identify 3 potential hallucination points in its response (package names, methods, config)
-3. Verify each point using official sources (PyPI, GitHub, docs)
-4. Document: What was hallucinated? What was real?
+1. Ask Claude to recommend 3 npm packages for a task (e.g., date formatting).
+2. Run `npm view <package>` for each one; count how many are hallucinated.
 
-**Expected result**: A verification report showing which suggestions passed and which failed.
-
-<details>
-<summary>💡 Hint</summary>
-Check package names on pypi.org first, then verify API examples in official docs. Don't trust Claude's "this package provides X method" until you see it in the package's own documentation.
-</details>
+**Expected result**: At least one of the three fails verification.
 
 <details>
 <summary>✅ Solution</summary>
 
-**Verification Process**:
 ```bash
-# Check each package exists
-pip show pydantic  # ✓ Real - most popular validation library
-pip show validators  # ✓ Real - simple validation functions
-pip show schema  # ✓ Real - exists but less common
-
-# Then verify API examples in official docs
-# Visit https://docs.pydantic.dev for pydantic
-# Visit https://pypi.org/project/validators/ for validators
+$ npm view moment    # ✓ real — long-established package
+$ npm view dayjs     # ✓ real — widely used
+$ npm view date-fns  # ✓ real — widely used
 ```
 
-**Common hallucinations in this scenario**:
-- Method names that sound right but don't exist (e.g., `pydantic.validate_dict()` instead of proper model validation)
-- Configuration options that are invented (e.g., `validators.strict_mode=True`)
-- Mixing API from different libraries
-
-**Lesson**: Package names are easier to verify than API details. Always check official docs for usage examples.
+Anything named like `super-date-formatter` or `vn-date-utils` should be verified immediately —
+generic, "too perfect" names are the most common hallucination pattern.
 </details>
-
----
 
 ### Exercise 2: API Method Verification
 
-**Goal**: Verify an API method actually exists before using it.
+**Goal**: Verify a method exists before implementing against it.
 
 **Instructions**:
-1. Ask Claude how to read a file asynchronously in Node.js
-2. Claude might suggest `fs.readFileAsync()` (which doesn't exist natively)
-3. Verify using Node.js official documentation at nodejs.org
-4. Find the ACTUAL correct method
-
-**Expected result**: You identify the hallucination and find the real async file reading methods (`fs.promises.readFile()` or `fs.readFile()` with callback).
-
-<details>
-<summary>💡 Hint</summary>
-Node.js core `fs` module doesn't have `readFileAsync()`. Check the "File System" section in Node.js docs, specifically look for the `fs.promises` namespace.
-</details>
+1. Ask Claude for a way to deep-flatten a nested array in JavaScript without a library.
+2. Claude may suggest `array.flattenDeep()` — a lodash method, not native `Array`.
+3. Check the MDN `Array.prototype` reference for the real method.
 
 <details>
 <summary>✅ Solution</summary>
 
-**Hallucinated suggestion**:
+**Hallucinated**:
 ```javascript
-// ❌ This doesn't exist in Node.js core
-const data = await fs.readFileAsync('file.txt', 'utf8');
+// ❌ Not a native Array method
+const flat = nested.flattenDeep();
 ```
 
-**Real methods**:
+**Real** (native, ES2019+):
 ```javascript
-// ✅ Modern Promise-based approach (Node.js 10+)
-import { readFile } from 'fs/promises';
-const data = await readFile('file.txt', 'utf8');
-
-// ✅ Or using the promises namespace
-import fs from 'fs';
-const data = await fs.promises.readFile('file.txt', 'utf8');
-
-// ✅ Traditional callback approach
-import fs from 'fs';
-fs.readFile('file.txt', 'utf8', (err, data) => {
-  if (err) throw err;
-  console.log(data);
-});
+// ✅ Array.prototype.flat() with Infinity depth
+const flat = nested.flat(Infinity);
 ```
 
-**Verification source**: https://nodejs.org/api/fs.html#promise-example
+**Verification source**: developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/flat
 </details>
-
----
 
 ### Exercise 3: Path Verification
 
-**Goal**: Verify file paths exist before trying to use them.
+**Goal**: Verify a file path before trusting it.
 
-**Instructions**:
-1. Ask Claude where Claude Code stores its configuration
-2. Claude might suggest paths like `~/.claude/config.json` or `~/.config/claude/settings.json`
-3. Verify each path on your actual system with `ls -la`
-4. Find the REAL config location (hint: it might be different)
-
-**Expected result**: You identify which paths are real vs hallucinated on your system.
-
-<details>
-<summary>💡 Hint</summary>
-Configuration paths vary by installation method and OS. Check with `ls -la ~/.config/`, `ls -la ~/Library/Application\ Support/`, and the official Claude Code docs.
-</details>
+**Instructions**: Ask Claude where a config or util lives in your project, then run `ls <path>` or
+`find . -name "<filename>"` yourself and compare.
 
 <details>
 <summary>✅ Solution</summary>
 
-**Paths to check**:
 ```bash
-ls -la ~/.claude/config.json            # verify
-ls -la ~/.config/claude/settings.json   # verify
-ls -la ~/.claude/                       # verify
+# Claude says: "Config lives at src/config/settings.ts"
+$ ls src/config/settings.ts
+ls: src/config/settings.ts: No such file or directory  # Output may vary
+
+$ find . -name "settings.ts"
+./src/lib/config.ts   # Output may vary — real file, different path
 ```
 
-**Verification**:
-```bash
-ls -la ~/.claude/
-# settings.json is present — this is the real global config file
-```
-
-**Real config location**: Claude Code stores global settings in `~/.claude/settings.json` (project-level overrides live in `.claude/settings.json` inside the repo, with `.claude/settings.local.json` for personal, gitignored overrides). Paths like `~/.claude/config.json` or `~/.config/claude/settings.json` are plausible-sounding but don't match what's actually on disk.
-
-**Lesson**: Confirm with `ls -la` on your own machine — never trust a suggested path without checking it yourself.
+Claude guessed a conventional path instead of reading the real project structure. `ls`/`find` are
+ground truth — never trust a path you haven't checked yourself.
 </details>
 
 ---
 
 ## 5. CHEAT SHEET
 
-| Hallucination Type | Verification Method | Command/Tool | Authoritative Source |
-|---|---|---|---|
-| **npm package** | Registry lookup | `npm view <package>` | npmjs.com |
-| **Python package** | PyPI lookup | `pip show <package>` | pypi.org |
-| **Node.js API** | Official docs | N/A | nodejs.org/api |
-| **Browser API** | MDN reference | N/A | developer.mozilla.org |
-| **CLI flag** | Help text or man page | `command --help` or `man command` | Tool's official docs |
-| **Git command** | Git documentation | `git help <command>` | git-scm.com/docs |
-| **File path** | File system check | `ls -la <path>` | Your actual system |
-| **Config syntax** | Tool documentation | N/A | Tool's official config reference |
-| **Library version** | Changelog | Check repo tags/releases | GitHub releases page |
-| **React/Vue API** | Framework docs | N/A | react.dev, vuejs.org |
+| Type | Command | Example |
+|------|---------|---------|
+| npm package | `npm view <package>` | `npm view vnpay` |
+| Python package | `pip show <package>` | `pip show requests` |
+| Go module | `go list -m -versions <module>` | `go list -m -versions github.com/gin-gonic/gin` |
+| CLI flag | `<command> --help` | `git --help` |
+| File path | `ls <path>` | `ls src/utils/` |
+| Find a file | `find . -name "<file>"` | `find . -name "*.ts"` |
+| Man page | `man <command>` | `man curl` |
 
-### Quick Verification Workflow
+### Red Flag Phrases → Verification
 
-```bash
-# Packages
-npm view <package-name>     # npm
-pip show <package-name>     # Python
-gem list <gem-name>         # Ruby
-go get -u <package>@latest  # Go (will fail if not real)
+- "You can use package X" → `npm view X`
+- "Call X.method()" → check the official docs/source
+- "The file is at src/..." → `ls src/...`
+- "Added in version X.Y.Z" → check the changelog/release tags
 
-# CLI flags
-<command> --help
-man <command>
+### Verification Prompts That Work
 
-# File paths
-ls -la <path>
-find ~ -name "<filename>"
-
-# APIs - Must check official docs (no shortcut)
+```text
+"Verify this package exists on npm before suggesting it — run npm view yourself."
+"Read the actual README/types of this package before describing its API."
 ```
-
-### Red Flags Checklist
-
-Before trusting Claude's output, check for:
-- [ ] Generic descriptive names (`awesome-X`, `fast-Y-loader`, `super-Z-utils`)
-- [ ] No source links provided (no GitHub, no docs URL)
-- [ ] "This was added in version X.Y.Z" claims (invented history)
-- [ ] Suspiciously perfect feature match (too good to be true)
-- [ ] Mixed or inconsistent syntax styles
-- [ ] Deprecated warnings without source citation
 
 ---
 
@@ -338,102 +287,62 @@ Before trusting Claude's output, check for:
 
 | ❌ Mistake | ✅ Correct Approach |
 |---|---|
-| **Trusting confident-sounding responses** | Confidence ≠ accuracy. Claude sounds equally confident whether right or wrong. Always verify. |
-| **Only checking the first suggestion** | Verify ALL suggestions, not just the first. Hallucinations can appear anywhere in the response. |
-| **Using Claude to verify Claude** | Don't ask Claude "Does X exist?" — it will often confidently confirm its own hallucination. Use external sources. |
-| **Assuming "it compiled" means correct** | Compilation success doesn't guarantee runtime behavior is correct. Test actual functionality. |
-| **Skipping verification for "simple" things** | Simple things hallucinate too. Package names and CLI flags are common hallucination targets. |
-| **Trusting code that "looks right"** | Syntax highlighting and proper formatting don't mean the code uses real APIs. Verify method names. |
-| **Relying on Claude's "source citations"** | Claude can't browse the web in real-time. It's reconstructing likely URLs from memory, not linking to actual current pages. |
-| **Batch-installing multiple packages without checking** | Check EACH package individually. A real-looking list might contain 2 real packages and 1 hallucinated one. |
+| Trusting a confident-sounding response | Confidence ≠ accuracy. Claude sounds equally sure whether right or wrong. |
+| Checking only the first suggestion | Verify every suggestion — hallucinations hide anywhere in a list. |
+| Using Claude to verify Claude ("does X exist?") | Use an external source: registry, docs, filesystem. |
+| Assuming "Claude can't browse the web" excuses unverified claims | Claude has `WebFetch`/`WebSearch` and can run `npm view` itself — ask it to actually check. |
+| Accepting the first passing test run as proof | (S12) **Early victory declaration**: "it ran once" isn't "it's correct." Re-run and inspect. |
+| Trusting a fix with no independent check | (S14) "The task verifier is nearly perfect, otherwise Claude will solve the wrong problem" — give it a real check to run. |
+| Batch-installing suggested packages without checking each one | A list of 3 can contain 2 real packages and 1 hallucinated one. |
 
-### The Most Dangerous Hallucination Type
-
-**Security configurations** are the highest-risk hallucinations because they fail silently:
+### The Most Dangerous Hallucination: Fake Security Config
 
 ```yaml
-# ❌ Hallucinated Docker security config
+# ❌ Hallucinated Docker security config — parses fine, does nothing
 docker:
   security:
-    safe_mode: true          # Doesn't exist
-    auto_scan_vulnerabilities: true  # Not a real flag
+    safe_mode: true                 # not a real key
+    auto_scan_vulnerabilities: true # not a real flag
 ```
 
-This looks professional, passes YAML validation, but does nothing. Your deployment runs without the security you think you have.
-
-**Protection**: Always cross-reference security configs with official docs before deploying.
+It passes YAML validation and looks professional. It provides zero actual protection.
 
 ---
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: Vietnamese fintech team building payment gateway integration for a mobile banking app.
+**Scenario**: A Vietnamese startup team integrating VNPay for mobile banking checkout.
 
-**Problem**: The team was integrating with a local payment provider's API. Claude suggested an endpoint structure that looked correct:
+**What happened**: A developer asked Claude for the VNPay npm package and got the same
+`vnpay-nodejs` / `createPaymentUrl()` suggestion as the DEMO above. The naming matched VNPay's
+conventions and Claude explained the flow clearly, which reinforced false confidence — no one ran
+`npm view` first. Two hours into implementation, the build still wouldn't resolve the import.
 
-```javascript
-// Claude's suggestion
-const response = await fetch('https://api.payment-provider.vn/v2/transactions/create', {
-  method: 'POST',
-  headers: {
-    'X-API-Key': apiKey,
-    'X-Signature': signature,
-  },
-  body: JSON.stringify({
-    amount: 100000,
-    currency: 'VND',
-    auto_confirm: true,  // ← Hallucinated field
-  })
-});
-```
+**Root cause found**: `npm view vnpay-nodejs` returned a 404. Both the package name and the method
+name were hallucinated — plausible guesses built from VNPay's naming style, not verified facts.
 
-The code looked professional. Variable names matched the provider's documentation style. The team implemented it, wrote tests with mocked responses (which passed), and deployed to staging.
+**Cost**: roughly 4 hours total (2 hours implementing the wrong package, 2 hours debugging why
+nothing resolved) versus 30 seconds for `npm view`.
 
-**Staging failed**: Real API calls returned `400 Bad Request`. The `auto_confirm` field didn't exist — Claude had invented it based on common API patterns. The actual API required a separate `/confirm` endpoint call.
+**Fix the team adopted** (added to CLAUDE.md): `npm view <package>` before any install; read the
+real README/types before using a suggested method name; a second engineer reviews payment
+integrations before merge.
 
-**Impact**:
-- 2 days of debugging (weekend work to meet deadline)
-- Customer complaints about incomplete transactions in staging
-- Team trust in AI assistance dropped significantly
-
-**Root cause**: Team skipped verification because:
-1. The suggestion matched the provider's naming conventions
-2. Mocked tests passed (they mocked the wrong behavior)
-3. Claude explained the logic clearly (which reinforced false confidence)
-
-**Fix implemented**:
-```markdown
-# Added to team's CLAUDE.md
-
-## AI Output Verification Protocol
-
-Before implementing ANY external API suggestion from AI:
-
-1. ✅ Check official API documentation (not AI-suggested docs)
-2. ✅ Verify endpoint URLs in provider's actual API reference
-3. ✅ Test each field with minimal real API call in development
-4. ✅ Review AI-suggested fields against API schema/OpenAPI spec
-5. ✅ For payment/financial APIs: Manual peer review REQUIRED
-
-Never trust AI for external API structures without verification.
-```
-
-**Lesson**: The more critical the integration (payments, security, data privacy), the more rigorous your verification must be. Claude doesn't have real-time access to API documentation — it's reconstructing likely patterns from training data.
-
-**Result**: Team now verifies all AI suggestions against official sources before implementation. Saved 15+ hours in the next integration by catching 3 hallucinated config fields during verification phase.
+**Result**: the team runs `npm view` reflexively now. The next integration caught 3 hallucinated
+config fields during verification — before they cost a minute of debugging. Team rule: "New
+package? `npm view` first. New API? Read the types first. No exceptions."
 
 ---
 
 ### Key Takeaways
 
-1. **Hallucinations are normal AI behavior** — not a bug, but a fundamental characteristic of how LLMs work
-2. **Confidence doesn't correlate with accuracy** — Claude sounds equally sure whether right or wrong
-3. **Verification is non-negotiable** — especially for packages, APIs, security configs, and external integrations
-4. **Use authoritative sources** — npm registry, official docs, man pages, not Claude verifying Claude
-5. **Red flags are your friends** — generic names, perfect feature matches, no source links = verify immediately
-6. **Critical systems need critical verification** — payments, security, data privacy require manual peer review
+1. Hallucination is normal model behavior, not a bug.
+2. Confidence doesn't correlate with accuracy.
+3. Verification is non-negotiable for packages, APIs, security config, and integrations.
+4. Claude can check things for you — ask it to verify instead of assuming it can't.
+5. Give it (and yourself) a real check to run, not a narrated success (S12, S14).
 
-Hallucination detection isn't about mistrusting AI — it's about **verifying AI**, which is faster than debugging AI. A 2-minute verification saves a 2-hour debugging session.
+A 2-minute `npm view` beats a 2-hour debugging session, every time.
 
 ---
 
