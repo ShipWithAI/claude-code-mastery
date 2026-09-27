@@ -19,12 +19,11 @@ claude_version: 2.1.283
 
 ## 1. WHY — Why This Matters
 
-Your CI job runs `claude -p "fix the lint errors"` on every push. It finishes in a few seconds,
-exits `0`, and the pipeline goes green — but `git diff` is empty. Nothing got fixed. In an
-interactive terminal, Claude would have shown a permission prompt and waited for a click. In a
-script, there is no one to click "Yes." The `-p` run declined the edit, reported success anyway,
-and CI trusted it. Headless mode is not "interactive minus the UI" — it is a different contract,
-and you have to pre-authorize what you want done before you run it.
+Your CI job runs `claude -p "fix the lint errors"` on every push. It exits `0` and the pipeline
+goes green — but `git diff` is empty, nothing got fixed. Interactively, Claude would show a
+permission prompt and wait for a click; in a script, no one is there to click "Yes." The `-p` run
+declined the edit, reported success anyway, and CI trusted it. Headless mode is not "interactive
+minus the UI" — it is a different contract, and you have to pre-authorize what you want done.
 
 ---
 
@@ -32,10 +31,13 @@ and you have to pre-authorize what you want done before you run it.
 
 **Non-interactive = pre-authorize or denied.** For `-p`, the built-in starting permission mode is
 Manual on every plan, so you must pass the permission mode you want — nobody is at the keyboard to
-approve a prompt, so anything that would prompt gets denied and the run can still exit `0`. From
-Claude Code v2.1.259, `--output-format stream-json` reports every denial as a `permission_denied`
-system message, and the final `result` message lists them all under `permission_denials` — the
-only reliable way to tell "approved" apart from "silently skipped."
+approve a prompt, so anything that would prompt gets denied and the run can still exit `0`. With
+`--output-format stream-json`, a denied call surfaces as a `permission_denied` system message, and
+the final `result` lists every denial under `permission_denials` (confirmed by re-running this
+module's own Step 1 with `stream-json`, no extra flag needed) — a way to tell "approved" apart from
+"silently skipped" from a script. The docs teach this next to `--permission-prompts none`, which
+stops Claude waiting on a permission host (an SDK `canUseTool` callback or
+`--permission-prompt-tool`) in unattended runs; that flag needs Claude Code v2.1.259 or later.
 
 ```mermaid
 graph TD
@@ -63,9 +65,9 @@ optionally `--include-partial-messages`) prints one JSON object per line — `sy
 `--bare` skips hooks, skills, custom commands, subagents, plugins, MCP servers, auto memory, and
 CLAUDE.md — "the recommended mode for scripted and SDK calls," and it will become the `-p` default
 in a future release. It never reads `CLAUDE_CODE_OAUTH_TOKEN`, so a bare script needs
-`ANTHROPIC_API_KEY` or an `apiKeyHelper`. Bound a run with `--max-turns`, `--max-budget-usd`, or
-`--no-session-persistence`; reopen a prior `-p` run with `--continue`/`--resume`. Piped stdin is
-capped at 10MB.
+`ANTHROPIC_API_KEY` or an `apiKeyHelper`. Bound a run with `--max-turns`, `--max-budget-usd`
+(requires Claude Code v2.1.217 or later), or `--no-session-persistence`; reopen a prior `-p` run
+with `--continue`/`--resume`. Piped stdin is capped at 10MB.
 
 For CI auth: `claude setup-token` mints a one-year OAuth token tied to the creator's Pro/Max/Team/
 Enterprise subscription — fine for your own script, fragile for a shared pipeline (it breaks if
@@ -151,7 +153,8 @@ claude -p "List exported functions in src/math.js" --output-format stream-json -
 Expected output:
 ```text
 # Output may vary
-…                                    # your own SessionStart/Setup hooks, if any, stream first
+…                                    # elided: your own SessionStart/Setup hooks (if any) and an
+                                      # undocumented rate_limit_event stream before init
 {"type":"system","subtype":"init"}
 {"type":"assistant","subtype":null}
 {"type":"user","subtype":null}
@@ -160,6 +163,10 @@ Expected output:
 ```
 
 **Step 6: fan out, 2 files first**
+
+Step 2's `"Read,Edit"` denied this prompt: for "add JSDoc," the model chose `Write` (a full-file
+rewrite), not `Edit` — a wider grant, since `Write` can create or overwrite any file. Check which
+tool a task uses (a `stream-json` `tool_use`, as in Step 5) before widening `--allowedTools`.
 ```bash
 # docs: headless
 for f in src/*.js; do
@@ -177,8 +184,8 @@ I added a JSDoc block to `capitalize` in `src/string.js` ...
  src/string.js |  9 +++++++++
  2 files changed, 23 insertions(+)
 ```
-Try on 2-3 files, then scale to the rest of `src/*.js` — the same "check before you widen the
-blast radius" habit as any other fan-out (S1). Reset the lab after this step.
+"Refine your prompt based on what goes wrong with the first 2-3 files, then run on the full set"
+(S1). Reset the lab after this step.
 
 **Step 7: `--bare` never reads the OAuth token**
 ```bash
@@ -262,7 +269,8 @@ claude -p "What number did I ask you to remember?" --resume "$sid" --output-form
 **Goal**: Run an open-ended refactor prompt without risking a runaway bill.
 
 **Instructions**:
-1. Add `--max-budget-usd 0.50` and `--max-turns 3` to a `-p` call that edits files.
+1. Add `--max-budget-usd 0.50` (requires Claude Code v2.1.217 or later) and `--max-turns 3` to a
+   `-p` call that edits files.
 2. Observe the run stop with an error once either limit is hit.
 
 <details>
@@ -288,7 +296,7 @@ claude -p "Refactor src/math.js for readability" \
 | `--json-schema '<schema>'` | Validate output into `structured_output` | no |
 | `--verbose --include-partial-messages` | Token-level `stream-json` events | no |
 | `--bare` | Skip hooks/skills/MCP/CLAUDE.md; needs `ANTHROPIC_API_KEY` | no (drops OAuth token) |
-| `--max-turns N` / `--max-budget-usd N` | Bound a run | no |
+| `--max-turns N` / `--max-budget-usd N` | Bound a run (`--max-budget-usd` needs v2.1.217+) | no |
 | `--no-session-persistence` | Don't save the session | no |
 | `--continue` / `--resume "$id"` | Reopen a prior `-p` session | no |
 | `--system-prompt` / `--append-system-prompt` | Replace / extend the system prompt | no |
@@ -297,7 +305,8 @@ claude -p "Refactor src/math.js for readability" \
 | `--setting-sources user,project,local` | Choose which settings files load | no |
 
 **`--output-format json` fields**: `result` (text), `session_id`, `total_cost_usd`,
-`structured_output` (with `--json-schema`), `permission_denials` (array, v2.1.259+).
+`structured_output` (with `--json-schema`), `permission_denials` (array of denied tool calls; the
+related `--permission-prompts` flag needs v2.1.259+).
 
 **`stream-json` event types**: `system` (`init` first), `assistant`, `user`, `stream_event`
 (partial deltas), `result` (last line: final text, cost, session metadata).

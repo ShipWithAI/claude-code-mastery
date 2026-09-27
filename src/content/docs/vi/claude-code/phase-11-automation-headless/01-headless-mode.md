@@ -31,11 +31,13 @@ không phải "interactive mode bỏ giao diện" — nó là một hợp đồn
 ## 2. CONCEPT — Không Tương Tác = Pre-Authorize Hoặc Bị Từ Chối
 
 **Non-interactive = pre-authorize or denied.** Với `-p`, permission mode khởi đầu luôn là Manual
-trên mọi plan, nên bạn phải tự truyền mode mình muốn — không ai ngồi bàn phím để duyệt prompt, nên
-thứ gì cần duyệt sẽ bị từ chối, và run vẫn exit `0` bình thường. Từ v2.1.259, `--output-format
-stream-json` báo mọi lượt từ chối thành system message `permission_denied`, và `result` cuối liệt
-kê chúng trong `permission_denials` — cách duy nhất đáng tin để phân biệt "đã duyệt" với "âm thầm
-bị bỏ qua".
+trên mọi plan, nên bạn phải tự truyền mode mình muốn — không ai ngồi bàn phím để duyệt, nên thứ gì
+cần duyệt sẽ bị từ chối, run vẫn exit `0` bình thường. Với `--output-format stream-json`, một call
+bị từ chối hiện thành `permission_denied`, và `result` cuối liệt kê chúng trong `permission_denials`
+(đã xác nhận bằng cách chạy lại Bước 1 với `stream-json`, không cần flag thêm) — cách phân biệt "đã
+duyệt" với "âm thầm bị bỏ qua". Docs dạy điều này cạnh `--permission-prompts none`, giúp Claude
+không chờ permission host (callback `canUseTool` của SDK, hoặc `--permission-prompt-tool`) trong
+run không người trông; riêng flag đó cần Claude Code v2.1.259 trở lên.
 
 ```mermaid
 graph TD
@@ -63,9 +65,9 @@ tùy chọn `--include-partial-messages`) in mỗi dòng một JSON object — `
 `--bare` bỏ qua hooks, skills, custom commands, subagents, plugins, MCP servers, auto memory và
 CLAUDE.md — "chế độ khuyến nghị cho lệnh gọi scripted và SDK", sẽ thành mặc định của `-p` trong một
 bản tương lai. Nó không bao giờ đọc `CLAUDE_CODE_OAUTH_TOKEN`, nên script `--bare` cần
-`ANTHROPIC_API_KEY` hoặc `apiKeyHelper`. Giới hạn run bằng `--max-turns`, `--max-budget-usd`, hoặc
-`--no-session-persistence`; mở lại phiên `-p` trước đó bằng `--continue`/`--resume`. Stdin qua pipe
-giới hạn 10MB.
+`ANTHROPIC_API_KEY` hoặc `apiKeyHelper`. Giới hạn run bằng `--max-turns`, `--max-budget-usd` (cần
+Claude Code v2.1.217 trở lên), hoặc `--no-session-persistence`; mở lại phiên `-p` trước đó bằng
+`--continue`/`--resume`. Stdin qua pipe giới hạn 10MB.
 
 Về xác thực CI: `claude setup-token` tạo OAuth token dùng một năm, gắn với subscription
 Pro/Max/Team/Enterprise của người tạo — ổn cho script cá nhân, nhưng mong manh cho pipeline dùng
@@ -151,7 +153,8 @@ claude -p "List exported functions in src/math.js" --output-format stream-json -
 Output:
 ```text
 # Output may vary
-…                                    # hook SessionStart/Setup của bạn (nếu có) stream ra trước
+…                                    # đã lược bỏ: hook SessionStart/Setup của bạn (nếu có) và một
+                                      # rate_limit_event chưa được document, stream trước init
 {"type":"system","subtype":"init"}
 {"type":"assistant","subtype":null}
 {"type":"user","subtype":null}
@@ -160,6 +163,10 @@ Output:
 ```
 
 **Bước 6: Fan-out, 2 file trước**
+
+`"Read,Edit"` ở Bước 2 bị từ chối ở đây: với "add JSDoc", model chọn `Write` (viết lại cả file)
+thay vì `Edit` — quyền rộng hơn, vì `Write` tạo/ghi đè được bất kỳ file nào. Kiểm tra task dùng tool
+nào (`tool_use` trong `stream-json`, như Bước 5) trước khi mở rộng `--allowedTools`.
 ```bash
 # docs: headless
 for f in src/*.js; do
@@ -177,8 +184,8 @@ I added a JSDoc block to `capitalize` in `src/string.js` ...
  src/string.js |  9 +++++++++
  2 files changed, 23 insertions(+)
 ```
-Thử trên 2-3 file trước, rồi mới scale ra `src/*.js` — thói quen "kiểm tra trước khi mở rộng blast
-radius" của mọi fan-out (S1). Reset lab sau bước này.
+"Refine your prompt based on what goes wrong with the first 2-3 files, then run on the full set"
+(S1). Reset lab sau bước này.
 
 **Bước 7: `--bare` không bao giờ đọc OAuth token**
 ```bash
@@ -262,7 +269,8 @@ claude -p "What number did I ask you to remember?" --resume "$sid" --output-form
 **Mục tiêu**: Chạy một prompt refactor mở mà không lo bị "chạy trốn" tốn tiền.
 
 **Hướng dẫn**:
-1. Thêm `--max-budget-usd 0.50` và `--max-turns 3` vào một lệnh `-p` có sửa file.
+1. Thêm `--max-budget-usd 0.50` (cần Claude Code v2.1.217 trở lên) và `--max-turns 3` vào một lệnh
+   `-p` có sửa file.
 2. Quan sát run dừng lại với lỗi khi chạm một trong hai giới hạn.
 
 <details>
@@ -288,7 +296,7 @@ claude -p "Refactor src/math.js for readability" \
 | `--json-schema '<schema>'` | Validate output vào `structured_output` | không |
 | `--verbose --include-partial-messages` | Event `stream-json` theo từng token | không |
 | `--bare` | Bỏ hooks/skills/MCP/CLAUDE.md; cần `ANTHROPIC_API_KEY` | không (mất OAuth token) |
-| `--max-turns N` / `--max-budget-usd N` | Giới hạn một run | không |
+| `--max-turns N` / `--max-budget-usd N` | Giới hạn một run (`--max-budget-usd` cần v2.1.217+) | không |
 | `--no-session-persistence` | Không lưu session | không |
 | `--continue` / `--resume "$id"` | Mở lại phiên `-p` trước đó | không |
 | `--system-prompt` / `--append-system-prompt` | Thay / nối thêm system prompt | không |
@@ -297,7 +305,8 @@ claude -p "Refactor src/math.js for readability" \
 | `--setting-sources user,project,local` | Chọn settings file nào được load | không |
 
 **Field của `--output-format json`**: `result` (text), `session_id`, `total_cost_usd`,
-`structured_output` (với `--json-schema`), `permission_denials` (mảng, từ v2.1.259).
+`structured_output` (với `--json-schema`), `permission_denials` (mảng tool call bị từ chối; flag
+liên quan `--permission-prompts` cần v2.1.259+).
 
 **Loại event của `stream-json`**: `system` (`init` đầu tiên), `assistant`, `user`, `stream_event`
 (delta từng phần), `result` (dòng cuối: text cuối, cost, session metadata).
