@@ -21,9 +21,8 @@ Claude has been running for 15 minutes. The token counter is climbing. The same 
 three times. Claude keeps saying "let me try a different approach," but the approaches look
 suspiciously similar. You've burned $5 in tokens and the bug still isn't fixed.
 
-Stuck loops are token-burning, time-wasting traps that happen to everyone. The difference between
-beginners and experts is speed of detection: experts recognize the pattern after 3 attempts and
-intervene, instead of waiting for the 10th try to "finally work."
+Stuck loops are token-burning traps that happen to everyone. Experts just detect them faster,
+recognizing the pattern after 3 attempts instead of waiting for a 10th try to "finally work."
 
 Claude doesn't know it's stuck. It will keep trying indefinitely. YOU are the circuit breaker.
 
@@ -33,7 +32,8 @@ Claude doesn't know it's stuck. It will keep trying indefinitely. YOU are the ci
 
 ### What is a Stuck Loop?
 
-A **stuck loop** is when Claude repeatedly attempts similar solutions without making progress. Unlike healthy iteration (which converges toward a solution), stuck loops spin in place.
+A **stuck loop** is when Claude repeatedly attempts similar solutions without making progress —
+unlike healthy iteration, which converges toward a solution.
 
 Characteristics:
 - Same or similar errors repeating
@@ -318,9 +318,11 @@ Stop. Forget token refresh. Read the ACTUAL error log, not just
 the error message. What's the full context?
 ```
 
-**Discovery**: The error log showed the token wasn't expired — it was INVALID. The staging environment was using a different API key than production. Token refresh could never fix an invalid key.
+**Discovery**: The token wasn't expired — it was INVALID. Staging was using a different API key
+than production, so token refresh could never fix it.
 
-**Lesson**: The loop was stuck because the FRAMING was wrong. "Expired" vs "Invalid" — completely different problems requiring completely different solutions. Breaking the loop required changing the frame, not trying harder within it.
+**Lesson**: The loop was stuck because the FRAMING was wrong. "Expired" vs "Invalid" needed
+completely different fixes — breaking the loop meant changing the frame, not trying harder in it.
 
 **Team rule now**: "After 3 similar failures, we don't try again. We ask: 'What are we assuming
 that might be wrong?'" Cost of waiting: $8 and 45 minutes vs. ~$3 and ~15 minutes if they'd

@@ -402,7 +402,6 @@ Không undo được thứ làm qua Bash — với thứ đó, git là recovery 
 - [ ] Never Full Auto không có git branch
 - [ ] Backup .env file riêng
 - [ ] Deny lệnh nguy hiểm bằng `permissions.deny` hoặc `PreToolUse` hook — không chỉ note CLAUDE.md
-- [ ] Deny command nguy hiểm bằng `permissions.deny` hoặc `PreToolUse` hook — không chỉ note CLAUDE.md
 
 ---
 

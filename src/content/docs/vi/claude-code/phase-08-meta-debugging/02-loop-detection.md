@@ -19,7 +19,8 @@ claude_version: 2.1.283
 
 Claude đã chạy 15 phút. Token counter leo dần. Bạn thấy cùng error message flash qua 3 lần. Claude cứ nói "Let me try a different approach" nhưng approach nào trông cũng giống nhau. Đã burn $5 token mà bug vẫn còn.
 
-Stuck loop là trap tốn token và thời gian. Ai cũng gặp — beginner lẫn expert. Khác biệt? Expert detect và break NHANH. Họ không đợi 10 iteration hy vọng "lần sau được". Họ nhận ra pattern sau 3 lần và intervene.
+Stuck loop là trap tốn token, ai cũng gặp. Expert chỉ detect nhanh hơn — nhận ra pattern sau 3 lần
+thay vì đợi lần 10 hy vọng "lần này được".
 
 Ví von: Claude như người đang cố mở cửa — cứ đẩy đẩy đẩy mà không nhận ra cửa phải kéo. Bạn phải là người nói "Dừng lại. Thử kéo xem."
 
@@ -29,7 +30,8 @@ Ví von: Claude như người đang cố mở cửa — cứ đẩy đẩy đẩ
 
 ### Stuck Loop Là Gì?
 
-**Stuck loop** = Claude cứ thử similar solution mà không progress. KHÔNG giống healthy iteration (có converge toward solution). Stuck loop quay tại chỗ.
+**Stuck loop** = Claude cứ thử similar solution mà không progress — khác healthy iteration, vốn
+converge toward solution.
 
 Đặc điểm:
 - Same hoặc similar error lặp lại
@@ -315,9 +317,11 @@ Stop. Forget token refresh. Read ACTUAL error log, không chỉ
 error message. Full context là gì?
 ```
 
-**Phát hiện**: Error log show token không expired — nó INVALID. Staging environment đang dùng API key khác production. Token refresh không bao giờ fix invalid key được.
+**Phát hiện**: Token không expired — nó INVALID. Staging dùng API key khác production, nên token
+refresh không bao giờ fix được.
 
-**Lesson**: Loop stuck vì FRAMING sai. "Expired" vs "Invalid" — problem hoàn toàn khác cần solution hoàn toàn khác. Break loop cần đổi frame, không phải try harder trong frame cũ.
+**Lesson**: Loop stuck vì FRAMING sai. "Expired" vs "Invalid" cần fix hoàn toàn khác — break loop
+nghĩa là đổi frame, không phải try harder trong frame cũ.
 
 **Team rule sau đó**: "Sau 3 similar failure, không try lại. Hỏi 'Assumption nào đang sai?'"
 
