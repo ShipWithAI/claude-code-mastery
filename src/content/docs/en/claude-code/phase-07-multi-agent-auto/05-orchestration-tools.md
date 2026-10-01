@@ -1,8 +1,8 @@
 ---
 title: 'Orchestration Tools'
 description: 'Climb the orchestration ladder: headless fan-out, subagents, agent teams, background agents and the Agent SDK — and pick the lowest rung that works.'
-verified: 2026-09-22
-claude_version: 2.1.278
+verified: 2026-09-27
+claude_version: 2.1.283
 ---
 
 # Module 7.5: Orchestration Tools
@@ -127,8 +127,8 @@ ec31a8e docs: jsdoc for src/strings.js
 
 Three cold sessions, three commits, no shared context. Two details make it work: the prompt ends in
 a one-word contract (`OK`/`FAIL`), and `--allowedTools` names exactly what a run may do: edit that
-file, commit. `--permission-mode default` forces the stock behaviour; on Pro, Max and Team plans
-the built-in starting mode is `auto`, which `permissions.defaultMode` overrides.
+file, commit. `--permission-mode default` forces the stock behaviour; `claude -p` starts in Manual
+on every plan, which `permissions.defaultMode` overrides.
 
 **Step 3: Dispatch a background agent**
 

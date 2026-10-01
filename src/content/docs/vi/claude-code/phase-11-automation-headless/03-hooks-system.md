@@ -1,8 +1,8 @@
 ---
 title: 'Hệ thống Hook'
 description: 'Cấu hình hook PreToolUse, PostToolUse và Stop trong settings.json để log, chặn và gate hành động của Claude Code một cách deterministic.'
-verified: 2026-09-22
-claude_version: 2.1.278
+verified: 2026-09-27
+claude_version: 2.1.283
 ---
 
 # Module 11.3: Hệ thống Hook
@@ -212,11 +212,10 @@ in Bash), since the hook is a deliberate guardrail.
 …
 ```
 
-Vì sao: exit 2 chặn `Read`; stderr thành lý do Claude nêu. `--permission-mode default` ép hành
-vi mặc định; trên gói Pro, Max và Team, starting mode built-in là `auto`, và
-`permissions.defaultMode` ghi đè nó. Thiếu nó, mode `auto` trên máy này để Claude `cat .env`
-qua **Bash** — tool mà matcher này không thấy. `@`-reference cũng bỏ qua tool; thêm deny rule
-`Read` (Module 2.2).
+Vì sao: exit 2 chặn `Read`; stderr thành lý do Claude nêu. `--permission-mode default` ép về
+Manual cho demo này: `claude -p` khởi động ở Manual trên mọi gói. Thiếu cờ này, một override
+`permissions.defaultMode: "auto"` trên máy này để Claude `cat .env` qua **Bash** — tool mà
+matcher này không thấy. `@`-reference cũng bỏ qua tool; thêm deny rule `Read` (Module 2.2).
 
 **Bước 4: Từ chối `git push --force` bằng JSON**
 

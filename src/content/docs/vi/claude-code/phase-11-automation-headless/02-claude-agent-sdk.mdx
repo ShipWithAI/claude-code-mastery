@@ -1,8 +1,8 @@
 ---
 title: 'Claude Agent SDK'
 description: 'Chạy agent loop của Claude Code từ TypeScript/Python bằng query(), giới hạn tool và permission, thêm in-process MCP tool, và fallback sang subprocess claude -p an toàn.'
-verified: 2026-09-22
-claude_version: 2.1.278
+verified: 2026-09-27
+claude_version: 2.1.283
 ---
 
 # Module 11.2: Claude Agent SDK
@@ -305,8 +305,8 @@ cost=$0.4687 session=324de8c2-c77b-4446-86f7-cf4746d2a0aa
 ```
 
 Dấu nháy và `$(dollar)` tới Claude dưới dạng text; nếu ghép vào chuỗi lệnh shell, chúng đã chạy
-trong shell của bạn. `--permission-mode default` ép về hành vi gốc; trên gói Pro, Max và Team,
-starting mode built-in là `auto`, và `permissions.defaultMode` ghi đè nó.
+trong shell của bạn. `--permission-mode default` ép về hành vi gốc: `claude -p` khởi động ở
+Manual trên mọi gói, và `permissions.defaultMode` ghi đè nó.
 
 ---
 

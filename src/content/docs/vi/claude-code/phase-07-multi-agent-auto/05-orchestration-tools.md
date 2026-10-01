@@ -1,8 +1,8 @@
 ---
 title: 'Công Cụ Điều Phối'
 description: 'Leo thang điều phối: headless fan-out, subagent, agent team, background agent và Agent SDK — chọn bậc thấp nhất mà vẫn đủ dùng.'
-verified: 2026-09-22
-claude_version: 2.1.278
+verified: 2026-09-27
+claude_version: 2.1.283
 ---
 
 # Module 7.5: Công Cụ Điều Phối
@@ -126,8 +126,8 @@ ec31a8e docs: jsdoc for src/strings.js
 
 Ba session nguội, ba commit, không chia sẻ context. Hai chi tiết làm nó chạy được: prompt kết thúc
 bằng một hợp đồng một từ (`OK`/`FAIL`), và `--allowedTools` nêu đúng những gì một lần chạy được
-làm — sửa file đó, commit. `--permission-mode default` ép về hành vi gốc; trên gói Pro, Max và
-Team, starting mode built-in là `auto`, và `permissions.defaultMode` ghi đè nó.
+làm — sửa file đó, commit. `--permission-mode default` ép về hành vi gốc; `claude -p` khởi động ở
+Manual trên mọi gói, và `permissions.defaultMode` ghi đè nó.
 
 **Bước 3: Bắn một background agent**
 

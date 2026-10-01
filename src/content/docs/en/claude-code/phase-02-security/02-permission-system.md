@@ -1,8 +1,8 @@
 ---
 title: 'Permission System Deep Dive'
 description: 'Write allow/deny/ask rules, pick a permission mode, and prove the rule actually blocked the action.'
-verified: 2026-09-23
-claude_version: 2.1.280
+verified: 2026-09-27
+claude_version: 2.1.283
 ---
 
 # Module 2.2: Permission System Deep Dive
@@ -142,7 +142,7 @@ report. I didn't try reading the file another way.
 The tool result behind it is the evidence:
 `Permission to use Bash with command cat .env has been denied.` `--allowedTools Bash` allowed the
 *tool*; the `Read(./.env)` deny still won, because deny goes first. `--permission-mode default`
-forces the stock behaviour; on Pro, Max and Team plans the built-in starting mode is `auto`.
+forces the stock behaviour: `claude -p` starts in Manual on every plan.
 
 **Step 3: Prove the allow rule removes the prompt**
 
