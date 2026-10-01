@@ -1,238 +1,302 @@
 ---
 title: 'Tích hợp GitHub Actions'
-description: 'Tích hợp Claude Code vào GitHub Actions: tự động review PR, generate code và CI/CD pipeline.'
+description: 'Cài Claude GitHub App bằng /install-github-app, chạy anthropics/claude-code-action@v1 khi có mention @claude hoặc theo lịch, và giữ permissions cùng input không tin cậy tránh xa shell.'
+verified: 2026-09-27
+claude_version: 2.1.283
 ---
 
 # Module 11.4: Tích hợp GitHub Actions
 
-> **Thời gian học**: ~35 phút
+> **Thời gian học**: ~30 phút
 >
-> **Yêu cầu trước**: Module 11.1-11.3 (Headless Mode, SDK Integration, Hooks System)
+> **Yêu cầu trước**: Module 11.1 (Headless Mode)
 >
-> **Kết quả**: Sau module này, bạn sẽ có production-ready GitHub Actions workflow cho Claude Code, hiểu pattern GitHub-specific, và biết leverage GitHub ecosystem cho AI automation.
+> **Kết quả**: Sau module này, bạn sẽ cài được Claude GitHub App bằng `/install-github-app`, chạy
+> `anthropics/claude-code-action@v1` khi có mention `@claude` hoặc theo lịch, và giữ secret cùng
+> input không tin cậy tránh xa các bước shell.
 
 ---
 
 ## 1. WHY — Tại sao cần học
 
-Bạn đã biết chạy Claude Code headless. Bạn muốn nó tự động review PR, generate test mỗi khi có code mới. Nhưng làm sao wire vào GitHub? Event nào trigger workflow? Post comment lên PR thế nào? API key để đâu cho an toàn?
-
-**Ví von**: GitHub Actions là "hệ thống thần kinh" của repo — phản ứng với mọi event. Claude Code là "bộ não AI" — suy nghĩ và quyết định. Kết hợp = repo tự động phản ứng thông minh với mọi thay đổi.
+Bạn đã chạy Claude headless từ terminal. Giờ team muốn nó tự chạy — review mọi PR, triage issue
+mỗi tuần — mà không ai phải gõ lệnh. Lối tắt hấp dẫn: tự dựng workflow với `npm install -g
+@anthropic-ai/claude-code`, một step `claude -p` tự viết, title PR nhét thẳng vào shell script.
+Cách đó gãy mỗi lần CLI ra bản mới, không kiểm tra ai có quyền chạy, và một title ác ý có thể chạy
+lệnh trên runner của bạn. Action chính thức giải quyết cả ba.
 
 ---
 
 ## 2. CONCEPT — Ý tưởng cốt lõi
 
-### GitHub Actions Basics
+`anthropics/claude-code-action@v1` chạy đúng binary Claude Code bạn dùng ở local, bên trong một
+GitHub Actions runner, nối vào hệ event của GitHub. Nó có hai mode:
 
-Workflow file nằm ở `.github/workflows/*.yml`. Mỗi workflow định nghĩa **events** (khi nào chạy) và **jobs** (làm gì).
+- **Interactive mode** — workflow không truyền input `prompt`. Claude chờ trigger phrase (mặc định
+  `@claude`) trong comment hoặc review.
+- **Automation mode** — workflow set input `prompt`. Claude chạy ngay khi job bắt đầu — dùng cho
+  `schedule` và `workflow_dispatch`.
 
-### Key Events cho Claude Code
+```mermaid
+graph LR
+    A["Comment: @claude fix the bug"] --> B[issue_comment event]
+    B --> C[Workflow job: claude]
+    C --> D["anthropics/claude-code-action@v1"]
+    D --> E[Claude Code chạy trong runner]
+    E --> F["Commit + link tạo PR, hoặc comment lên PR"]
+```
 
-| Event | Khi nào trigger | Dùng cho |
-|-------|----------------|----------|
-| `pull_request` | PR opened/updated | Code review, test generation |
-| `push` | Code pushed to branch | Doc updates, lint fixes |
-| `workflow_dispatch` | Manual trigger từ UI | On-demand analysis |
-| `schedule` | Cron schedule | Periodic security audit |
-| `issue_comment` | Comment trên PR/issue | Chatops (`/claude review`) |
+Input chính (đầy đủ ở CHEAT SHEET): `prompt`, `claude_args`, `anthropic_api_key` hoặc
+`claude_code_oauth_token`, `github_token`, `trigger_phrase`, `settings`, `allowed_bots`, và
+`use_bedrock` / `use_vertex` / `use_foundry` để xác thực qua OIDC với cloud provider.
 
-### GitHub Contexts
+Khối `permissions:` quyết định token của action — và Claude — chạm được gì. Bộ tối thiểu:
+`contents: write`, `pull-requests: write`, `issues: write`, cộng `id-token: write` (App auth lẫn
+OIDC federation đều cần, kể cả khi tự truyền `github_token`) và `actions: read` (đọc kết quả CI).
 
-Actions cung cấp context variables:
+Ai trigger được: actor cần quyền write trên repo cho issue/PR/comment/review; bot bị từ chối trừ
+khi nằm trong `allowed_bots`. GitHub cũng không trigger lại workflow từ commit dùng `GITHUB_TOKEN`
+mặc định, nên commit của Claude không thể lặp vô hạn job.
 
-- `${{ github.event.pull_request.number }}` — PR number
-- `${{ github.event.pull_request.head.ref }}` — Branch name
-- `${{ secrets.ANTHROPIC_API_KEY }}` — Secret từ repo settings
-- `${{ github.workspace }}` — Working directory
-
-### Post Results về PR
-
-Sau khi Claude chạy xong, bạn cần:
-
-1. **Comment lên PR** — dùng `actions/github-script`
-2. **Add label** — "needs-revision", "ai-approved"
-3. **Set status check** — Pass/Fail hiển thị trên PR
-
-### Cost Control
-
-Claude Code tốn tiền API. Pattern kiểm soát:
-
-- **paths filter** — chỉ chạy khi file quan trọng thay đổi
-- **concurrency** — cancel workflow cũ khi có commit mới
-- **file limit** — chỉ review files thay đổi, không review toàn bộ repo
+Bảo mật được xây sẵn: action tự strip markdown ẩn khỏi comment không tin cậy, và giá trị context
+của GitHub không bao giờ chạm thẳng vào một step shell (DEMO Step 5).
 
 ---
 
 ## 3. DEMO — Từng bước thực hành
 
-**Scenario**: TypeScript project, muốn Claude auto review mỗi PR.
+**Scenario**: nối một repo để mention `@claude` được phản hồi, cộng thêm job triage hàng tuần.
 
-### Step 1: Tạo Workflow File
+**Step 1: Cài Claude GitHub App**
 
-Tạo `.github/workflows/claude-review.yml`:
-
-```yaml
-name: Claude Code Review
-
-on:
-  pull_request:
-    types: [opened, synchronize]
-    paths:
-      - 'src/**'
-      - 'tests/**'
-
-concurrency:
-  group: claude-review-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
-
-jobs:
-  review:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Install Claude Code
-        run: npm install -g @anthropic-ai/claude-code
-
-      - name: Get changed files
-        id: changed
-        run: |
-          FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E '\.(ts|tsx)$' | head -20)
-          echo "files<<EOF" >> $GITHUB_OUTPUT
-          echo "$FILES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: Run Claude Review
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: |
-          claude -p "Review these files for bugs and best practices: ${{ steps.changed.outputs.files }}" > review.txt
-
-      - name: Post PR Comment
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const review = fs.readFileSync('review.txt', 'utf8');
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `## 🤖 Claude Code Review\n\n${review}`
-            });
-```
-
-### Step 2: Set Up Secret
-
-Vào **Settings → Secrets and variables → Actions → New repository secret**:
-
-- Name: `ANTHROPIC_API_KEY`
-- Value: `sk-ant-api03-...`
-
-### Step 3: Test với PR
-
-```bash
-$ git checkout -b test-claude-review
-$ echo "const x = 1" > src/test.ts
-$ git add src/test.ts
-$ git commit -m "test: claude review trigger"
-$ git push origin test-claude-review
-```
-
-Tạo PR trên GitHub. Sau ~30 giây, bạn sẽ thấy comment từ bot:
+Trong một session Claude Code, ở repo có git remote trỏ về `github.com`, chạy:
 
 ```text
-🤖 Claude Code Review
-
-File: src/test.ts
-- Variable `x` declared but never used
-- Missing type annotation
-- Consider `const x: number = 1`
+/install-github-app
 ```
 
-### Step 4: Chatops Pattern
+Lệnh cài [Claude GitHub App](https://github.com/apps/claude) và viết workflow khởi động — sau khi
+kiểm tra `gh` CLI auth. Một lần chạy thật, lab repo, `gh` login thiếu scope:
 
-Tạo `.github/workflows/claude-chatops.yml`:
+```text
+# Output may vary — actual run in a lab repo, no GitHub remote / full gh auth scope
+❯ /install-github-app
+
+✳ Burrowing…
+────────────────────────────────────────────────────────────
+──Install GitHub App──────────────────────────────────────────
+
+  Error: GitHub CLI is missing required permissions: workflow.
+
+  Reason: Missing required scopes
+
+  How to fix:
+    ● Your GitHub CLI authentication is missing the "workflow" scope needed to manage GitHub Actions and secrets.
+    ●
+    ● To fix this, run:
+    ●   gh auth refresh -h github.com -s repo,workflow
+    ●
+    ● This will add the necessary permissions to manage workflows and secrets.
+
+  For manual setup instructions, see: https://github.com/anthropics/claude-code-action/blob/main/docs/setup.md
+
+  Press any key to exit
+```
+
+Sửa scope xong, lệnh chuyển sang xác thực trên trình duyệt. Trên remote `gitlab.com`/
+`bitbucket.org`, lệnh in thông báo rồi thoát — xem Step 6.
+
+Làm thủ công: cài App (Contents/Issues/Pull requests read-write), thêm secret `ANTHROPIC_API_KEY`,
+copy workflow dưới đây.
+
+**Step 2: Workflow tối thiểu**
 
 ```yaml
-name: Claude Chatops
-
+# .github/workflows/claude.yml — docs: github-actions (verbatim starter)
+name: Claude Code
 on:
   issue_comment:
     types: [created]
-
+  pull_request_review_comment:
+    types: [created]
 jobs:
-  chatops:
-    if: startsWith(github.event.comment.body, '/claude')
+  claude:
+    if: contains(github.event.comment.body, '@claude')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Parse and run command
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: |
-          COMMAND="${{ github.event.comment.body }}"
-          CMD="${COMMAND#/claude }"
-          claude -p "$CMD" > response.txt
-
-      - name: Reply
-        uses: actions/github-script@v7
+      - uses: actions/checkout@v6
         with:
-          script: |
-            const fs = require('fs');
-            const response = fs.readFileSync('response.txt', 'utf8');
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `### 🤖 Claude Response\n\n${response}`
-            });
+          fetch-depth: 1
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
 
-User comment `/claude explain src/auth.ts` → workflow chạy và reply.
+Không có input `prompt` — interactive mode, Claude chờ `@claude`.
+
+**Step 3: Kích hoạt nó**
+
+Comment `@claude add a README section about tests` trên một issue hoặc PR. Mặc định Claude không
+tự mở PR cho bạn — nó "commits code changes to a new branch [and] provides a link to the GitHub PR
+creation page... the user must click the link" (`claude-code-action/docs/security.md`).
+
+**Step 4: Automation mode — chạy theo lịch, không cần mention**
+
+```yaml
+# .github/workflows/claude-weekly-triage.yml
+name: Claude Weekly Triage
+on:
+  schedule:
+    - cron: '0 9 * * 1'
+permissions:
+  contents: read
+  issues: write
+  id-token: write
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: "Summarize open issues labelled bug"
+          claude_args: "--max-turns 5"
+```
+
+`prompt:` chuyển sang automation mode — chạy ngay khi job bắt đầu. `permissions:` hẹp hơn Step 2:
+không có `contents: write` hay `pull-requests`, vì job này chỉ đọc issue.
+
+**Step 5: Không bao giờ để context GitHub chưa tin cậy chạm shell**
+
+```yaml
+# ❌ đừng ship cái này — comment body ác ý biến thành lệnh shell
+- name: Echo comment (VULNERABLE)
+  run: echo "${{ github.event.comment.body }}"
+```
+
+```yaml
+# ✅ đưa context không tin cậy qua env: trước (docs.github.com — Secure use reference)
+- name: Echo comment safely
+  env:
+    COMMENT_BODY: ${{ github.event.comment.body }}
+  run: echo "$COMMENT_BODY"
+```
+
+Vì sao: một title PR dạng `a"; ls $GITHUB_WORKSPACE"` nhét vào `run:` sẽ chạy `ls` trên runner —
+`${{ }}` được thay thế vào shell script *trước khi* nó chạy. `env:` lưu giá trị vào bộ nhớ thay vì
+vậy. Cách sửa này áp dụng cho mọi field `${{ github.event.* }}` mà step của bạn chạm tới, không chỉ
+riêng action này.
+
+**Step 6: Không dùng GitHub? GitLab CI/CD có bản tương đương (beta, do GitLab duy trì)**
+
+```yaml
+# docs: gitlab-ci-cd — verbatim minimal example
+stages:
+  - ai
+
+claude:
+  stage: ai
+  image: node:24-alpine3.21
+  # Adjust rules to fit how you want to trigger the job:
+  # - manual runs
+  # - merge request events
+  # - web/API triggers when a comment contains '@claude'
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  variables:
+    GIT_STRATEGY: fetch
+  before_script:
+    - apk update
+    - apk add --no-cache git curl bash
+    - curl -fsSL https://claude.ai/install.sh | bash
+    # The installer places claude in ~/.local/bin, which isn't on PATH in this image
+    - export PATH="$HOME/.local/bin:$PATH"
+  script:
+    # Optional: start a GitLab MCP server if your setup provides one
+    - /bin/gitlab-mcp-server || true
+    # Use AI_FLOW_* variables when invoking via web/API triggers with context payloads
+    - echo "$AI_FLOW_INPUT for $AI_FLOW_CONTEXT on $AI_FLOW_EVENT"
+    - >
+      claude
+      -p "${AI_FLOW_INPUT:-'Review this MR and implement the requested changes'}"
+      --permission-mode acceptEdits
+      --allowedTools "Bash Read Edit Write mcp__gitlab"
+      --debug
+```
+
+"Currently in beta... maintained by GitLab." Lưu API key dưới dạng CI/CD variable đã masked — không
+bao giờ để trong `.gitlab-ci.yml`.
 
 ---
 
 ## 4. PRACTICE — Luyện tập
 
-### Exercise 1: Basic PR Review
+### Exercise 1: Auto-review mọi PR
+**Goal**: Cho Claude tự review PR, không ai phải gõ `@claude`.
 
-**Mục tiêu**: Tạo workflow tự động review PR.
+**Instructions**:
+1. Trigger trên `pull_request: [opened, synchronize]`.
+2. Set `prompt:` review, giới hạn bằng `claude_args: "--max-turns 5"`.
+3. Giới hạn `permissions:` đúng nhu cầu của một reviewer.
 
-**Hướng dẫn**:
-1. Tạo `.github/workflows/claude-review.yml`
-2. Trigger on `pull_request` cho `src/**`
-3. Set `ANTHROPIC_API_KEY` secret
-4. Post kết quả lên PR comment
-
-**Kết quả mong đợi**: Mỗi PR có comment từ Claude bot.
+**Expected result**: mọi PR chạy một lượt review giới hạn; kết quả mặc định nằm trong run log (xem
+Solution để post ra PR).
 
 <details>
 <summary>💡 Hint</summary>
-
-Dùng `paths: ['src/**']` để filter. Dùng `actions/github-script@v7` để post comment.
-
+Automation mode cần `prompt:` — event `pull_request` không mang theo comment nào để khớp `@claude`.
 </details>
 
 <details>
 <summary>✅ Solution</summary>
 
-Dùng YAML từ DEMO Step 1. Thay đổi `paths` phù hợp với project của bạn.
-
+```yaml
+name: Claude PR Review
+on:
+  pull_request:
+    types: [opened, synchronize]
+permissions:
+  contents: read
+  pull-requests: read
+  id-token: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: "Review this pull request for bugs, security issues, and missing tests."
+          claude_args: "--max-turns 5"
+```
+Không có posting tool, kết quả chỉ tới run log. Để post inline comment, thêm
+`--allowedTools "mcp__github_inline_comment__create_inline_comment"` vào `claude_args` và bảo
+Claude comment trong `prompt` — giống ví dụ "Run a skill" của docs.
 </details>
 
-### Exercise 2: Cost Control với Filters
+### Exercise 2: Sửa cặp filter xung đột
+**Goal**: Workflow `pull_request` của đồng nghiệp set hai path filter GitHub không cho dùng chung.
 
-**Mục tiêu**: Chỉ chạy review khi files quan trọng thay đổi, cancel workflow cũ khi có commit mới.
+**Instructions**:
+1. Tìm hai filter key không thể cùng áp dụng trên một event.
+2. Viết lại trigger, chỉ dùng một trong hai.
+3. Xác nhận tập file mong muốn vẫn được cover.
 
-**Hướng dẫn**:
-1. Thêm `paths` filter cho `src/**`, `lib/**`
-2. Thêm `paths-ignore` cho `*.md`
-3. Thêm `concurrency` với `cancel-in-progress: true`
+**Expected result**: chỉ một filter key quyết định thay đổi nào kích hoạt workflow.
+
+<details>
+<summary>💡 Hint</summary>
+Xem bảng PITFALLS để biết đúng cặp filter và nên giữ cái nào.
+</details>
 
 <details>
 <summary>✅ Solution</summary>
@@ -240,121 +304,150 @@ Dùng YAML từ DEMO Step 1. Thay đổi `paths` phù hợp với project của 
 ```yaml
 on:
   pull_request:
+    types: [opened, synchronize]
     paths:
       - 'src/**'
       - 'lib/**'
-    paths-ignore:
-      - '**/*.md'
-
-concurrency:
-  group: review-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
 ```
-
+Gộp phần muốn loại trừ vào hình dạng của include list, thay vì thêm một filter key thứ hai cạnh
+tranh với nó.
 </details>
 
-### Exercise 3: Chatops Commands
+### Exercise 3: Migrate workflow khỏi `@beta`
+**Goal**: Một workflow cũ pin `@beta` với `mode`, `direct_prompt`, `custom_instructions`.
 
-**Mục tiêu**: Cho phép user comment `/claude review` hoặc `/claude explain`.
+**Instructions**:
+1. Nâng ref lên `@v1`.
+2. Bỏ `mode` — không còn tồn tại.
+3. Đổi tên `direct_prompt` thành `prompt`.
+4. Thay `custom_instructions` bằng `--append-system-prompt` trong `claude_args`.
+
+**Expected result**: workflow chạy trên `@v1` với hành vi tương đương.
 
 <details>
 <summary>💡 Hint</summary>
-
-Dùng `on: issue_comment`, check `startsWith(github.event.comment.body, '/claude')`.
-
+`custom_instructions` không có input cùng tên ở `@v1` — nó trở thành một CLI flag.
 </details>
 
 <details>
 <summary>✅ Solution</summary>
 
-Dùng YAML từ DEMO Step 4. Parse command với `${COMMAND#/claude }` để lấy phần sau prefix.
+```yaml
+# before (@beta)
+- uses: anthropics/claude-code-action@beta
+  with:
+    mode: tag
+    direct_prompt: "Review this PR"
+    custom_instructions: "Always check for SQL injection"
 
+# after (@v1)
+- uses: anthropics/claude-code-action@v1
+  with:
+    prompt: "Review this PR"
+    claude_args: "--append-system-prompt 'Always check for SQL injection'"
+```
 </details>
 
 ---
 
 ## 5. CHEAT SHEET
 
-### Common Events
+### Input chính
+
+| Input | Chức năng |
+|---|---|
+| `prompt` | Chuyển sang automation mode |
+| `claude_args` | CLI flags, vd `--max-turns 5 --model claude-sonnet-5` |
+| `anthropic_api_key` | API key từ Console, lấy từ secret |
+| `claude_code_oauth_token` | Token từ `claude setup-token` |
+| `github_token` | Token tùy chỉnh; bỏ trống để auth như App |
+| `trigger_phrase` | Mention phrase (mặc định `@claude`) |
+| `settings` | Claude Code settings JSON nhúng trực tiếp |
+| `allowed_bots` | Allow-list bot được trigger (mặc định không bot nào được) |
+| `use_bedrock` / `use_vertex` / `use_foundry` | Cloud provider qua OIDC |
+
+### `permissions:` tối thiểu
 
 ```yaml
-on:
-  pull_request:
-    types: [opened, synchronize]
-  push:
-    branches: [main]
-  workflow_dispatch:
-  issue_comment:
-    types: [created]
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write   # xác thực GitHub App của action / OIDC federation
+  actions: read      # cho Claude đọc kết quả CI trên PR
 ```
 
-### GitHub Contexts
+### Ma trận trigger
 
-| Context | Ví dụ | Dùng cho |
-|---------|-------|----------|
-| `github.event.pull_request.number` | `42` | PR number |
-| `github.base_ref` | `main` | Target branch |
-| `secrets.ANTHROPIC_API_KEY` | `sk-ant-...` | API key |
+| Mode | Input | Chạy khi |
+|---|---|---|
+| Interactive | không có `prompt` | `@claude ...` trong comment/review |
+| Automation | có `prompt` | job bắt đầu — `schedule`, `workflow_dispatch`, ... |
+| GitLab (beta) | `AI_FLOW_INPUT` | một `rules:` của pipeline khớp |
 
-### Post PR Comment
+### Các cách auth
 
-```yaml
-- uses: actions/github-script@v7
-  with:
-    script: |
-      github.rest.issues.createComment({
-        issue_number: context.issue.number,
-        owner: context.repo.owner,
-        repo: context.repo.repo,
-        body: 'Your message here'
-      });
-```
-
-### Cost Control
-
-```yaml
-paths: ['src/**']
-paths-ignore: ['**/*.md']
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-```
+| Option | Secret / variable | Phù hợp cho |
+|---|---|---|
+| API key | `ANTHROPIC_API_KEY` | CI dùng chung/org |
+| OAuth token | `CLAUDE_CODE_OAUTH_TOKEN` | repo cá nhân, plan Pro/Max/Team/Enterprise |
+| OIDC federation | `anthropic_federation_rule_id` | không cần secret tĩnh nào |
 
 ---
 
 ## 6. PITFALLS — Lỗi thường gặp
 
 | ❌ Sai | ✅ Đúng |
-|--------|---------|
-| Hardcode API key trong workflow | Dùng `${{ secrets.ANTHROPIC_API_KEY }}` |
-| Dùng `pull_request_target` không hiểu rõ | Dùng `pull_request` (an toàn hơn) |
-| Không set `concurrency` | Thêm `cancel-in-progress: true` |
-| Review toàn bộ repo mỗi PR | Dùng `paths` filter, limit files |
-| Workflow trigger chính nó (infinite loop) | Commit với `[skip ci]` |
-| Echo secret ra log để debug | NEVER echo secrets |
-| Diff quá lớn làm Claude timeout | Filter files, limit 20 files/run |
+|---|---|
+| Tự dựng `npm install -g @anthropic-ai/claude-code` + step `claude -p` viết tay | Dùng `anthropics/claude-code-action@v1` — đã lo sẵn install, App auth, kiểm tra actor |
+| Nhét `${{ github.event.comment.body }}` (hay bất kỳ context không tin cậy nào) thẳng vào `run:` | Đưa qua `env:` trước — cách GitHub sửa script injection |
+| Set cả `paths` và `paths-ignore` trên cùng một trigger `pull_request` | [GitHub](https://docs.github.com/en/actions/writing-workflows/workflow-syntax-for-github-actions): "cannot use both... for the same event" — chỉ giữ một |
+| Commit API key hoặc OAuth token vào file workflow | Lưu làm GitHub Secret (`ANTHROPIC_API_KEY` / `CLAUDE_CODE_OAUTH_TOKEN`) |
+| Quên `id-token: write` | Cần cho App auth và OIDC federation, kể cả khi tự truyền `github_token` |
+| Chạy `/install-github-app` trên remote GitLab hoặc Bitbucket | Lệnh in thông báo rồi thoát — dùng tích hợp GitLab CI/CD thay thế |
+| Dùng chung một token OAuth cá nhân (`claude setup-token`) làm secret CI cho cả org | Dùng API key từ Console — OAuth token gắn với subscription của người tạo nó |
 
 ---
 
 ## 7. REAL CASE — Câu chuyện thực tế
 
-**Scenario**: Open-source framework Zalo Mini App (TypeScript), 20+ contributors. Maintainer overwhelmed — 15 PR/week, mỗi PR cần 30 phút review.
+**Scenario**: Một thư viện mã nguồn mở nhận PR từ contributor rải khắp múi giờ. Maintainer chỉ muốn
+review khi họ chủ động yêu cầu, không phải mỗi lần push.
 
-**Problem**: Quality không đều. Một số PR thiếu test, không follow convention. Maintainer burnout.
+**Problem**: Workflow tự dựng cũ review mọi commit trên mọi lần update, chạy lại cả khi chỉ sửa lỗi
+chính tả, xếp hàng runs nhanh hơn tốc độ maintainer đọc kịp.
 
-**Solution**: Implement 3 workflows:
+**Solution**: Dựng lại trên `anthropics/claude-code-action@v1` với bốn cơ chế: chỉ trigger khi
+maintainer gắn label `needs-review`, dùng automation mode với `prompt:` review (event label không
+mang theo mention `@claude` nào để chờ), giới hạn chạy bằng `--max-turns 5`, và hủy review đang
+chạy dở khi có push mới thay thế nó.
 
-1. **claude-review.yml** — Auto review mỗi PR, check convention
-2. **claude-tests.yml** — Generate test khi PR có label `needs-tests`
-3. **claude-docs.yml** — Update docs khi merge vào main
+```yaml
+on:
+  pull_request:
+    types: [labeled, synchronize]
+concurrency:
+  group: claude-review-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  review:
+    if: contains(github.event.pull_request.labels.*.name, 'needs-review')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: "Review this pull request for bugs, security issues, and missing tests."
+          claude_args: "--max-turns 5"
+```
 
-**Results** (sau 3 tháng):
-
-- **Review time**: 30 phút → 15 phút/PR (-50%)
-- **PR quality**: 60% PR approve ngay lần đầu (trước: 25%)
-- **Test coverage**: 55% → 80% (+25%)
-
-**Quote từ maintainer**: "GitHub Actions + Claude = maintainer không bao giờ ngủ. Tôi giờ chỉ review AI suggestions thay vì review từng dòng code."
+**Result**: review chỉ trigger qua label; kết quả nằm trong run log (thêm posting tool, như Exercise
+1, để comment thay vì vậy); mỗi lần chạy có giới hạn turn cứng, và các lần chạy bị thay thế tự hủy.
 
 ---
 
