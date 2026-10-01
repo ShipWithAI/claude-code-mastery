@@ -1,6 +1,8 @@
 ---
 title: 'CLAUDE.md Templates'
 description: 'Get ready-to-use CLAUDE.md templates for common project types and adapt them for your specific stack.'
+verified: 2026-09-28
+claude_version: 2.1.283
 ---
 
 # Module 15.1: CLAUDE.md Templates
@@ -9,15 +11,19 @@ description: 'Get ready-to-use CLAUDE.md templates for common project types and 
 >
 > **Prerequisite**: Phase 4 (Prompt Engineering & Memory)
 >
-> **Outcome**: After this module, you will have a library of CLAUDE.md templates for common project types and know how to adapt them for your specific needs.
+> **Outcome**: After this module, you will have a library of CLAUDE.md templates for common
+> project types and know how to adapt them for your specific needs
 
 ---
 
 ## 1. WHY — Why This Matters
 
-Every new project, you start CLAUDE.md from scratch. What patterns should I include? What mistakes should I warn about? What conventions does this framework use? You spend 30 minutes writing CLAUDE.md when you could be coding.
+Every new project, you start CLAUDE.md from scratch. What patterns should I include? What mistakes
+should I warn about? What conventions does this framework use? You spend 30 minutes writing
+CLAUDE.md when you could be coding.
 
-Templates are pre-built CLAUDE.md files for specific project types. Start with a template that knows your framework, then customize for your project specifics. 30 minutes → 5 minutes.
+Templates are pre-built CLAUDE.md files for specific project types. Start with a template that
+knows your framework, then customize for your project specifics. 30 minutes → 5 minutes.
 
 ---
 
@@ -75,17 +81,34 @@ Templates are pre-built CLAUDE.md files for specific project types. Start with a
 - Easy to customize
 - Evolves with learnings
 
+### Keep Templates Lean: `@imports` and `.claude/rules/`
+
+The docs' own size guidance: "Aim to keep CLAUDE.md under 200 lines by including only essentials"
+(S15). Two features organize a growing template library — but only one actually shrinks what loads:
+
+- **`@path/to/import`** pulls another file's content into `CLAUDE.md` at that point — relative
+  paths resolve against the *importing file's* location, and imports can recursively import up to
+  four hops deep. Put shared conventions (commit format, testing rules) in one file and `@import`
+  it from every template instead of copy-pasting. ⚠️ This is organization only: "imported files
+  still load and enter the context window at launch" — splitting into imports doesn't reduce
+  context.
+- **`.claude/rules/*.md`** files load the same way as `.claude/CLAUDE.md` by default, but adding a
+  `paths:` frontmatter key scopes a rule to specific files — it "trigger[s] when Claude reads files
+  matching the pattern, not on every tool use." This is what actually keeps content out of context
+  until it's relevant (e.g., a `paths: ["**/*.test.ts"]` rule with your testing conventions).
+
 ---
 
 ## 3. DEMO — Step by Step
 
-### Template 1: Next.js 14 (App Router)
+### Template 1: Next.js (App Router)
 
 ````markdown
 # Project: [Your Next.js App]
 
 ## Tech Stack
-- Next.js 14 with App Router
+- Next.js (App Router) — check `package.json` for the version; this template targets the
+  App Router convention, stable since Next.js 13
 - TypeScript strict mode
 - Tailwind CSS
 - Prisma ORM
@@ -200,7 +223,8 @@ export class UserService {
 - NEVER modify turbo.json pipeline without team discussion
 ```
 
-**Package-level CLAUDE.md** (`packages/web/CLAUDE.md` — lazy-loaded when Claude enters this directory):
+**Package-level CLAUDE.md** (`packages/web/CLAUDE.md` — lazy-loaded when Claude enters this
+directory):
 
 ```markdown
 # Package: web (Next.js Frontend)
@@ -225,7 +249,41 @@ export class UserService {
 - Test files: `*.test.tsx` next to component
 ```
 
-**Key insight**: The root CLAUDE.md loads immediately on every session. Package-level CLAUDE.md files only load when Claude navigates into that package directory. This keeps context lean — Claude only knows about the package you're working in, plus the global rules.
+**Key insight**: The root CLAUDE.md loads immediately on every session. Package-level CLAUDE.md
+files only load when Claude navigates into that package directory. This keeps context lean — Claude
+only knows about the package you're working in, plus the global rules.
+
+### Template 4: `@imports` + `.claude/rules/` (shared conventions across templates)
+
+Instead of pasting the same "Commit format" block into every template, put it once and import it:
+
+```markdown
+<!-- .claude/shared/commit-format.md -->
+## Commit Format
+`type(scope): message` — types: feat, fix, refactor, docs, test.
+```
+
+```markdown
+# Project: [Name]
+@.claude/shared/commit-format.md
+
+## Tech Stack
+...
+```
+
+For rules that should only load for matching files, use `.claude/rules/` with `paths:` instead of a
+package-level CLAUDE.md:
+
+```markdown
+---
+paths: ["src/**/*.test.ts", "src/**/*.test.tsx"]
+---
+# Testing Rules
+Use Jest + React Testing Library. One assertion focus per `it()` block.
+```
+
+This rule loads only "when Claude reads files matching the pattern," not on every turn — for a
+large template library, this is what keeps the always-loaded root file under 200 lines.
 
 ### Using a Template
 
@@ -262,7 +320,7 @@ Start with the closest template, don't build from scratch. Even 70% match saves 
 <summary>✅ Solution</summary>
 
 Example for a Next.js e-commerce project:
-1. Start with Next.js 14 template
+1. Start with the Next.js (App Router) template
 2. Customizations needed:
    - Add Stripe integration patterns
    - Add cart state management
@@ -392,13 +450,14 @@ Shareable template has:
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: Vietnamese development agency works on 10+ Next.js projects per year. Each developer wrote their own CLAUDE.md — inconsistent quality, missed patterns, repeated mistakes.
+**Scenario**: A Vietnamese dev agency works on 10+ Next.js projects a year. Each developer wrote
+their own CLAUDE.md — inconsistent quality, missed patterns, repeated mistakes.
 
 **Solution: Template Library**
 
 ```text
 /templates
-├── nextjs-app-router.md      # Standard Next.js 14
+├── nextjs-app-router.md      # Standard Next.js App Router
 ├── nextjs-ecommerce.md       # E-commerce specific
 ├── nodejs-api.md             # Backend API
 ├── react-native-app.md       # Mobile
@@ -417,7 +476,8 @@ Shareable template has:
 - Junior developers match senior patterns
 - Templates improved monthly from team feedback
 
-**Quote**: "Templates aren't about being lazy. They're about encoding our best practices so every project starts at our highest standard."
+**Quote**: "Templates aren't about being lazy. They're about encoding our best practices so every
+project starts at our highest standard."
 
 ---
 

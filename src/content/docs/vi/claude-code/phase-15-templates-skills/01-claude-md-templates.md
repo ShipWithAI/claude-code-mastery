@@ -1,6 +1,8 @@
 ---
 title: 'CLAUDE.md Templates'
 description: 'Bộ sưu tập CLAUDE.md templates cho các loại dự án: frontend, backend, mobile, KMP và monorepo.'
+verified: 2026-09-28
+claude_version: 2.1.283
 ---
 
 # Module 15.1: CLAUDE.md Templates
@@ -9,15 +11,18 @@ description: 'Bộ sưu tập CLAUDE.md templates cho các loại dự án: fron
 >
 > **Yêu cầu trước**: Phase 4 (Prompt Engineering & Memory)
 >
-> **Kết quả**: Sau module này, bạn sẽ có library CLAUDE.md template cho common project type và biết adapt cho specific need.
+> **Kết quả**: Sau module này, bạn sẽ có library CLAUDE.md template cho common project type và biết
+> adapt cho specific need.
 
 ---
 
 ## 1. WHY — Tại sao cần học
 
-Mỗi project mới, bạn start CLAUDE.md từ scratch. Pattern nào include? Mistake nào warn? Convention framework nào? Bạn mất 30 phút viết CLAUDE.md thay vì coding.
+Mỗi project mới, bạn start CLAUDE.md từ scratch. Pattern nào include? Mistake nào warn? Convention
+framework nào? Bạn mất 30 phút viết CLAUDE.md thay vì coding.
 
-Template là pre-built CLAUDE.md cho specific project type. Start với template biết framework của bạn, customize cho project specific. 30 phút → 5 phút.
+Template là pre-built CLAUDE.md cho specific project type. Start với template biết framework của
+bạn, customize cho project specific. 30 phút → 5 phút.
 
 ---
 
@@ -75,17 +80,33 @@ Template là pre-built CLAUDE.md cho specific project type. Start với template
 - Dễ customize
 - Evolve với learning
 
+### Giữ template gọn: `@imports` và `.claude/rules/`
+
+Hướng dẫn kích thước của docs: "Aim to keep CLAUDE.md under 200 lines by including only essentials"
+(S15). Hai tính năng tổ chức thư viện template — nhưng chỉ một cái thật sự giảm context load:
+
+- **`@path/to/import`** kéo nội dung file khác vào `CLAUDE.md` tại đúng vị trí đó — path tương đối
+  resolve theo vị trí *file import*, và import có thể đệ quy tới bốn tầng. Đặt convention dùng
+  chung (commit format, quy tắc test) vào một file rồi `@import` từ mọi template thay vì
+  copy-paste. ⚠️ Đây chỉ là tổ chức: "imported files still load and enter the context window at
+  launch" — tách thành import không giảm context.
+- **`.claude/rules/*.md`** load giống `.claude/CLAUDE.md` mặc định, nhưng thêm frontmatter `paths:`
+  sẽ giới hạn rule cho file cụ thể — nó "trigger[s] when Claude reads files matching the pattern,
+  not on every tool use." Nhờ vậy phần nội dung luôn-load được thay bằng nội dung chỉ xuất hiện khi
+  liên quan (ví dụ rule `paths: ["**/*.test.ts"]` cho quy tắc test).
+
 ---
 
 ## 3. DEMO — Từng bước cụ thể
 
-### Template 1: Next.js 14 (App Router)
+### Template 1: Next.js (App Router)
 
 ````markdown
 # Project: [Your Next.js App]
 
 ## Tech Stack
-- Next.js 14 với App Router
+- Next.js (App Router) — kiểm tra version thực tế trong `package.json`; template này nhắm
+  vào convention App Router, ổn định từ Next.js 13
 - TypeScript strict mode
 - Tailwind CSS
 - Prisma ORM
@@ -225,7 +246,41 @@ export class UserService {
 - Test files: `*.test.tsx` cạnh component
 ```
 
-**Điểm mấu chốt**: Root CLAUDE.md được load ngay khi bắt đầu session. Các CLAUDE.md cấp package chỉ load khi Claude điều hướng vào thư mục package đó. Điều này giữ context gọn nhẹ — Claude chỉ biết về package bạn đang làm việc, cộng với các quy tắc chung.
+**Điểm mấu chốt**: Root CLAUDE.md được load ngay khi bắt đầu session. Các CLAUDE.md cấp package chỉ
+load khi Claude điều hướng vào thư mục package đó — giữ context gọn nhẹ, Claude chỉ biết package
+đang làm việc cộng quy tắc chung.
+
+### Template 4: `@imports` + `.claude/rules/` (chia sẻ convention giữa các template)
+
+Thay vì paste cùng một khối "Commit format" vào mọi template, đặt một lần rồi import:
+
+```markdown
+<!-- .claude/shared/commit-format.md -->
+## Commit Format
+`type(scope): message` — type: feat, fix, refactor, docs, test.
+```
+
+```markdown
+# Project: [Name]
+@.claude/shared/commit-format.md
+
+## Tech Stack
+...
+```
+
+Với rule chỉ nên load cho file khớp pattern, dùng `.claude/rules/` với `paths:` thay vì CLAUDE.md
+cấp package:
+
+```markdown
+---
+paths: ["src/**/*.test.ts", "src/**/*.test.tsx"]
+---
+# Testing Rules
+Dùng Jest + React Testing Library. Mỗi `it()` tập trung một assertion.
+```
+
+Rule này chỉ load "khi Claude đọc file khớp pattern," không phải mỗi lượt — với thư viện template
+lớn, đây là cách giữ file root luôn-load dưới 200 dòng.
 
 ### Sử dụng Template
 
@@ -262,7 +317,7 @@ Start với template gần nhất, đừng build từ scratch. Even 70% match ti
 <summary>✅ Giải pháp</summary>
 
 Ví dụ cho Next.js e-commerce:
-1. Start với Next.js 14 template
+1. Start với template Next.js (App Router)
 2. Customization cần:
    - Thêm Stripe integration pattern
    - Thêm cart state management
@@ -392,13 +447,14 @@ Shareable template có:
 
 ## 7. REAL CASE — Câu chuyện thực tế
 
-**Scenario**: Agency Việt Nam làm 10+ Next.js project/năm. Mỗi developer viết CLAUDE.md riêng — inconsistent quality, missed pattern, repeated mistake.
+**Scenario**: Agency Việt Nam làm 10+ Next.js project/năm. Mỗi developer viết CLAUDE.md riêng —
+inconsistent quality, missed pattern, repeated mistake.
 
 **Solution: Template Library**
 
 ```text
 /templates
-├── nextjs-app-router.md      # Standard Next.js 14
+├── nextjs-app-router.md      # Standard Next.js App Router
 ├── nextjs-ecommerce.md       # E-commerce specific
 ├── nodejs-api.md             # Backend API
 ├── react-native-app.md       # Mobile
@@ -417,7 +473,8 @@ Shareable template có:
 - Junior developer match senior pattern
 - Template improved monthly từ team feedback
 
-**Quote**: "Template không phải về lazy. Về encode best practice để mọi project start ở highest standard của team."
+**Quote**: "Template không phải về lazy. Về encode best practice để mọi project start ở highest
+standard của team."
 
 ---
 
