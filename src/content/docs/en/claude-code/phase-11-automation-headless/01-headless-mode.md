@@ -1,299 +1,284 @@
 ---
 title: 'Headless Mode'
-description: 'Run Claude Code in headless mode for scripted automation, batch processing, and CI/CD pipelines.'
+description: 'Run claude -p with explicit permissions, get JSON/stream-json output, and authenticate CI.'
+verified: 2026-09-27
+claude_version: 2.1.283
 ---
 
 # Module 11.1: Headless Mode
 
-> **Estimated time**: ~30 minutes
+> **Estimated time**: ~35 minutes
 >
-> **Prerequisite**: Phase 10 (Team Collaboration)
+> **Prerequisite**: Module 2.2 (Permission System Deep Dive)
 >
-> **Outcome**: After this module, you will understand headless mode fundamentals, know how to script Claude Code, and be ready for advanced automation.
+> **Outcome**: After this module, you will run `claude -p` in scripts with explicit permissions,
+> get machine-readable results with `--output-format json` and `--json-schema`, stream events, and
+> authenticate CI with `claude setup-token` or an API key.
 
 ---
 
 ## 1. WHY — Why This Matters
 
-You want to run Claude Code as part of a script. Maybe generate tests for all files in a directory. Maybe do code review on every PR automatically. Maybe batch process documentation. But Claude Code is interactive — it waits for your input, shows spinners, expects approval.
-
-Headless mode solves this: Claude executes, outputs result, returns control to your script. No interaction needed. This unlocks automation: cron jobs, CI/CD pipelines, batch processing, and more.
+Your CI job runs `claude -p "fix the lint errors"` on every push. It exits `0` and the pipeline
+goes green — but `git diff` is empty, nothing got fixed. Interactively, Claude would show a
+permission prompt and wait for a click; in a script, no one is there to click "Yes." The `-p` run
+declined the edit, reported success anyway, and CI trusted it. Headless mode is not "interactive
+minus the UI" — it is a different contract, and you have to pre-authorize what you want done.
 
 ---
 
-## 2. CONCEPT — Core Ideas
+## 2. CONCEPT — Non-Authorize Or Denied
 
-### Interactive vs Headless
+**Non-interactive = pre-authorize or denied.** For `-p`, the built-in starting permission mode is
+Manual on every plan, so you must pass the permission mode you want — nobody is at the keyboard to
+approve a prompt, so anything that would prompt gets denied and the run can still exit `0`. With
+`--output-format stream-json`, a denied call surfaces as a `permission_denied` system message, and
+the final `result` lists every denial under `permission_denials` (confirmed by re-running this
+module's own Step 1 with `stream-json`, no extra flag needed) — a way to tell "approved" apart from
+"silently skipped" from a script. The docs teach this next to `--permission-prompts none`, which
+stops Claude waiting on a permission host (an SDK `canUseTool` callback or
+`--permission-prompt-tool`) in unattended runs; that flag needs Claude Code v2.1.259 or later.
 
-| Aspect | Interactive | Headless |
-|--------|------------|----------|
-| Invocation | `claude` | `claude -p "prompt"` |
-| Input | Conversation | Single prompt |
-| Output | Formatted, spinners | Raw stdout |
-| Approval | Required | Skipped or auto |
-| Use case | Development | Automation |
-
-### The `-p` Flag
-
-The `-p` (print) flag is the key to headless mode:
-
-```bash
-claude -p "Your prompt here"
+```mermaid
+graph TD
+    A["claude -p 'prompt'"] --> B{Permission mode?}
+    B -->|"default: Manual"| C[Tool call needs approval]
+    C -->|"no one to approve"| D["Denied — exit 0, listed in permission_denials"]
+    B -->|"--allowedTools 'Bash(git diff *)'"| E[Matching calls run; rest denied]
+    B -->|"--permission-mode acceptEdits / dontAsk / auto"| F[Broader auto-approval]
+    B -->|"--dangerously-skip-permissions"| G["Everything runs (sandbox only)"]
 ```
 
-- Executes the prompt
-- Outputs result to stdout
-- Returns to shell when complete
-- Exit code indicates success/failure
+Pre-authorize on a ladder, narrowest first: `--allowedTools` with a scoped pattern such as
+`"Bash(git diff *)"` (the space before `*` matters — `Bash(git diff*)` would also match
+`git diff-index`); `--permission-mode acceptEdits|dontAsk|auto` for broader auto-approval; then
+`--dangerously-skip-permissions`, only inside a sandbox/container you can throw away.
 
-### Capturing Output
+Output comes in three shapes. `text` (default) prints the final answer. `--output-format json`
+wraps it with `result`, `session_id`, `total_cost_usd`, and a per-model cost breakdown, so a script
+can `jq` a field instead of parsing prose. Add `--json-schema '<schema>'` and the same JSON payload
+gains a validated `structured_output` field; an invalid schema fails fast with
+`Error: --json-schema is not a valid JSON Schema`. `--output-format stream-json` (with `--verbose`,
+optionally `--include-partial-messages`) prints one JSON object per line — `system` (subtype
+`init` first), `assistant`, `user`, `stream_event`, ending in `result` — for real-time pipelines.
 
-```bash
-# To variable
-result=$(claude -p "Explain this function")
+`--bare` skips hooks, skills, custom commands, subagents, plugins, MCP servers, auto memory, and
+CLAUDE.md — "the recommended mode for scripted and SDK calls," and it will become the `-p` default
+in a future release. It never reads `CLAUDE_CODE_OAUTH_TOKEN`, so a bare script needs
+`ANTHROPIC_API_KEY` or an `apiKeyHelper`. Bound a run with `--max-turns`, `--max-budget-usd`
+(requires Claude Code v2.1.217 or later), or `--no-session-persistence`; reopen a prior `-p` run
+with `--continue`/`--resume`. Piped stdin is capped at 10MB.
 
-# To file
-claude -p "Generate README" > README.md
-
-# Pipe to another command
-claude -p "List issues in code" | grep "ERROR"
-```
-
-### Input Methods
-
-```bash
-# Direct prompt
-claude -p "Explain recursion"
-
-# With file context
-claude -p "Review this code: $(cat file.js)"
-
-# Pipe from stdin
-cat file.js | claude -p "Review this code"
-```
-
-### Exit Codes
-
-- `0`: Success
-- Non-zero: Error (check stderr)
-- Use in scripts: `if claude -p "..."; then ... fi`
+For CI auth: `claude setup-token` mints a one-year OAuth token tied to the creator's Pro/Max/Team/
+Enterprise subscription — fine for your own script, fragile for a shared pipeline (it breaks if
+that person leaves). An `ANTHROPIC_API_KEY` from the Console belongs to the org, not a person, so
+it is the safer default for CI.
 
 ---
 
 ## 3. DEMO — Step by Step
 
-**Scenario**: Automate documentation generation using headless Claude Code.
-
-### Step 1: Basic Headless Execution
-
+**Step 1: Manual mode denies silently**
 ```bash
-claude -p "What is 2 + 2?"
+# docs: headless
+claude -p "Add a subtract function to src/math.js"
+git diff
 ```
-
-Output:
+Expected output:
 ```text
-4
-```
+# Output may vary
+I didn't add `subtract`. Permission to write to `src/math.js` and `tests/math.test.mjs` was
+declined, so neither file was changed.
 
-Check exit code:
+These are the changes I would make:
+...
+If you grant write access, I'll make these edits and run `npm test` to check them.
+```
+`git diff` prints nothing — the run exited `0` but changed no files.
+
+**Step 2: pre-authorize with `--allowedTools`**
 ```bash
-echo $?
+# docs: headless
+claude -p "Add a subtract function to src/math.js" --allowedTools "Read,Edit"
+git diff --stat
 ```
-
-Output:
+Expected output:
 ```text
-0
+# Output may vary
+I added `subtract(a, b)` to `src/math.js:2` ... both tests pass when I run `npm test`.
+
+ src/math.js         | 1 +
+ tests/math.test.mjs | 1 +
+ 2 files changed, 2 insertions(+)
 ```
+Reset (`git checkout -- .`) before the next step.
 
-### Step 2: Capture to Variable
-
+**Step 3: structured `json` output**
 ```bash
-explanation=$(claude -p "Explain async/await in one paragraph")
-echo "$explanation"
+# docs: headless
+claude -p "List exported functions in src/math.js" --output-format json | \
+  jq '{result, session_id, total_cost_usd}'
 ```
-
-Output:
+Expected output:
 ```text
-Async/await is a JavaScript feature that makes asynchronous code
-easier to write and read by allowing you to write asynchronous
-operations in a synchronous-looking style...
+# Output may vary
+{
+  "result": "`src/math.js` exports two functions:\n\n- `add(a, b)` ...",
+  "session_id": "fc02c4ee-1247-42da-aaa8-32f46f6fc81f",
+  "total_cost_usd": 0.2626594
+}
 ```
 
-### Step 3: Generate File from Output
-
+**Step 4: validated output with `--json-schema`**
 ```bash
-claude -p "Generate a README.md for a TypeScript utility library" > README.md
-head -5 README.md
+# docs: headless
+claude -p "List exported functions in src/math.js" --output-format json \
+  --json-schema '{"type":"object","properties":{"functions":{"type":"array","items":{"type":"string"}}},"required":["functions"]}' | \
+  jq .structured_output
+```
+Expected output:
+```text
+# Output may vary
+{
+  "functions": ["add", "divide"]
+}
 ```
 
-Output:
-```markdown
-# TypeScript Utility Library
-
-A collection of useful TypeScript utilities for common tasks.
-
-## Installation
-```
-
-### Step 4: Process Multiple Files
-
+**Step 5: `stream-json` events**
 ```bash
-#!/bin/bash
-# generate-docs.sh
+# docs: headless
+claude -p "List exported functions in src/math.js" --output-format stream-json --verbose | \
+  jq -c 'select(.type) | {type, subtype}' | head
+```
+Expected output:
+```text
+# Output may vary
+…                                    # elided: your own SessionStart/Setup hooks (if any) and an
+                                      # undocumented rate_limit_event stream before init
+{"type":"system","subtype":"init"}
+{"type":"assistant","subtype":null}
+{"type":"user","subtype":null}
+{"type":"assistant","subtype":null}
+{"type":"result","subtype":"success"}
+```
 
-for file in src/*.ts; do
-  echo "Documenting $file..."
-  doc=$(claude -p "Generate JSDoc comments for: $(cat "$file")")
-  echo "$doc" > "docs/$(basename "$file" .ts).md"
+**Step 6: fan out, 2 files first**
+
+Step 2's `"Read,Edit"` denied this prompt: for "add JSDoc," the model chose `Write` (a full-file
+rewrite), not `Edit` — a wider grant, since `Write` can create or overwrite any file. Check which
+tool a task uses (a `stream-json` `tool_use`, as in Step 5) before widening `--allowedTools`.
+```bash
+# docs: headless
+for f in src/*.js; do
+  claude -p "Add JSDoc to $f" --allowedTools "Read,Edit,Write" --max-turns 5
 done
-
-echo "Documentation complete!"
+git diff --stat
 ```
-
-Run the script:
-```bash
-chmod +x generate-docs.sh
-./generate-docs.sh
-```
-
-Output:
+Expected output:
 ```text
-Documenting src/utils.ts...
-Documenting src/helpers.ts...
-Documenting src/api.ts...
-Documentation complete!
+# Output may vary
+I added JSDoc comments to both functions in `src/math.js` ...
+I added a JSDoc block to `capitalize` in `src/string.js` ...
+
+ src/math.js   | 14 ++++++++++++++
+ src/string.js |  9 +++++++++
+ 2 files changed, 23 insertions(+)
 ```
+"Refine your prompt based on what goes wrong with the first 2-3 files, then run on the full set"
+(S1). Reset the lab after this step.
 
-### Step 5: Conditional Logic Based on Output
-
+**Step 7: `--bare` never reads the OAuth token**
 ```bash
-#!/bin/bash
-# check-security.sh
-
-result=$(claude -p "Review this code for security issues.
-Output 'SAFE' if no issues, or 'UNSAFE: [reason]' if issues found.
-Code: $(cat "$1")")
-
-if [[ "$result" == SAFE* ]]; then
-  echo "✅ $1 passed security check"
-  exit 0
-else
-  echo "❌ $1 failed: $result"
-  exit 1
-fi
+# docs: headless, authentication
+ANTHROPIC_API_KEY="sk-ant-FAKE-DO-NOT-USE" claude -p "List exported functions in src/math.js" --bare
 ```
-
-### Step 6: Error Handling
-
-```bash
-if ! output=$(claude -p "Generate tests for $(cat file.js)" 2>&1); then
-  echo "Error: $output"
-  exit 1
-fi
-echo "$output" > tests.js
+Expected output:
+```text
+# Output may vary
+Failed to authenticate. API Error: 401 API key is invalid.
 ```
+`CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token` was set in the shell too, and `--bare` still
+ignored it and tried the (fake) API key instead — proving the "bare mode doesn't read the OAuth
+token" claim.
 
-### Step 7: JSON Output for Structured Processing
-
-```bash
-# Get structured JSON output
-result=$(claude -p --output-format json "List the 3 main source files")
-echo "$result" | jq '.result'
-
-# Stream JSON for real-time processing
-claude -p --output-format stream-json "Fix all lint errors" | \
-  while read -r line; do
-    type=$(echo "$line" | jq -r '.type')
-    echo "Event: $type"
-  done
-```
-
-### Step 8: Limit Turns and Budget
-
-```bash
-# Limit to 3 agentic turns (prevents runaway automation)
-claude -p --max-turns 3 "Fix the failing test in auth.test.ts"
-
-# Set a $2 spending cap
-claude -p --max-budget-usd 2 "Refactor the utils module"
-
-# Restrict to read-only tools
-claude -p --allowedTools "Read" "Bash(git log *)" "Bash(git diff *)" \
-  "Review this codebase for security issues"
-```
+`Tested with:` Claude Code v2.1.283, macOS, 2026-09-27, in `~/cc-lab`.
 
 ---
 
 ## 4. PRACTICE — Try It Yourself
 
-### Exercise 1: First Headless Command
+### Exercise 1: Read-only pre-commit review
 
-**Goal**: Execute your first headless Claude command.
+**Goal**: Block a commit when Claude's structured review flags it, without letting the review
+touch any file.
 
 **Instructions**:
-1. Run: `claude -p "Say hello"`
-2. Capture to variable: `greeting=$(claude -p "Say hello")`
-3. Echo the variable: `echo "$greeting"`
-4. Check exit code: `echo $?`
+1. Write a script that runs `claude -p` on `git diff --cached` with only `--allowedTools "Bash(git diff *)"`.
+2. Ask for `--json-schema '{"type":"object","properties":{"blocking":{"type":"boolean"},"summary":{"type":"string"}},"required":["blocking","summary"]}'`.
+3. `exit 1` when `jq -e '.structured_output.blocking' file.json` is `true`.
+
+**Expected result**: staged changes with an obvious bug make the script exit non-zero; clean
+changes exit `0`.
 
 <details>
 <summary>💡 Hint</summary>
-
-The output should be a simple greeting. Exit code 0 means success.
+`--allowedTools "Bash(git diff *)"` only allows Claude to read the diff — it cannot edit anything,
+so this is safe to run on every commit.
 </details>
-
-### Exercise 2: File Generation
-
-**Goal**: Generate code to a file.
-
-**Instructions**:
-1. Generate a function: `claude -p "Write a JavaScript function to capitalize strings" > capitalize.js`
-2. Verify: `cat capitalize.js`
-3. Run: `node -e "$(cat capitalize.js); console.log(capitalize('hello'))"`
 
 <details>
 <summary>✅ Solution</summary>
 
 ```bash
-claude -p "Write a JavaScript function called capitalize that takes a string and returns it with the first letter capitalized" > capitalize.js
-cat capitalize.js
-node -e "$(cat capitalize.js); console.log(capitalize('hello'))"
-# Output: Hello
+#!/bin/bash
+out=$(claude -p "Review the staged diff (git diff --cached) for bugs or security issues" \
+  --allowedTools "Bash(git diff *)" \
+  --output-format json \
+  --json-schema '{"type":"object","properties":{"blocking":{"type":"boolean"},"summary":{"type":"string"}},"required":["blocking","summary"]}')
+blocking=$(echo "$out" | jq -r '.structured_output.blocking')
+if [ "$blocking" = "true" ]; then
+  echo "$out" | jq -r '.structured_output.summary'
+  exit 1
+fi
+exit 0
 ```
 </details>
 
-### Exercise 3: Batch Processing Script
+### Exercise 2: Continue a session by ID
 
-**Goal**: Process multiple files with a script.
+**Goal**: Ask a follow-up question in the same conversation a script already ran.
 
 **Instructions**:
-1. Create 3 small code files in a test directory
-2. Write a bash script that loops through files
-3. For each file, generate a one-line description
-4. Output all descriptions to summary.txt
+1. Run a `-p` call with `--output-format json` and capture `session_id` from the result.
+2. Pass it back with `--resume "$session_id"` on a second `-p` call.
+
+**Expected result**: the second call answers using context from the first.
 
 <details>
 <summary>✅ Solution</summary>
 
 ```bash
-# Create test files
-mkdir -p test-batch
-echo "function add(a, b) { return a + b; }" > test-batch/math.js
-echo "const API_URL = 'https://api.example.com';" > test-batch/config.js
-echo "class User { constructor(name) { this.name = name; } }" > test-batch/user.js
+sid=$(claude -p "Remember the number 42" --output-format json | jq -r '.session_id')
+claude -p "What number did I ask you to remember?" --resume "$sid" --output-format json | jq -r '.result'
+# Output: You asked me to remember 42.
+```
+</details>
 
-# Batch processing script (save as batch-describe.sh)
-#!/bin/bash
-for file in test-batch/*.js; do
-  name=$(basename "$file")
-  desc=$(claude -p "Describe in one line: $(cat "$file")")
-  echo "$name: $desc" >> test-batch/summary.txt
-done
+### Exercise 3: Cap cost and turns
 
-# Run and verify
-chmod +x batch-describe.sh
-./batch-describe.sh
-cat test-batch/summary.txt
+**Goal**: Run an open-ended refactor prompt without risking a runaway bill.
+
+**Instructions**:
+1. Add `--max-budget-usd 0.50` (requires Claude Code v2.1.217 or later) and `--max-turns 3` to a
+   `-p` call that edits files.
+2. Observe the run stop with an error once either limit is hit.
+
+<details>
+<summary>✅ Solution</summary>
+
+```bash
+claude -p "Refactor src/math.js for readability" \
+  --allowedTools "Read,Edit" --max-budget-usd 0.50 --max-turns 3
 ```
 </details>
 
@@ -301,130 +286,58 @@ cat test-batch/summary.txt
 
 ## 5. CHEAT SHEET
 
-### Basic Headless
+| Flag | Purpose | Needs permission? |
+|---|---|---|
+| `-p "prompt"` | Run non-interactively | starts in Manual mode |
+| `--allowedTools "Bash(git diff *)"` | Pre-authorize scoped tool calls | narrows what still prompts |
+| `--permission-mode acceptEdits\|dontAsk\|auto` | Broader auto-approval | replaces Manual for the run |
+| `--dangerously-skip-permissions` | Skip prompts entirely | sandbox/container only |
+| `--output-format text\|json\|stream-json` | Choose result shape | no |
+| `--json-schema '<schema>'` | Validate output into `structured_output` | no |
+| `--verbose --include-partial-messages` | Token-level `stream-json` events | no |
+| `--bare` | Skip hooks/skills/MCP/CLAUDE.md; needs `ANTHROPIC_API_KEY` | no (drops OAuth token) |
+| `--max-turns N` / `--max-budget-usd N` | Bound a run (`--max-budget-usd` needs v2.1.217+) | no |
+| `--no-session-persistence` | Don't save the session | no |
+| `--continue` / `--resume "$id"` | Reopen a prior `-p` session | no |
+| `--system-prompt` / `--append-system-prompt` | Replace / extend the system prompt | no |
+| `--tools "Bash,Edit,Read"` | Restrict which tools even exist | no |
+| `--strict-mcp-config` | Only use `--mcp-config` servers | no |
+| `--setting-sources user,project,local` | Choose which settings files load | no |
 
-```bash
-claude -p "prompt"                    # Execute and output
-result=$(claude -p "prompt")          # Capture to variable
-claude -p "prompt" > file.txt         # Output to file
-claude -p "prompt" | grep "pattern"   # Pipe to command
-```
+**`--output-format json` fields**: `result` (text), `session_id`, `total_cost_usd`,
+`structured_output` (with `--json-schema`), `permission_denials` (array of denied tool calls; the
+related `--permission-prompts` flag needs v2.1.259+).
 
-### With File Input
+**`stream-json` event types**: `system` (`init` first), `assistant`, `user`, `stream_event`
+(partial deltas), `result` (last line: final text, cost, session metadata).
 
-```bash
-claude -p "Review: $(cat file.js)"    # Inline file content
-```
-
-### In Scripts
-
-```bash
-# Error handling
-if ! result=$(claude -p "..."); then
-  echo "Failed"
-  exit 1
-fi
-
-# Loop processing
-for f in *.js; do
-  claude -p "Document: $(cat "$f")" > "${f%.js}.md"
-done
-```
-
-### Exit Codes
-
-| Code | Meaning |
-|------|---------|
-| 0 | Success |
-| Non-zero | Error |
-
-### Key Flags
-
-#### Core Flags
-
-| Flag | Purpose | Example |
-|------|---------|---------|
-| `-p "prompt"` | Headless execution (required) | `claude -p "explain this"` |
-| `--output-format json` | JSON structured output | `claude -p --output-format json "list files"` |
-| `--output-format stream-json` | Streaming JSON events | For real-time processing pipelines |
-| `--verbose` | Show full tool usage details | `claude -p --verbose "fix lint"` |
-| `--help` | Show all available options | `claude --help` |
-
-#### Limits & Safety
-
-| Flag | Purpose | Example |
-|------|---------|---------|
-| `--max-turns N` | Limit agentic turns | `claude -p --max-turns 3 "fix tests"` |
-| `--max-budget-usd N` | Dollar spending limit | `claude -p --max-budget-usd 5 "refactor auth"` |
-| `--allowedTools "Tool1" "Tool2"` | Whitelist specific tools | `claude -p --allowedTools "Read" "Bash(git *)"` |
-| `--disallowedTools "Tool"` | Blacklist specific tools | `claude -p --disallowedTools "Edit"` |
-| `--dangerously-skip-permissions` | Skip all permission prompts (CI only) | For trusted CI/CD environments only |
-
-#### Model & Prompt
-
-| Flag | Purpose | Example |
-|------|---------|---------|
-| `--model <name>` | Select specific model | `claude -p --model sonnet "query"` |
-| `--system-prompt "text"` | Replace system prompt entirely | `claude -p --system-prompt "You are a reviewer"` |
-| `--append-system-prompt "text"` | Append to default system prompt | `claude -p --append-system-prompt "Use TypeScript"` |
-
-#### Session
-
-| Flag | Purpose | Example |
-|------|---------|---------|
-| `--continue` / `-c` | Continue last session | `claude -c -p "now check the types"` |
-| `--resume <id>` / `-r` | Resume specific session | `claude -r "auth-work" -p "status?"` |
+**CI auth**: `claude setup-token` → one-year OAuth token, tied to the creator's subscription
+(Pro/Max/Team/Enterprise) → env var `CLAUDE_CODE_OAUTH_TOKEN`. `ANTHROPIC_API_KEY` (Console) → not
+tied to a person, works with `--bare`, recommended for org CI.
 
 ---
 
 ## 6. PITFALLS — Common Mistakes
 
 | ❌ Mistake | ✅ Correct Approach |
-|-----------|---------------------|
-| Expecting interactive features | Headless is one-shot. No conversation. |
-| Long prompts directly in command | Use variables or files for long prompts |
-| Ignoring exit codes | Always check exit codes in scripts |
-| Not escaping special characters | Quote variables: `"$(cat file)"` |
-| Assuming same behavior as interactive | Test headless separately. Output format differs. |
-| No error handling | Capture stderr, check exit codes |
-| Overloading with huge files | Context limits apply. Chunk large files. |
+|---|---|
+| `claude -p "fix lint"` on CI with no permission flag | Add `--allowedTools` or `--permission-mode` — Manual denies silently and still exits `0` |
+| `Bash(git diff*)` to allow `git diff` | Write `Bash(git diff *)` — the space matters, or it also matches `git diff-index` |
+| Parsing `result` text with regex to extract data | Use `--json-schema` and read `structured_output` |
+| `--bare` combined with `CLAUDE_CODE_OAUTH_TOKEN` | Bare mode never reads it — set `ANTHROPIC_API_KEY` instead |
+| Running `-p` in a repo you have not reviewed | A `-p` session runs that repo's `.claude/settings.json` hooks and `.mcp.json` servers with no trust dialog — use `--bare` or read `.claude/` first |
+| Sharing one person's `claude setup-token` as the org's CI secret | Use an `ANTHROPIC_API_KEY` from the Console instead — it is not tied to one subscription |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: Vietnamese startup needed to generate API documentation for 50+ endpoints. Manual process took 2 days per documentation update.
-
-**Solution with headless mode**:
-
-```bash
-#!/bin/bash
-# generate-api-docs.sh
-
-for endpoint in src/routes/*.ts; do
-  name=$(basename "$endpoint" .ts)
-  echo "Documenting $name..."
-
-  claude -p "Generate OpenAPI documentation for this endpoint:
-$(cat "$endpoint")
-
-Output in YAML format." > "docs/api/$name.yaml"
-done
-
-# Combine all YAML files
-claude -p "Combine these OpenAPI specs into one:
-$(cat docs/api/*.yaml)" > docs/openapi.yaml
-
-echo "API documentation generated!"
-```
-
-**Results**:
-- 2 days manual → 15 minutes automated
-- Runs nightly via cron job
-- Documentation always up-to-date
-- Human review only when needed
-
-**Quote**: "Headless mode turned Claude from a chat buddy into a documentation factory."
+A Vietnamese platform team generates their nightly changelog from `git log` with
+`claude -p --json-schema`, run by GitHub Actions. Auth is a workspace-scoped
+`ANTHROPIC_API_KEY` (not one engineer's `claude setup-token`), so the job survives team changes.
+`--max-budget-usd 1` caps the run, and the schema forces a `{version, sections}` shape the
+release script consumes directly — no prose-parsing, no surprise diffs, no "who's OAuth token is
+this."
 
 ---
 
