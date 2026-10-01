@@ -1,6 +1,8 @@
 ---
 title: 'Terminal & Shell Operations'
-description: 'Execute, monitor, and chain terminal commands through Claude Code for intelligent shell automation.'
+description: 'How the real Bash tool works: cd persistence, timeouts, run_in_background + /tasks, Ctrl+B, shell mode, and Bash permission rule syntax.'
+verified: 2026-09-27
+claude_version: 2.1.283
 ---
 
 # Module 3.4: Terminal & Shell Operations
@@ -9,522 +11,226 @@ description: 'Execute, monitor, and chain terminal commands through Claude Code 
 >
 > **Prerequisite**: Module 3.3 (Git Integration)
 >
-> **Outcome**: After this module, you will be able to execute, monitor, and chain terminal commands through Claude Code intelligently
+> **Outcome**: After this module, you will know exactly what persists between Bash calls, how
+> Claude Code decides to background a command, and how to write permission rules that actually
+> hold.
 
 ---
 
 ## 1. WHY — Why This Matters
 
-You're deploying a Node.js microservice. You need to build the Docker image, run tests in a container, push to registry, update the deployment config, and verify the pod is healthy. That's at least 8 terminal commands, each with different output to parse, different error conditions to handle, and some need to run in sequence while others can run in parallel.
+You ask Claude to install dependencies, run a build, then start a dev server to check it. Some
+takes seconds, some takes minutes, and a server never returns at all. Not knowing what the Bash
+tool actually does with a slow command — wait, time out, background it — leaves you either
+blocked or repeating myths about how backgrounding works.
 
-Typing each command manually, waiting for each to finish, copying error logs, pasting them into Claude's context to debug — this is death by a thousand terminal switches. Claude Code can execute commands directly, parse their output, detect errors, chain operations intelligently, and even run long-running processes in the background while continuing other work. You stay in conversation mode. Claude handles the shell.
+This module replaces guesswork with the documented mechanism: timeout, output limits,
+`run_in_background`, `/tasks`, and the permission-rule syntax deciding what runs without asking.
 
 ---
 
 ## 2. CONCEPT — Core Ideas
 
-Claude Code has **direct terminal access** through its Bash tool. This isn't just a convenience wrapper — it's a fundamental capability that transforms how you interact with development environments.
+### What persists between commands, what doesn't
 
-### Mental Model: Claude as Terminal Orchestrator
-
-Think of Claude Code as having three modes of terminal interaction:
+`cd` **does** carry over to later Bash calls in the running session — but only while it stays
+inside the project directory or an `--add-dir` path, and only within that one process. Landing
+outside those bounds resets it and Claude Code appends `Shell cwd was reset to <dir>`. **Subagent
+sessions never carry over working directory changes** — each starts fresh. Set
+`CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR=1` to force a return to the start dir after every
+command instead. `export VAR=value` does **not** persist, but shell aliases/functions from
+`~/.zshrc`/`~/.bashrc`/`~/.profile` load once at session start and apply to every command.
 
 ```mermaid
 graph TD
-    A[Terminal Task] --> B{Task Type?}
-    B -->|Quick check| C[Immediate Execution]
-    B -->|Long-running| D[Background Process]
-    B -->|Sequential| E[Chained Commands]
-
-    C --> F[Parse output instantly]
-    D --> G[Monitor via polling]
-    E --> H[Stop on first failure]
-
-    F --> I[Claude analyzes result]
-    G --> I
-    H --> I
-
-    I --> J{Success?}
-    J -->|Yes| K[Continue workflow]
-    J -->|No| L[Debug & retry]
+    A[Bash call 1: cd src] -->|same session, in-project| B[Bash call 2: pwd sees src]
+    C[cd outside project/--add-dir] --> D["reset + Shell cwd was reset to &lt;dir&gt;"]
 ```
 
-### Key Concepts
+### Timeout and backgrounding are tool-level, not `&`
 
-1. **Command Execution Context**: Claude Code runs commands in a **persistent working directory** but **non-persistent shell state**. `cd` into a directory? That sticks. Export an environment variable? Gone after command completes. Use `&&` to chain commands that need shared state.
+Claude sets a `timeout` on the call when it expects a command to run long; default **120,000 ms**,
+Claude can ask for up to **600,000 ms** (`BASH_DEFAULT_TIMEOUT_MS`, `BASH_MAX_TIMEOUT_MS`). If a
+command outruns its timeout with no estimate given, Claude Code moves it to the background
+automatically unless the command starts with `sleep`. There's no `BashOutput`/`KillShell` tool
+anymore: a backgrounded command is managed with `run_in_background: true` on the call, inspected
+or stopped from `/tasks` (alias `/bashes`), or by pressing **Ctrl+B** on a running command (tmux:
+twice). A bare `cmd &` still backgrounds within one OS shell — it isn't a managed background task.
 
-2. **Output Parsing**: Claude doesn't just run commands blindly — it reads stdout/stderr, detects error patterns, and can extract specific information (version numbers, file paths, test counts) from output.
+### Output limits
 
-3. **Background vs Foreground**: Long-running tasks (builds, tests, installs) should run in background. Quick commands (status checks, file lists) run blocking. Claude manages the difference automatically but you can override.
+A successful command reads back **~30,000 characters** inline by default
+(`BASH_MAX_OUTPUT_LENGTH`, max 150,000; `bashOutputMaxChars` supersedes it up to 128,000) — past
+that, Claude gets a saved file path and a 2,000-character preview. A failing command reads back
+about 10,000 characters as a head-and-tail excerpt. Output over 5 GB kills the command outright.
 
-4. **Error Propagation**: When a command fails, Claude sees the exit code AND the error output. It can automatically suggest fixes or re-run with corrections.
+### `!` shell mode runs outside the sandbox
 
-5. **Interactive Command Limitation**: Commands requiring user input (interactive prompts, password entry, TUI interfaces) won't work. Claude Code needs non-interactive, scriptable operations.
+Typing `!command` runs it directly and folds the output into context — but it runs **outside**
+Claude Code's sandbox even with sandboxing on, since sandboxing wraps commands Claude runs, not
+ones you type. Claude auto-responds like a normal turn unless `respondToBashCommands: false`.
+
+### Bash permission rules aren't a security boundary
+
+`Bash(npm run build)` matches only that literal string. `Bash(npm run test *)` ≡
+`Bash(npm run test:*)` — both match anything starting with `npm run test `; the space before the
+wildcard is part of the rule, so `Bash(ls *)` doesn't match `lsof` but `Bash(ls*)` does. Wrappers
+like `timeout`, `time`, `nice`, `nohup` are stripped before matching, so `Bash(npm test *)` still
+catches `timeout 30 npm test`. But a **deny** rule for `Bash(rm *)` does not stop `/bin/rm -rf` or
+`bash -c 'rm -rf ...'` — Claude Code says plainly this "isn't a security boundary around the
+program." Treat deny rules as a speed bump; enforce for real in a `PreToolUse` hook or the sandbox
+(Module 2.3).
 
 ---
 
 ## 3. DEMO — Step by Step
 
-Let's walk through a realistic scenario: setting up and testing a new microservice.
+**Step 1: `cd` persists across Bash calls in one session**
 
-**Context**: You're starting a new Express.js API service. You need to initialize it, install dependencies, add tests, and verify everything works.
-
-**Step 1: Create project structure**
-
-Ask Claude:
-```text
-"Create a new Express API project called user-service with TypeScript,
-install dependencies, and show me the package.json"
-```
-
-Claude will execute:
 ```bash
-mkdir -p user-service && cd user-service && npm init -y
+# docs: en/tools-reference — "carries over to later Bash commands"
+claude -p "First, run 'cd src && ls -la' as one Bash call. Then, as a SEPARATE Bash call, run \
+'pwd'. Show both outputs." --permission-mode acceptEdits
 ```
 
-Expected output:
 ```text
-Wrote to /Users/you/projects/user-service/package.json:
-{
-  "name": "user-service",
-  "version": "1.0.0",
-  ...
-}
+# Output may vary
+**1. `cd src && ls -la`**
+total 8
+drwxr-xr-x@ 4 you staff 128 … .
+-rw-r--r--@ 1 you staff 143 … math.js
+
+**2. `pwd`** (separate call)
+/Users/you/cc-lab/src
+
+The `cd src` from the first call carried over to the second.
 ```
 
-Why it matters: Claude used `&&` to chain commands because the later commands depend on the directory existing. Single command execution.
+**Step 2: Shell mode (`!`) folds real output into context**
 
----
-
-**Step 2: Install dependencies in background**
-
-Claude automatically detects this is a long-running task:
-```bash
-npm install express typescript @types/express @types/node ts-node
-```
-
-This runs in **background mode**. Claude continues the conversation while npm downloads packages. You'll see:
 ```text
-⏳ Running in background: npm install...
+# Output may vary — captured interactively, ! prefix typed at the prompt
+! git status
+  ⎿  On branch main
+     nothing to commit, working tree clean
+
+⏺ Your working tree is clean on main. What would you like to work on?
 ```
 
-Why it matters: You don't wait for npm. Claude can continue answering questions or preparing the next steps while installation happens.
+**Step 3: A command Claude expects to run long goes to the background on its own**
 
----
-
-**Step 3: Check installation status**
-
-While install runs, ask Claude:
 ```text
-"Is the installation done? Show me the installed packages."
+# Output may vary — auto permission mode
+❯ Run this in the background: node -e "setTimeout(()=>{},200000)". Do not wait for it.
+
+⏺ Bash(node -e "setTimeout(()=>{},200000)")
+  ⎿  Running in the background (↓ to manage)
+  ⎿  Allowed by auto mode classifier
+
+⏺ The Node process is running in the background as task bs75gee9e. It will sit idle for about
+  200 seconds and then exit. I'm not waiting on it, but I'll get a notification when it finishes.
 ```
 
-Claude checks background task status, then runs:
-```bash
-npm list --depth=0
-```
+When Claude doesn't estimate duration and the command hits the wall unassisted, the message
+differs:
 
-Expected output:
 ```text
-user-service@1.0.0
-├── express@4.18.2
-├── typescript@5.3.3
-├── @types/express@4.17.21
-├── @types/node@20.10.4
-└── ts-node@10.9.2
+# Example from docs: https://code.claude.com/docs/en/tools-reference
+Command did not complete within its 120s timeout and was moved to the background
 ```
 
-Why it matters: Claude can query intermediate state without blocking the workflow.
+**Step 4: Check on it with `/tasks`**
 
----
-
-**Step 4: Create and run tests**
-
-Ask Claude:
 ```text
-"Create a simple test for a /health endpoint and run it with jest"
+# Output may vary
+  Shell details
+
+  Status:   running
+  Runtime:  28s
+  Command:  node -e "setTimeout(()=>{},200000)"
+
+  Output:
+  No output available
+
+  ← to go back · Esc/Enter/Space to close · x to stop
 ```
 
-Claude executes multiple commands in sequence:
-```bash
-npm install --save-dev jest @types/jest ts-jest && \
-npx ts-jest config:init && \
-npm test
-```
+**Step 5: Ctrl+B backgrounds the running command.** Mid-run, the hint appears on the status line:
 
-Expected output:
 ```text
-> user-service@1.0.0 test
-> jest
-
- PASS  src/__tests__/health.test.ts
-  ✓ GET /health returns 200 (15 ms)
-
-Test Suites: 1 passed, 1 total
-Tests:       1 passed, 1 total
+# Output may vary
+⏺ Bash(npm test 2>&1 | tail -40)
+  ⎿  Running… (7s · timeout 5m)
+     (ctrl+b to run in background)
 ```
 
-Why it matters: Sequential operations with `&&` ensure each step completes before the next. If test fails, Claude sees the failure output immediately and can debug.
+<!-- AUTHOR-CAPTURE: press Ctrl+B once (tmux: twice) during that "Running…" state in a real TTY
+     and capture the frame that follows — the nested pexpect session used for this module's other
+     captures could not deliver a raw Ctrl+B keystroke reliably. -->
 
----
+**Step 6: A permission rule that looks safe but isn't**
 
-**Step 5: Run development server in background**
-
-Ask Claude:
-```text
-"Start the dev server and verify it's responding"
-```
-
-Claude runs:
-```bash
-npm run dev &
-```
-
-Then immediately verifies:
-```bash
-sleep 2 && curl http://localhost:3000/health
-```
-
-Expected output:
 ```json
-{"status":"ok","timestamp":"2026-02-02T10:30:00.000Z"}
+{ "permissions": { "deny": ["Bash(rm *)"] } }
 ```
 
-Why it matters: Background process (`&`) + verification command. Claude chains them intelligently.
-
----
-
-**Step 6: Parse logs for errors**
-
-Ask Claude:
-```text
-"Check the last 20 lines of application logs for any errors"
-```
-
-Claude runs:
 ```bash
-tail -n 20 logs/app.log | grep -i error
+bash -c 'rm -rf /tmp/scratch'   # not matched — deny rule never sees "rm" as the command name
 ```
 
-Expected output (if clean):
-```text
-(no output = no errors)
-```
-
-Why it matters: Claude can parse structured output, extract patterns, and interpret "no output" as success.
-
----
-
-**Step 7: Environment-aware commands**
-
-Ask Claude:
-```text
-"Build the Docker image for production"
-```
-
-Claude detects the environment context and runs:
-```bash
-docker build -t user-service:latest \
-  --build-arg NODE_ENV=production \
-  --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
-  .
-```
-
-Expected output:
-```text
-[+] Building 45.2s (12/12) FINISHED
- => [internal] load build definition from Dockerfile
- => => transferring dockerfile: 432B
- => [stage-1 3/5] COPY package*.json ./
- => [stage-1 4/5] RUN npm ci --omit=dev
- => exporting to image
- => => naming to docker.io/library/user-service:latest
-```
-
-Why it matters: Claude constructs commands with appropriate flags and arguments based on context. Note the `$(date)` subshell — Claude handles command substitution correctly.
-
----
-
-**Step 8: Multi-stage pipeline**
-
-Ask Claude:
-```text
-"Run the full CI pipeline: lint, test, build, and verify the Docker image runs"
-```
-
-Claude executes a complex pipeline:
-```bash
-npm run lint && \
-npm test && \
-docker build -t user-service:test . && \
-docker run --rm -d -p 3001:3000 --name user-service-test user-service:test && \
-sleep 3 && \
-curl http://localhost:3001/health && \
-docker stop user-service-test
-```
-
-Expected output (abbreviated):
-```text
-> eslint . --ext .ts
-✓ No linting errors
-
-> jest
-Tests: 5 passed, 5 total
-
-[+] Building 12.3s (12/12) FINISHED
-=> exporting to image
-
-a3f9c8d1e0b2
-{"status":"ok"}
-user-service-test
-```
-
-Why it matters: This demonstrates **chained commands with proper error handling**. If any step fails (lint errors, test failures, build errors), the chain stops. Claude sees exactly where it failed.
-
----
-
-**Step 9: Error recovery**
-
-Suppose the test failed at step 8. Claude sees:
-```text
-FAIL src/__tests__/auth.test.ts
-  ✕ POST /login validates credentials (23 ms)
-
-Expected: 200
-Received: 401
-```
-
-Claude automatically:
-1. Identifies the failing test
-2. Reads the test file
-3. Reads the route handler
-4. Proposes a fix
-5. Asks: "Should I update the auth middleware to fix this?"
-
-Why it matters: Claude doesn't just execute — it **monitors, detects failures, and initiates debugging** without you needing to copy-paste error logs.
-
----
-
-**Step 10: Cleanup and verification**
-
-Ask Claude:
-```text
-"Clean up all test containers and verify nothing is still running"
-```
-
-Claude runs:
-```bash
-docker ps -a --filter "name=user-service-test" --format "{{.Names}}" | \
-xargs -r docker rm -f && \
-docker ps --filter "name=user-service"
-```
-
-Expected output:
-```text
-user-service-test
-CONTAINER ID   IMAGE   COMMAND   CREATED   STATUS   PORTS   NAMES
-(empty = cleanup successful)
-```
-
-Why it matters: Claude can construct complex pipelines with `xargs`, filters, and format strings. It verifies cleanup by checking the result is empty.
+Use a hook (Module 2.3) if `rm` must actually be blocked.
 
 ---
 
 ## 4. PRACTICE — Try It Yourself
 
-### Exercise 1: Background Process Management
-**Goal**: Practice running long tasks in background while continuing work
+### Exercise 1: Watch a Real Timeout
+
+**Goal**: Trigger the background transition and confirm it with `/tasks`.
 
 **Instructions**:
-1. Create a new Python project directory
-2. Ask Claude to install dependencies from a `requirements.txt` (with at least 5 packages) in background
-3. While installation runs, ask Claude to create a FastAPI app skeleton
-4. Verify installation completed successfully
-5. Run the FastAPI dev server and test the `/docs` endpoint
+1. Ask Claude to run a ~3-minute command without saying how long it'll take (a script, not
+   `sleep`).
+2. Watch what happens after roughly 120 seconds.
+3. Run `/tasks` and read the shell's status.
 
-**Expected result**: You should see the Swagger UI JSON response from `/docs` while installation ran in background
+**Expected result**: either Claude sets its own longer timeout and backgrounds proactively, or the
+command auto-backgrounds with the "moved to the background" message — both are correct.
 
 <details>
 <summary>💡 Hint</summary>
 
-Use explicit language: "Install these in the background" or "run in background while you...". Claude will automatically detect long-running commands like `pip install`, but being explicit helps.
-
-For FastAPI dev server, the command is `uvicorn main:app --reload`. You can test with `curl http://localhost:8000/docs`.
+Don't use `sleep` — it's excluded from auto-backgrounding.
 
 </details>
 
 <details>
 <summary>✅ Solution</summary>
 
-**Conversation flow**:
-
-You: "Create a Python project called api-service with a requirements.txt containing fastapi, uvicorn, pydantic, sqlalchemy, and pytest. Install dependencies in background."
-
-Claude runs:
-```bash
-mkdir api-service && cd api-service
-echo -e "fastapi\nuvicorn\npydantic\nsqlalchemy\npytest" > requirements.txt
-pip install -r requirements.txt  # (runs in background)
-```
-
-You: "While that installs, create a basic FastAPI app with a health check endpoint"
-
-Claude creates `main.py` while pip runs in background.
-
-You: "Is pip done? Start the dev server and test the /docs endpoint"
-
-Claude:
-```bash
-# Check if background task finished
-ps aux | grep "pip install"  # (empty = done)
-
-# Start server in background
-uvicorn main:app --reload &
-
-# Wait for startup and test
-sleep 2 && curl http://localhost:8000/docs
-```
-
-Output:
-```json
-{"openapi":"3.1.0","info":{"title":"FastAPI","version":"0.1.0"},...}
-```
+`node -e "setTimeout(()=>{}, 180000)"` works. Check Claude's message: did it set `timeout` itself,
+or did the 120-second wall trigger the transition?
 
 </details>
 
 ---
 
-### Exercise 2: Error Detection and Recovery
-**Goal**: Practice letting Claude detect and fix command errors
+### Exercise 2: Write a Rule, Then Break It
+
+**Goal**: Confirm a Bash deny rule is a speed bump, not a wall.
 
 **Instructions**:
-1. Ask Claude to run a deliberately broken Docker build (misspell a Dockerfile instruction or reference nonexistent file)
-2. Observe how Claude detects the error
-3. Ask Claude to fix it
-4. Verify the build succeeds
+1. Add `{"permissions": {"deny": ["Bash(rm *)"]}}` to `.claude/settings.local.json`.
+2. Ask Claude to run `rm somefile` — confirm it's blocked.
+3. Ask Claude to run `bash -c "rm somefile"` instead.
 
-**Expected result**: Claude should identify the exact error line, explain what's wrong, propose a fix, and re-run the build
-
-<details>
-<summary>💡 Hint</summary>
-
-Create a Dockerfile with an error like `FRON node:22` (misspelled FROM) or `COPY nonexistent.txt /app/`. Claude will see the Docker build error output and can identify the syntax or file issue.
-
-</details>
+**Expected result**: step 2 is denied; step 3 runs, since the rule matches command text, not
+intent.
 
 <details>
 <summary>✅ Solution</summary>
 
-**Conversation**:
-
-You: "Create a Dockerfile for a Node app but make it broken on purpose — I want to practice debugging"
-
-Claude creates:
-```dockerfile
-FRON node:22
-WORKDIR /app
-COPY package.json .
-RUN npm install
-```
-
-You: "Try to build this"
-
-Claude runs:
-```bash
-docker build -t test-app .
-```
-
-Output:
-```text
-Error response from daemon: Dockerfile parse error line 1: unknown instruction: FRON
-```
-
-Claude responds:
-"The build failed because line 1 has a typo: `FRON` should be `FROM`. This is the base image instruction. Should I fix this?"
-
-You: "Yes"
-
-Claude fixes the Dockerfile and re-runs:
-```bash
-docker build -t test-app .
-```
-
-Output:
-```text
-[+] Building 8.2s (8/8) FINISHED
-=> exporting to image
-```
-
-**Key insight**: You didn't have to copy-paste the error. Claude saw it, diagnosed it, and offered a fix.
-
-</details>
-
----
-
-### Exercise 3: Complex Pipeline Construction
-**Goal**: Practice building multi-command pipelines with proper error handling
-
-**Instructions**:
-1. Create a scenario where you need to: clone a repo, check out a specific branch, install dependencies, run tests, and generate a coverage report
-2. Ask Claude to do this in a **single command chain** that stops on first error
-3. Deliberately introduce a failure (e.g., nonexistent branch) and observe how Claude handles it
-4. Fix the issue and re-run
-
-**Expected result**: A properly constructed pipeline using `&&`, clear error identification when a step fails, and successful completion after fix
-
-<details>
-<summary>💡 Hint</summary>
-
-Use `&&` to chain commands. The chain will stop at the first failing command. For example:
-```bash
-git clone URL && cd repo && git checkout branch && npm install && npm test && npm run coverage
-```
-
-If `git checkout branch` fails (branch doesn't exist), the chain stops there. Claude will see the "branch not found" error.
-
-</details>
-
-<details>
-<summary>✅ Solution</summary>
-
-You: "Clone the repo https://github.com/example/demo-api, check out the 'feature/auth' branch, install dependencies, run tests, and generate coverage. Do this in one command chain."
-
-Claude runs:
-```bash
-git clone https://github.com/example/demo-api && \
-cd demo-api && \
-git checkout feature/auth && \
-npm install && \
-npm test && \
-npm run coverage
-```
-
-If the branch doesn't exist, output shows:
-```text
-Cloning into 'demo-api'...
-error: pathspec 'feature/auth' did not match any file(s) known to git
-```
-
-Claude responds:
-"The checkout failed because the branch 'feature/auth' doesn't exist. Let me check available branches."
-
-Claude runs:
-```bash
-cd demo-api && git branch -r
-```
-
-Output:
-```text
-origin/main
-origin/develop
-origin/feature/authentication
-```
-
-Claude: "The branch is named 'feature/authentication', not 'feature/auth'. Should I re-run with the correct branch name?"
-
-You: "Yes"
-
-Claude re-runs the full chain with the correct branch name. All steps complete successfully.
+Documented limitation, not a bug. Real enforcement needs a `PreToolUse` hook inspecting the actual
+command string, not a Bash allow/deny rule.
 
 </details>
 
@@ -532,35 +238,24 @@ Claude re-runs the full chain with the correct branch name. All steps complete s
 
 ## 5. CHEAT SHEET
 
-| Task | Command Pattern | Notes |
-|------|----------------|-------|
-| **Sequential commands** | `cmd1 && cmd2 && cmd3` | Stops on first failure |
-| **Background process** | `cmd &` | Returns immediately |
-| **Background with verification** | `cmd & sleep 2 && verify-cmd` | Wait then check |
-| **Conditional execution** | `cmd1 || cmd2` | Run cmd2 if cmd1 fails |
-| **Ignore errors** | `cmd1 ; cmd2` | Always run cmd2 |
-| **Capture output** | `result=$(cmd)` | Use in other commands |
-| **Suppress output** | `cmd > /dev/null 2>&1` | Silent execution |
-| **Check exit code** | `cmd && echo "success" \|\| echo "fail"` | Explicit success/fail |
-| **Timeout command** | `timeout 30s cmd` | Kill after 30 seconds |
-| **Retry on failure** | `cmd \|\| cmd \|\| cmd` | Try 3 times |
-| **Parse JSON output** | `cmd \| jq '.key'` | Extract JSON fields |
-| **Filter logs** | `tail -n 100 log \| grep ERROR` | Find errors in logs |
-| **Count results** | `cmd \| wc -l` | Count output lines |
-| **Multi-line command** | `cmd1 && \`<br>`cmd2 && \`<br>`cmd3` | Readable chaining |
-| **Environment variable** | `VAR=value cmd` | Set for single command |
-| **Shared env state** | `export VAR=value && cmd` | Persist in chain |
-| **Check process running** | `ps aux \| grep process-name` | Find running process |
-| **Kill background task** | `pkill -f process-name` | Stop by name |
-| **Docker cleanup** | `docker ps -aq \| xargs docker rm -f` | Remove all containers |
-| **Port check** | `lsof -i :3000` | See what's on port 3000 |
+| Task | How | Notes |
+|---|---|---|
+| Run long task without blocking | "run it in the background" | Sets `run_in_background: true` |
+| Check background tasks | `/tasks` (`/bashes`) | Replaces retired `BashOutput`/`KillShell` |
+| Background the current command | `Ctrl+B` | Tmux: press twice |
+| Run outside the sandbox | `!command` | Not classifier-checked |
+| Default timeout | `BASH_DEFAULT_TIMEOUT_MS` | 120000 ms |
+| Max timeout Claude can request | `BASH_MAX_TIMEOUT_MS` | 600000 ms |
+| Read back more output | `BASH_MAX_OUTPUT_LENGTH` / `bashOutputMaxChars` | ~30,000 default; max 150,000 / 128,000 |
+| Always return to start dir | `CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR=1` | Opposite of default carry-over |
+| Exact-match rule | `Bash(npm run build)` | Only that literal command |
+| Wildcard rule | `Bash(npm run *)` ≡ `Bash(npm run:*)` | Space before `*` matters |
 
-**Operators Quick Reference**:
-- `&&` = AND (run next only if previous succeeded)
-- `||` = OR (run next only if previous failed)
-- `;` = SEQUENCE (always run next, ignore previous exit code)
-- `&` = BACKGROUND (run in background, return immediately)
-- `|` = PIPE (send output of cmd1 to input of cmd2)
+**Shell operators** (still real syntax — just not how Claude Code backgrounds a *tool call*):
+
+- `&&` = run next only if previous succeeded · `||` = run next only if previous failed
+- `;` = always run next · `|` = pipe · `cmd &` = background within that one OS shell, not a
+  Claude-managed task
 
 ---
 
@@ -568,127 +263,41 @@ Claude re-runs the full chain with the correct branch name. All steps complete s
 
 | ❌ Mistake | ✅ Correct Approach |
 |---|---|
-| Using `cd` alone and expecting it to persist for next command | Chain with `&&`: `cd dir && npm install` |
-| Running long builds/installs in foreground, blocking conversation | Explicitly request background: "install in background" |
-| Trying to run interactive commands (`vim`, `top`, `npm init` without `-y`) | Use non-interactive alternatives: `npm init -y`, `echo "text" > file` |
-| Assuming environment variables persist across commands | Use `export VAR=value && cmd1 && cmd2` to share state |
-| Not checking if background process finished before next step | Ask Claude: "Is the build done?" or use `wait` command |
-| Chaining with `;` when you need error detection | Use `&&` to stop on first failure |
-| Forgetting to cleanup background processes | Explicitly ask Claude to stop/kill processes when done |
-| Not quoting paths with spaces | Always quote: `cd "/path/with spaces"` |
-| Using `sudo` commands without permission setup | Claude can't enter passwords; configure passwordless sudo or use Docker |
-| Running commands that require GUI | Use headless/CLI alternatives: `chrome` → `curl`, `git` GUI → `git` CLI |
-| Expecting real-time streaming output from long commands | Claude sees output after command completes; use periodic checks for long tasks |
-| Not specifying timeout for potentially hanging commands | Use `timeout` wrapper: `timeout 60s long-running-cmd` |
-
-**Special Case — Docker Compose**:
-
-❌ Wrong:
-```bash
-docker compose up
-# This blocks forever
-```
-
-✅ Correct:
-```bash
-docker compose up -d  # Detached mode
-sleep 3
-docker compose ps     # Verify containers started
-```
-
-**Special Case — npm/yarn Scripts**:
-
-❌ Wrong:
-```bash
-npm run dev
-# Blocks in foreground
-```
-
-✅ Correct:
-```bash
-npm run dev &        # Background
-sleep 2
-curl http://localhost:3000  # Verify running
-```
+| Teaching `npm run dev &` as "how Claude backgrounds things" | Ask Claude to run it in the background — it sets `run_in_background` on the call |
+| Looking for `BashOutput`/`KillShell` tools | Retired — use `/tasks` (`/bashes`) |
+| Assuming a Bash deny rule stops `rm` everywhere | Matches command text only; `bash -c`, `/bin/rm` bypass it — use a hook instead |
+| Assuming `cd` survives a fresh `--continue` process | Persists within one running session, not across a restarted process |
+| Piping install output through `--only=production` | Flag is gone; use `npm ci --omit=dev` |
+| Basing an image on `node:18` | Move to a maintained LTS, e.g. `node:22` |
+| Writing `docker-compose` (old standalone binary) | Use `docker compose` (the v2 plugin) |
+| Assuming `sleep 300` auto-backgrounds at 120s | `sleep` is explicitly excluded — it just blocks |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: Deploying a microservice update to Kubernetes staging cluster at 2 AM (production deploy window). The deployment requires building a new Docker image, running smoke tests in a temp container, pushing to registry, updating the K8s deployment, and verifying pod health. Normally this takes 15 minutes of manual terminal work.
+**Scenario**: Deploying a microservice update to a Kubernetes staging cluster at 2 AM — new image,
+smoke test in a temp container, registry push, deployment update, pod-health check. Normally 15
+minutes of manual terminal work.
 
-**Problem**: During the deploy, the smoke test failed with a cryptic error:
+**Problem**: The smoke test failed:
+
 ```text
 Error: connect ECONNREFUSED 10.0.0.45:5432
 ```
 
-The developer (working solo at 2 AM) needed to:
-1. Identify which service couldn't connect (database connection)
-2. Check if the database pod was running
-3. Verify network policies
-4. Check service DNS resolution
-5. Examine recent config changes
+**Solution**: Working solo, the developer asked Claude to debug it. Claude ran a diagnostic chain —
+`kubectl get pods`, `kubectl get endpoints`, `kubectl get networkpolicies`, an `nslookup` from
+inside the app pod, `kubectl rollout history` — and found the database pod stuck `Pending`.
+`kubectl describe pod … | grep -A 5 Events` showed `FailedScheduling: insufficient memory`; a
+recent deployment had raised memory requests elsewhere.
 
-Normally this would mean switching between terminal, kubectl commands, log files, and Slack/Notion to check deployment docs.
+**Result**: Root cause in under 2 minutes, across 8 kubectl commands the developer didn't have to
+remember. Lowering a non-critical service's memory request let the database pod schedule; total
+deploy time was 12 minutes despite the incident.
 
-**Solution**: The developer used Claude Code to orchestrate the entire debug process:
-
-**Conversation**:
-
-Dev: "Smoke test failed with ECONNREFUSED to 10.0.0.45:5432. Debug this."
-
-Claude executed automatically:
-```bash
-# Check if database pod is running
-kubectl get pods -l app=postgres -n staging
-
-# Check service endpoints
-kubectl get endpoints postgres-service -n staging
-
-# Check network policies
-kubectl get networkpolicies -n staging
-
-# Test DNS resolution from app pod
-kubectl exec -it $(kubectl get pod -l app=user-service -n staging -o jsonpath='{.items[0].metadata.name}') \
-  -- nslookup postgres-service
-
-# Check recent config changes
-kubectl rollout history deployment/user-service -n staging
-```
-
-Output revealed:
-```text
-NAME                        READY   STATUS    RESTARTS   AGE
-postgres-6d8f9c4b5b-7x2n4   0/1     Pending   0          45s
-```
-
-Claude: "The database pod is in Pending state. Let me check why."
-
-```bash
-kubectl describe pod postgres-6d8f9c4b5b-7x2n4 -n staging | grep -A 5 Events
-```
-
-Output:
-```text
-Events:
-  Warning  FailedScheduling  30s   default-scheduler  0/3 nodes available:
-  insufficient memory.
-```
-
-Claude: "The database pod can't schedule due to insufficient memory. Recent deployments might have increased memory usage. Let me check resource requests."
-
-```bash
-kubectl top nodes
-kubectl get pods -n staging -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.containers[*].resources.requests.memory}{"\n"}{end}'
-```
-
-Claude identified that a recent deployment increased memory requests, leaving no room for the database pod.
-
-**Result**: Claude constructed a complete diagnostic pipeline, executed 8 different kubectl commands, parsed outputs, correlated information across commands, and identified the root cause in **under 2 minutes**. The developer didn't need to remember kubectl syntax, grep patterns, or jsonpath queries. They stayed in natural language, asking follow-up questions as Claude surfaced information.
-
-The fix: temporarily reduce memory request for a non-critical service, let database pod schedule, complete deployment, then rebalance resources. Total deploy time: 12 minutes instead of the usual 15, despite hitting a critical issue. Without Claude Code, debugging alone would have taken 30+ minutes of manual kubectl/grep/jq work.
-
-**Key Takeaway**: Terminal operations through Claude Code aren't just about running commands — it's about **intelligent orchestration, automatic error detection, and contextual debugging**. Claude doesn't just execute; it monitors, analyzes, and guides you through complex command sequences.
+**Key Takeaway**: Terminal work through Claude Code isn't about typing faster — it's reading exit
+codes and stderr correctly, and knowing when to background instead of blocking.
 
 ---
 
