@@ -1,6 +1,8 @@
 ---
 title: 'Đánh giá chất lượng'
 description: 'Đánh giá chất lượng output của Claude Code: tiêu chí kiểm tra, scoring và khi nào cần can thiệp.'
+verified: 2026-09-28
+claude_version: 2.1.283
 ---
 
 # Module 8.4: Đánh giá chất lượng
@@ -73,6 +75,20 @@ Sau đó ask Claude self-review:
 - "Senior dev sẽ criticize gì?"
 - "Edge case nào có thể fail?"
 - "Có cách đơn giản hơn không?"
+
+### Deterministic Gates (Ngoài Self-Review)
+
+Self-review phụ thuộc vào việc ai đó nhớ chạy nó. **Deterministic gate** chạy tự động mỗi lần —
+khác biệt "enforced vs recommended" từ Module 2.2. (S1)/(S7): *"Give Claude a check it can run:
+tests, a build, a screenshot to compare"* — verify là một bước trong loop, không phải afterthought:
+
+- **PostToolUse hook**: chạy linter sau mỗi Edit/Write (Module 11.3, Hooks System).
+- **Stop hook**: chạy test suite, block turn kết thúc cho tới khi pass.
+- **Reviewer subagent, fresh context**: chỉ thấy diff, không thấy implementation reasoning, nên
+  không kế thừa blind spot của người viết.
+- **`claude-code-action`**: automated review trên mỗi PR, chạy trong CI (Module 11.4, GitHub Actions).
+- **Mini-eval**: 3-10 case thật bạn re-run sau mỗi lần đổi feature. (S11) full eval dùng 20-50 task
+  được grade bởi code/model/human — cùng ý tưởng, scale nhỏ hơn.
 
 ### "Good Enough" Decision
 
@@ -282,6 +298,16 @@ git diff          # Review change
 "Nếu input rất lớn thì sao?"
 ```
 
+### Deterministic Gate
+
+| Gate | Chạy khi | Enforce |
+|------|----------|---------|
+| PostToolUse hook | Sau mỗi Edit/Write | Lint chạy, không ngoại lệ (11.3) |
+| Stop hook | Trước khi Claude kết thúc turn | Test phải pass (11.3) |
+| Reviewer subagent | On-demand, fresh context | Bắt blind spot người viết không thấy |
+| `claude-code-action` | Mỗi PR, trong CI | Review xảy ra dù không ai hỏi (11.4) |
+| Mini-eval (3-10 case) | Sau đổi feature này | Bắt regression trước khi merge (S11) |
+
 ### Good Enough Matrix
 
 | Risk Level | Standard | Action |
@@ -303,6 +329,7 @@ git diff          # Review change
 | Không dùng Claude review code của Claude | Self-review prompt catch real issue |
 | Check quality chỉ cuối cùng | Assess during development, không phải chỉ sau |
 | Ignore gut feeling "this seems wrong" | Feel off → investigate trước khi accept |
+| Trust Claude tự nhớ self-review | (S1)/(S7): cho nó một check thật để chạy, không phải reminder trong CLAUDE.md |
 
 ---
 

@@ -1,6 +1,8 @@
 ---
 title: 'Loop Detection & Breaking'
 description: 'Recognize stuck loop patterns in Claude Code and apply intervention strategies without losing progress.'
+verified: 2026-09-28
+claude_version: 2.1.283
 ---
 
 # Module 8.2: Loop Detection & Breaking
@@ -15,9 +17,12 @@ description: 'Recognize stuck loop patterns in Claude Code and apply interventio
 
 ## 1. WHY — Why This Matters
 
-Claude has been running for 15 minutes. The token counter is climbing. You see the same error message flash by three times. Claude keeps saying "Let me try a different approach" but the approaches look suspiciously similar. You've burned $5 in tokens and the bug still isn't fixed.
+Claude has been running for 15 minutes. The token counter is climbing. The same error flashes by
+three times. Claude keeps saying "let me try a different approach," but the approaches look
+suspiciously similar. You've burned $5 in tokens and the bug still isn't fixed.
 
-Stuck loops are token-burning, time-wasting traps. They happen to everyone — beginners and experts alike. The difference? Experts detect and break them FAST. They don't wait for 10 iterations hoping "the next try will work." They recognize the pattern after 3 attempts and intervene.
+Stuck loops are token-burning traps that happen to everyone. Experts just detect them faster,
+recognizing the pattern after 3 attempts instead of waiting for a 10th try to "finally work."
 
 Claude doesn't know it's stuck. It will keep trying indefinitely. YOU are the circuit breaker.
 
@@ -27,7 +32,8 @@ Claude doesn't know it's stuck. It will keep trying indefinitely. YOU are the ci
 
 ### What is a Stuck Loop?
 
-A **stuck loop** is when Claude repeatedly attempts similar solutions without making progress. Unlike healthy iteration (which converges toward a solution), stuck loops spin in place.
+A **stuck loop** is when Claude repeatedly attempts similar solutions without making progress —
+unlike healthy iteration, which converges toward a solution.
 
 Characteristics:
 - Same or similar errors repeating
@@ -60,7 +66,7 @@ Note: A' ≈ A ≈ A'' — slight variations of the same approach, all failing t
 | Same error 3+ times | Very High | "TypeError: X is not a function" repeating |
 | Same file edited repeatedly | High | `userService.ts` modified 4 times |
 | "Let me try another approach" but similar code | High | Slight variations of same fix |
-| Token usage spiking | Medium | `/cost` shows rapid increase |
+| Token usage spiking | Medium | `/usage` shows rapid increase |
 | Time without visible progress | Medium | 5+ minutes, same problem |
 | Claude apologizing repeatedly | Medium | "Sorry, let me try again" |
 
@@ -73,18 +79,24 @@ Note: A' ≈ A ≈ A'' — slight variations of the same approach, all failing t
 
 ### The 3-Strike Rule
 
-**If the same approach fails 3 times with similar results, intervene immediately.** Don't wait for 5 or 10. Three is the pattern — after that, more attempts rarely help.
+**If the same approach fails 3 times with similar results, intervene immediately.** Don't wait for
+5 or 10. Three is the pattern — after that, more attempts rarely help. The official best-practices
+guide puts it plainly: (S1) *"If you've corrected Claude more than twice on the same issue…
+`/clear` and start fresh."*
 
 ### Loop Breaking Strategies (Escalation Ladder)
 
 | Level | Strategy | When to Use |
 |-------|----------|-------------|
-| 1 | **Redirect** | "Stop. Try a completely different approach." |
-| 2 | **Information inject** | "Here's context you might be missing: ..." |
-| 3 | **Decompose** | "This is too complex. Solve just [smaller piece] first." |
-| 4 | **Context refresh** | `/compact` to clean up, preserve key decisions |
-| 5 | **Nuclear reset** | `/clear` and start fresh with lessons learned |
+| 1 | **Interrupt** — `Esc` | Stop the current turn immediately; session and context stay intact |
+| 2 | **Rewind** — `Esc Esc` (or `/rewind`) | Undo the last few failed edits, keep the conversation, retry with a redirect |
+| 3 | **Redirect + decompose** (prompt) | "Stop. Explain the cause before trying again" / "Solve just [smaller piece] first" |
+| 4 | **Context refresh** — `/compact <focus>` | Compress out the noise from failed attempts, keep key decisions |
+| 5 | **Nuclear reset** — `/clear` | Start a fresh session, carry the lesson forward yourself |
 | 6 | **Human takeover** | Some things need human debugging |
+
+Rewind (level 2) only undoes changes the Edit/Write tools made — it does **not** undo file changes
+made through Bash (`rm`, `mv`, scripts). See Module 8.5 for that limitation in detail.
 
 ---
 
@@ -170,11 +182,9 @@ No errors found.
 
 **Goal**: Practice recognizing stuck loop signals.
 
-**Instructions**:
-1. Give Claude an intentionally tricky problem (conflicting requirements work well)
-2. Watch for stuck loop signals as Claude works
-3. Count iterations before you intervene
-4. Practice the redirect: "Stop. Explain what you've tried and why it's not working."
+**Instructions**: Give Claude an intentionally tricky problem (conflicting requirements work well),
+watch for stuck loop signals, count iterations before you intervene, then practice the redirect:
+"Stop. Explain what you've tried and why it's not working."
 
 **Expected result**: You recognize the loop within 3-4 iterations and intervene effectively.
 
@@ -193,11 +203,8 @@ Watch for the signals: repeated errors, same file edits, apologetic language.
 
 **Goal**: Practice the 3-strike rule.
 
-**Instructions**:
-1. Pick a real bug in your codebase
-2. Let Claude try to fix it — count the attempts
-3. After strike 3 (3 similar failures), intervene using the escalation ladder
-4. Note which strategy worked
+**Instructions**: Pick a real bug, let Claude try to fix it, count the attempts. After strike 3
+(3 similar failures), intervene using the escalation ladder and note which level worked.
 
 <details>
 <summary>✅ Solution</summary>
@@ -225,15 +232,16 @@ The key is asking Claude to ANALYZE before attempting again.
 
 ### Exercise 3: Context Refresh
 
-**Goal**: Practice using `/compact` to break loops.
+**Goal**: Practice using `/compact <focus>` to break loops.
 
 **Instructions**:
 1. Get into a stuck loop intentionally (use Exercise 1's method)
-2. Run `/compact`
+2. Run `/compact Focus on the actual requirement, drop the failed attempts`
 3. Reframe the problem with fresh wording
-4. Compare Claude's behavior before and after refresh
+4. Compare Claude's behavior before and after
 
-**Expected result**: After `/compact`, Claude often approaches the problem differently because old failed attempts are compressed out of active context.
+**Expected result**: After `/compact`, Claude often approaches the problem differently — the failed
+attempts are compressed out of active context.
 
 ---
 
@@ -246,14 +254,14 @@ The key is asking Claude to ANALYZE before attempting again.
 | Same error 3+ times | 🚨 Intervene NOW |
 | Same file edited 3+ times | 🚨 Intervene NOW |
 | "Let me try again" with similar code | ⚠️ Watch closely |
-| Token burn without progress | ⚠️ Check `/cost` |
+| Token burn without progress | ⚠️ Check `/usage` |
 
 ### Intervention Escalation Ladder
 
-1. **Redirect**: "Stop. Different approach."
-2. **Information**: "You might be missing: ..."
-3. **Decompose**: "Just solve [smaller part] first."
-4. **Refresh**: `/compact`
+1. **Interrupt**: `Esc`
+2. **Rewind**: `Esc Esc` or `/rewind`
+3. **Redirect/decompose**: "Stop. Explain why it's failing." / "Just solve [smaller part] first."
+4. **Refresh**: `/compact <focus>`
 5. **Reset**: `/clear`
 6. **Human**: You take over
 
@@ -274,8 +282,9 @@ The key is asking Claude to ANALYZE before attempting again.
 | Command | Effect |
 |---------|--------|
 | `Esc` | Interrupt the current turn immediately (session and context stay intact) |
-| `/cost` | Check token burn |
-| `/compact` | Compress context, preserve decisions |
+| `Esc Esc` / `/rewind` | Open the rewind menu — restore code and/or conversation to a checkpoint |
+| `/compact <focus>` | Compress context with an explicit focus, preserve key decisions |
+| `/usage` (alias `/cost`) | Check token/cost burn for the session |
 | `/clear` | Nuclear reset (loses progress) |
 
 ---
@@ -287,8 +296,8 @@ The key is asking Claude to ANALYZE before attempting again.
 | Letting loops run hoping "next try will work" | 3-strike rule. Intervene after 3 similar failures. |
 | Intervening too early (after 1 retry) | Some iteration is healthy. Wait for pattern, not single failure. |
 | "Try harder" interventions ("Really fix it this time") | Change APPROACH, not intensity. Ask for analysis. |
-| `/clear` as first response | Escalate: redirect → refresh → reset. `/clear` loses progress. |
-| Not checking `/cost` during long sessions | Monitor `/cost`. Stuck loops burn tokens fast. |
+| `/clear` as first response | Escalate: `Esc` → `/rewind` → `/compact <focus>` → `/clear`. `/clear` loses progress. |
+| Not checking `/usage` during long sessions | Monitor `/usage` (alias `/cost`). Stuck loops burn tokens fast. |
 | Blaming Claude ("Why can't you fix this?") | Loops mean misalignment. Provide info, change angle. |
 | Ignoring your own confusion | If YOU don't understand why it's failing, Claude can't either. |
 
@@ -296,9 +305,11 @@ The key is asking Claude to ANALYZE before attempting again.
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: Vietnamese dev team debugging an authentication flow. Claude kept trying to fix a "token expired" error by adjusting token refresh logic. 7 attempts, 45 minutes, $8 in tokens.
+**Scenario**: Vietnamese dev team debugging an authentication flow. Claude kept trying to fix a
+"token expired" error by adjusting token refresh logic — 7 attempts, 45 minutes, $8 in tokens.
 
-**What happened**: Each "fix" was a variation of token refresh timing — adjust the expiry window, add a buffer, refresh earlier. Same error every time. Claude was stuck in a "token refresh" mental model.
+**What happened**: Each "fix" was a variation of token refresh timing (expiry window, buffer,
+earlier refresh). Same error every time — Claude was stuck in a "token refresh" mental model.
 
 **The break**: After 7 attempts, the dev finally said:
 
@@ -307,13 +318,15 @@ Stop. Forget token refresh. Read the ACTUAL error log, not just
 the error message. What's the full context?
 ```
 
-**Discovery**: The error log showed the token wasn't expired — it was INVALID. The staging environment was using a different API key than production. Token refresh could never fix an invalid key.
+**Discovery**: The token wasn't expired — it was INVALID. Staging was using a different API key
+than production, so token refresh could never fix it.
 
-**Lesson**: The loop was stuck because the FRAMING was wrong. "Expired" vs "Invalid" — completely different problems requiring completely different solutions. Breaking the loop required changing the frame, not trying harder within it.
+**Lesson**: The loop was stuck because the FRAMING was wrong. "Expired" vs "Invalid" needed
+completely different fixes — breaking the loop meant changing the frame, not trying harder in it.
 
-**Team rule now**: "After 3 similar failures, we don't try again. We ask: 'What are we assuming that might be wrong?'"
-
-**Cost of waiting**: $8 and 45 minutes vs. intervening at attempt 3 (~$3, ~15 minutes). Early detection matters.
+**Team rule now**: "After 3 similar failures, we don't try again. We ask: 'What are we assuming
+that might be wrong?'" Cost of waiting: $8 and 45 minutes vs. ~$3 and ~15 minutes if they'd
+intervened at attempt 3.
 
 ---
 

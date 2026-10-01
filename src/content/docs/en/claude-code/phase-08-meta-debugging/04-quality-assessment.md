@@ -1,6 +1,8 @@
 ---
 title: 'Quality Assessment'
 description: 'Systematically assess Claude Code output quality with acceptance checklists and improvement strategies.'
+verified: 2026-09-28
+claude_version: 2.1.283
 ---
 
 # Module 8.4: Quality Assessment
@@ -73,6 +75,21 @@ Then ask Claude for self-review:
 - "What would a senior dev criticize about this?"
 - "What edge cases might this miss?"
 - "Is there a simpler approach?"
+
+### Deterministic Gates (Beyond Self-Review)
+
+Self-review depends on someone remembering to run it. A **deterministic gate** runs automatically
+every time — the "enforced vs. recommended" distinction from Module 2.2. (S1)/(S7): *"Give Claude
+a check it can run: tests, a build, a screenshot to compare"* — verification is a loop step, not
+an afterthought:
+
+- **PostToolUse hook**: runs the linter after every Edit/Write (Module 11.3, Hooks System).
+- **Stop hook**: runs the test suite and blocks the turn from ending until it passes.
+- **Reviewer subagent, fresh context**: sees only the diff, not the implementation reasoning, so it
+  doesn't inherit the writer's blind spots.
+- **`claude-code-action`**: automated review on every PR, in CI (Module 11.4, GitHub Actions).
+- **Mini-eval**: 3-10 real cases you re-run after every change. (S11) full evals use 20-50 tasks
+  graded by code/model/human — same idea, smaller scale.
 
 ### The "Good Enough" Decision
 
@@ -282,6 +299,16 @@ git diff          # Review changes
 "What happens if this input is very large?"
 ```
 
+### Deterministic Gates
+
+| Gate | Runs | Enforces |
+|------|------|----------|
+| PostToolUse hook | After every Edit/Write | Lint runs, no exceptions (11.3) |
+| Stop hook | Before Claude can end the turn | Tests must pass (11.3) |
+| Reviewer subagent | On demand, fresh context | Catches blind spots the writer can't see |
+| `claude-code-action` | On every PR, in CI | Review happens even if no one asks (11.4) |
+| Mini-eval (3-10 cases) | After changes to this feature | Regressions caught before merge (S11) |
+
 ### Good Enough Matrix
 
 | Risk Level | Standard | Action |
@@ -303,6 +330,7 @@ git diff          # Review changes
 | Not using Claude to review Claude's code | Self-review prompts catch real issues |
 | Checking quality only at the end | Assess during development, not just after |
 | Ignoring gut feeling "this seems wrong" | If it feels off, investigate before accepting |
+| Relying on Claude to remember self-review | (S1)/(S7): give it a check it can actually run, not a CLAUDE.md reminder |
 
 ---
 
