@@ -1,6 +1,8 @@
 ---
 title: 'Templates lệnh & prompt'
-description: 'Bộ templates prompt và lệnh tái sử dụng cho Claude Code: code review, debugging và feature development.'
+description: 'Biến prompt lặp lại thành file .claude/commands/*.md thật, có frontmatter, $ARGUMENTS, và shell pre-executed.'
+verified: 2026-09-28
+claude_version: 2.1.283
 ---
 
 # Module 15.2: Templates lệnh & prompt
@@ -9,367 +11,223 @@ description: 'Bộ templates prompt và lệnh tái sử dụng cho Claude Code:
 >
 > **Yêu cầu trước**: Module 15.1 (CLAUDE.md Templates)
 >
-> **Kết quả**: Sau module này, bạn sẽ có library prompt template cho common task và biết create reusable prompt.
+> **Kết quả**: Sau module này, bạn có file `.claude/commands/*.md` thật — có frontmatter,
+> `$ARGUMENTS`, và shell pre-executed — gọi được bằng `/name`, cùng quy tắc khi nào một prompt
+> one-off nên ở lại dạng prompt thường thay vì thành command file.
 
 ---
 
 ## 1. WHY — Tại sao cần học
 
-Bạn làm same task lặp đi lặp lại — code review, test generation, documentation. Mỗi lần viết prompt từ đầu. Có khi quên criteria quan trọng. Result quality vary.
-
-Prompt template là pre-written prompt cho common task. Write once, reuse forever. Consistent quality, nothing forgotten.
+Bạn cứ gõ lại đúng instruction review/test/doc mỗi lần dùng Claude Code. Một "prompt template"
+chỉ tồn tại dưới dạng đoạn Markdown copy-paste thì không reusable theo nghĩa Claude Code hiểu —
+vẫn phải gõ tay, `{{placeholder}}` không ai parse, đồng nghiệp không tìm ra trừ khi bạn chỉ chỗ.
+Claude Code có cơ chế thật cho việc này: file trong `.claude/commands/` trở thành command `/name`
+thật, có argument substitution thật và shell output được inject trước khi Claude thấy prompt.
+Viết file một lần, commit, cả repo có cùng `/name`.
 
 ---
 
 ## 2. CONCEPT — Khái niệm cốt lõi
 
-### Prompt Template Structure
+### Command file nằm ở đâu
 
-```markdown
-# Template: [Task Name]
+| Location | Gọi bằng |
+|---|---|
+| `.claude/commands/pr-review.md` | `/pr-review` (project, commit vào git) |
+| `~/.claude/commands/pr-review.md` | `/pr-review` (personal, mọi project) |
+| `.claude/commands/testing/gen-unit-tests.md` | `/testing:gen-unit-tests` (namespaced) |
 
-## Purpose
-[Template làm gì]
+Docs quote (trang skills): "A file at `.claude/commands/deploy.md` and a skill at
+`.claude/skills/deploy/SKILL.md` both create `/deploy` and work the same way. Your existing
+`.claude/commands/` files keep working." Skill (Module 15.3) thêm folder cho supporting file và
+control invocation chi tiết hơn; command file một file đơn giản hơn khi bạn chỉ cần vậy. Nếu skill
+và command file trùng tên, skill chạy. [Module 4.3](../../phase-04-prompt-memory/03-slash-commands/)
+cover cơ chế slash-command rộng hơn — built-in, `/help`, và command ở session-level — mà command
+file này plug vào.
 
-## Prompt
-[Actual prompt với {{placeholder}}]
+### Frontmatter (command file support cùng field với skill, trừ `name`/`paths`)
 
-## Variables
-- {{code}}: Code cần analyze
-- {{file}}: Target file path
+| Field | Ý nghĩa |
+|---|---|
+| `description` | Hiện trong `/help`; Claude dùng để quyết định khi nào gợi ý |
+| `argument-hint` | Hint autocomplete, ví dụ `[focus-area]` |
+| `allowed-tools` | Tool pre-approve cho lần gọi này, ví dụ `Bash(git diff *)` |
+| `model` | Override model chỉ cho command này |
+| `disable-model-invocation` | `true` = chỉ bạn gọi được, Claude không tự chạy |
 
-## Usage
-[Cách sử dụng template]
-```
+### Substitution
 
-### Template Category
+- `$ARGUMENTS` — toàn bộ text sau tên command. Nếu body không đọc nó, Claude Code append
+  `ARGUMENTS: <value>` vào cuối.
+- `$0`, `$1`, … — positional argument; `$0` là argument **đầu tiên**, không phải `$1`.
+- `` !`git diff HEAD` `` — chạy shell command trước khi prompt được gửi; output thay placeholder.
+  Command fail thì abort toàn bộ invocation — thêm `|| true` nếu fail là expected.
 
-| Category | Templates | Use Case |
-|----------|-----------|----------|
-| **Review** | Code review, PR review | Quality assurance |
-| **Generate** | Tests, docs, types | Tạo content mới |
-| **Refactor** | Extract, rename, optimize | Improve existing |
-| **Debug** | Error analysis, logging | Find/fix issue |
-| **Explain** | Code walkthrough | Understanding |
+### Quy tắc đặt tên
 
-### Template Variable
-
-Placeholder phổ biến cho flexibility:
-
-```text
-{{code}}      — Code cần analyze
-{{file}}      — File path
-{{language}}  — Programming language
-{{error}}     — Error message
-{{context}}   — Additional context
-{{criteria}}  — Specific requirement
-```
-
-### Template Storage
-
-- **CLAUDE.md** — Project-specific template
-- **Personal folder** — Reusable template cá nhân
-- **Team repository** — Shared team template
+Đừng đặt tên command trùng built-in. `/review` đã là alias của `/code-review`, `/debug` đã là
+bundled skill — check danh sách built-in (`/help`, hoặc docs commands) trước khi chọn tên.
 
 ---
 
 ## 3. DEMO — Từng bước cụ thể
 
-### Template 1: Code Review
+**Bước 1: Viết command review thật**
 
 ```markdown
-# Template: Code Review
+---
+description: Review the current working-tree diff for correctness, security, and readability
+argument-hint: [focus-area]
+allowed-tools: Bash(git diff *)
+---
+## Diff to review
+!`git diff HEAD`
 
-## Prompt
-Review code sau cho:
+## Focus area (optional)
+$ARGUMENTS
 
-1. **Correctness**: Logic error, edge case, bug
-2. **Security**: Vulnerability, injection risk, auth issue
-3. **Performance**: Inefficiency, N+1 query, memory leak
-4. **Maintainability**: Readability, naming, complexity
-5. **Standards**: Follow convention trong CLAUDE.md không?
-
-Code cần review:
-{{code}}
-
-Format response:
-- 🔴 Critical (phải fix)
-- 🟠 Important (nên fix)
-- 🟡 Suggestion (nice to have)
-- ✅ Good practice observed
-
-## Usage
-Paste code, dùng template cho structured review.
+Review the diff above. If a focus area was given, cover that category first, then the others.
+For each finding: 🔴 Critical / 🟠 Important / 🟡 Suggestion — `file:line` — one-sentence reason.
+End with ✅ Good practices observed (if any).
 ```
+Lưu thành `.claude/commands/pr-review.md` — docs: `code.claude.com/docs/en/skills`.
 
-### Template 2: Test Generation
+**Bước 2: Viết thêm hai command, cùng pattern**
 
-```markdown
-# Template: Generate Tests
+`.claude/commands/gen-tests.md` (`argument-hint: [file]`, `allowed-tools: Read, Glob`) yêu cầu
+Claude generate `node:test` case theo style của `@tests/math.test.mjs` cho `$ARGUMENTS`.
+`.claude/commands/gen-docs.md` (`allowed-tools: Read`) generate JSDoc block cho mỗi exported
+function trong `$ARGUMENTS`. Cả hai chỉ print code, không edit file.
 
-## Prompt
-Generate comprehensive test cho:
-{{code}}
+**Bước 3: Tạo diff thật, rồi gọi `/pr-review`**
 
-Requirement:
-- Dùng {{testFramework}} (Jest/Pytest/etc.)
-- Cover happy path và edge case
-- Include error scenario
-- Mock external dependency
-- Follow AAA pattern (Arrange, Act, Assert)
-
-Generate test cho:
-1. Normal operation
-2. Edge case (empty, null, boundary)
-3. Error handling
-4. Integration point
-
-## Usage
-Paste function/class code để generate complete test file.
+```bash
+# sửa src/math.js, thêm function mới chia không guard
+git diff --stat
 ```
-
-### Template 3: Documentation
-
-```markdown
-# Template: Generate Documentation
-
-## Prompt
-Generate documentation cho:
-{{code}}
-
-Include:
-1. **Overview**: Code này làm gì?
-2. **Parameters**: Tất cả input với type
-3. **Returns**: Output với type
-4. **Examples**: 2-3 usage example
-5. **Errors**: Có thể throw gì?
-
-Format: JSDoc/docstring phù hợp với {{language}}
-
-## Usage
-Paste code để generate complete documentation.
-```
-
-### Template 4: Debug Helper
-
-```markdown
-# Template: Debug Analysis
-
-## Prompt
-Tôi gặp error này:
-{{error}}
-
-Trong code này:
-{{code}}
-
-Analyze:
-1. Cái gì gây error này?
-2. Tại sao nó xảy ra?
-3. Fix thế nào (provide code)?
-4. Cách prevent similar issue?
-
-## Usage
-Paste error message + code cho root cause analysis.
-```
-
-### Sử dụng Template
-
+Expected output:
 ```text
-Bước 1: Copy template prompt
-Bước 2: Replace {{placeholder}} với value thực tế
-Bước 3: Paste vào Claude session
-Bước 4: Get consistent, structured output
+# Output may vary
+ src/math.js | 3 +++
+ 1 file changed, 3 insertions(+)
 ```
+
+```bash
+claude -p "/pr-review security" --allowedTools "Read,Bash(git diff *)"
+```
+Expected output (rút gọn):
+```text
+# Output may vary
+**Security**
+- 🟠 Important — `src/math.js:3` — `percentOf` doesn't check its inputs. JavaScript silently
+  converts types, so bad values pass through without an error…
+
+**Correctness**
+- 🟠 Important — `src/math.js:4` — When `whole === 0`, the function returns `Infinity` … instead
+  of failing clearly. The existing `divide` at `src/math.js:2` has the same gap.
+
+✅ Good practices observed
+- It's a pure function with no side effects, so it's easy to test.
+```
+Không có permission prompt nào hiện ra: `git diff` là Bash form read-only và `Read` không cần
+approval trong working directory, nên chạy y hệt trên CI như trên laptop.
 
 ---
 
 ## 4. PRACTICE — Luyện tập
 
-### Bài 1: Dùng Template có sẵn
+### Bài 1: Gọi thử và so sánh
 
-**Mục tiêu**: Trải nghiệm template consistency.
+**Mục tiêu**: Thấy command file thật catch được gì mà prompt copy-paste không catch.
 
 **Hướng dẫn**:
-1. Lấy code review template ở trên
-2. Apply vào một piece of code gần đây
-3. So sánh result với ad-hoc review prompt thông thường
-4. Note sự khác biệt về consistency
+1. Tạo `.claude/commands/pr-review.md` từ Bước 1.
+2. Sửa nhỏ trong repo, chạy `/pr-review`, rồi `/pr-review security`.
+3. So sánh: argument focus có đổi thứ tự finding không?
 
 <details>
 <summary>💡 Gợi ý</summary>
-
-Focus vào template có catch những thứ bạn thường quên không (security? edge case?).
-
+`$ARGUMENTS` chỉ đổi phần "Focus area" — phần diff inject qua `!` chạy giống hệt cả hai lần.
 </details>
+
+### Bài 2: Command namespaced với positional argument
+
+**Mục tiêu**: Build command nhận hai argument riêng biệt.
+
+**Hướng dẫn**:
+1. Tạo `.claude/commands/testing/gen-unit-tests.md` với `argument-hint: [file] [function-name]`
+   và body đọc `$0` (file) và `$1` (function name) riêng.
+2. Chạy `/testing:gen-unit-tests src/math.js percentOf`.
+3. Xác nhận tên command bị namespace (`/testing:gen-unit-tests`, không phải `/gen-unit-tests`).
 
 <details>
 <summary>✅ Giải pháp</summary>
 
-Template review thường tìm được:
-- Security issue (template nhắc check)
-- Edge case (explicit trong template)
-- Standard violation (reference CLAUDE.md)
-
-Ad-hoc review thường miss 1-2 category hoàn toàn.
-
-</details>
-
-### Bài 2: Tạo Template riêng
-
-**Mục tiêu**: Build template cho workflow của bạn.
-
-**Hướng dẫn**:
-1. Identify một task bạn làm repeated với Claude
-2. Viết prompt bạn thường dùng
-3. Formalize thành template structure (Purpose, Prompt, Variables, Usage)
-4. Test template hai lần
-
-<details>
-<summary>💡 Gợi ý</summary>
-
-Good candidate: API endpoint review, component creation, migration script.
-
-</details>
-
-<details>
-<summary>✅ Giải pháp</summary>
-
-Ví dụ: API Endpoint Template
 ```markdown
-# Template: API Endpoint Review
-
-## Prompt
-Review API endpoint này cho:
-- Input validation
-- Error response (correct status code)
-- Authentication/authorization
-- Rate limiting consideration
-- Documentation accuracy
-
-Code: {{code}}
+---
+description: Generate node:test unit tests matching this repo's existing style
+argument-hint: [file] [function-name]
+allowed-tools: Read, Glob
+---
+Generate `node:test` unit tests for `$1` in `$0`, matching `@tests/math.test.mjs`'s style.
+Cover the happy path, one edge case, and one error case. Print the code only.
 ```
-
-Test trên 2 endpoint, refine dựa trên result.
-
-</details>
-
-### Bài 3: Template Library
-
-**Mục tiêu**: Build personal template collection.
-
-**Hướng dẫn**:
-1. Tạo 5 template cho common task của bạn
-2. Store trong dedicated folder
-3. Document khi nào dùng mỗi template
-4. Test mỗi template trên real task
-
-<details>
-<summary>💡 Gợi ý</summary>
-
-Start với: review, test, doc, refactor, explain. Cover 80% nhu cầu.
-
-</details>
-
-<details>
-<summary>✅ Giải pháp</summary>
-
-Template library structure:
-```text
-~/prompt-templates/
-├── code-review.md
-├── test-generation.md
-├── documentation.md
-├── refactoring.md
-├── explanation.md
-└── README.md (index + usage guide)
-```
-
-Mỗi template được test trên real code trước khi add vào library.
-
+Subdirectory dưới `.claude/commands/` luôn thành prefix `/subdir:name` — đó là cách Claude Code
+namespace command, không phải convention bạn tự chọn.
 </details>
 
 ---
 
 ## 5. CHEAT SHEET
 
-### Template Structure
+| Frontmatter field | Mục đích |
+|---|---|
+| `description` | Liệt kê trong `/help`; drive auto-suggestion |
+| `argument-hint` | Hint autocomplete |
+| `allowed-tools` | Pre-approve tool cho invocation này |
+| `model` | Override model cho command này |
+| `disable-model-invocation` | `true` = chỉ user gọi được, không auto-trigger |
 
-```markdown
-# Template: [Name]
-## Purpose: [Làm gì]
-## Prompt: [Actual prompt với {{variable}}]
-## Variables: [List placeholder]
-## Usage: [Cách invoke]
-```
+| Substitution | Ý nghĩa |
+|---|---|
+| `$ARGUMENTS` | Toàn bộ text sau tên command |
+| `$0`, `$1`, … | Positional argument (0-indexed) |
+| `` !`cmd` `` | Chạy trước prompt; output thay placeholder |
 
-### Essential Template
-
-| Template | Purpose |
-|----------|---------|
-| `/review` | Code review với criteria |
-| `/test` | Generate test file |
-| `/doc` | Generate documentation |
-| `/refactor` | Refactoring suggestion |
-| `/debug` | Error analysis |
-| `/explain` | Code walkthrough |
-
-### Common Variable
-
-```text
-{{code}}      — Code cần analyze
-{{file}}      — File path
-{{language}}  — Programming language
-{{error}}     — Error message
-{{context}}   — Additional context
-```
-
-### Storage Location
-
-- CLAUDE.md (project-specific)
-- Personal templates folder
-- Team shared repository
+| Location | Scope |
+|---|---|
+| `.claude/commands/<name>.md` | Project, commit vào git |
+| `~/.claude/commands/<name>.md` | Personal, mọi project |
+| `.claude/commands/<subdir>/<name>.md` | Namespaced `/subdir:name` |
 
 ---
 
 ## 6. PITFALLS — Sai lầm thường gặp
 
 | ❌ Sai | ✅ Đúng |
-|--------|---------|
-| Template quá vague | Specific criteria và output format |
-| Quên variable | Luôn include {{placeholder}} |
-| Một template khổng lồ | Focused template per task |
-| Không define output | Define good response trông như thế nào |
-| Không bao giờ update | Improve template dựa trên result |
-| Template chỉ trong đầu | Write down và share |
-| Ignore project context | Template reference CLAUDE.md |
+|---|---|
+| `docs/prompt-templates.md` không ai chạy | File `.claude/commands/<name>.md` thật, gọi bằng `/name` |
+| Syntax `{{placeholder}}` (không bao giờ được parse) | `$ARGUMENTS` hoặc `$0`/`$1` — substitution duy nhất Claude Code đọc |
+| Đặt tên command `/review` hay `/debug` | Check danh sách built-in trước; skill thắng khi trùng tên |
+| `!`command`` không có `\|\| true` khi fail là expected | Command abort hoàn toàn — Claude không thấy phần còn lại của file |
+| Một command khổng lồ làm mọi thứ | Mỗi command một task; one-off thật (dán đúng error này) ở lại dạng prompt thường |
+| Command read-only không có `allowed-tools` | Thêm vào để command chạy unattended trong `-p` và CI, không chỉ interactive |
 
 ---
 
 ## 7. REAL CASE — Câu chuyện thực tế
 
-**Scenario**: Team fintech Việt Nam làm 20+ code review/tuần. Quality vary — some developer check security, some không. Some tìm edge case, some miss.
+**Scenario**: Một team nhỏ giữ Google Doc chung "prompt Claude Code hay". Ai nhớ doc tồn tại thì
+dùng; new hire không biết mà tìm.
 
-**Template Solution**:
+**Fix**: Họ commit `.claude/commands/pr-review.md`, `gen-tests.md`, và `gen-docs.md` vào repo. Mọi
+reviewer giờ chạy đúng một checklist `/pr-review` — criteria nằm trong file version control, không
+nằm trong đầu một người. Khi ai muốn cải thiện checklist, họ mở pull request vào `pr-review.md`
+như mọi thay đổi khác, và diff cho thấy chính xác criteria cũ là gì.
 
-Tạo `/review` template với mandatory section:
-- Security (SQL injection, XSS, auth)
-- Performance (query, memory)
-- Business logic (edge case, validation)
-- Standards (team convention)
-- Test coverage (cần test gì)
-
-**Implementation**:
-- Tuần 1: Tạo standard review template
-- Tuần 2: All review phải dùng template
-- Tuần 3: PR checklist thêm: "Reviewed using template"
-
-**Kết quả (2 tháng)**:
-- Security finding: +200% (template nhắc check)
-- Review consistency: 95% same criteria
-- Review time: Unchanged
-- Production bug từ reviewed code: -40%
-
-**Quote**: "Template không biến chúng tôi thành robot. Nó đảm bảo không quên stuff quan trọng. Mỗi reviewer vẫn add expertise riêng trên đó."
+**Result**: Prompt library không còn là tribal knowledge. Nó reviewable, diffable, và `git blame`
+cho thấy ai thêm check nào và vì sao.
 
 ---
 
