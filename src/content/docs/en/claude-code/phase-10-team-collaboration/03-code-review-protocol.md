@@ -1,6 +1,8 @@
 ---
 title: 'Code Review Protocol'
-description: 'Review AI-generated code effectively and use Claude Code as a code review assistant for your team.'
+description: 'Use /code-review and /security-review as a fresh-context reviewer, and keep a human gate on every merge.'
+verified: 2026-09-27
+claude_version: 2.1.283
 ---
 
 # Module 10.3: Code Review Protocol
@@ -9,232 +11,182 @@ description: 'Review AI-generated code effectively and use Claude Code as a code
 >
 > **Prerequisite**: Module 10.2 (Git Conventions)
 >
-> **Outcome**: After this module, you will have a code review protocol that accounts for AI-generated code, know how to use Claude as a review assistant, and understand both author and reviewer responsibilities.
+> **Outcome**: After this module, you will know why the agent that wrote code can't approve it,
+> how to run `/code-review` and `/security-review` as an independent check, and what a human must
+> still verify before merge.
 
 ---
 
 ## 1. WHY — Why This Matters
 
-Developer submits PR with 500 lines of Claude-generated code. Reviewer skims it — "looks clean, AI wrote it, probably fine." Ships to production. Bug discovered a week later: AI missed an edge case that was implied but not explicit in the requirements. Nobody caught it because both author and reviewer assumed AI was thorough.
-
-AI-generated code requires MORE scrutiny, not less. This module establishes the "trust but verify" protocol for AI-assisted PRs.
+A developer submits a PR with 400 lines of Claude-generated code. The reviewer skims it — "looks
+clean, AI wrote it, probably fine" — and approves. A week later, a bug surfaces: an edge case that
+was implied by the requirements but never stated in the prompt. Nobody caught it, because both
+author and reviewer assumed the same session that wrote the code would also have caught its own
+mistake. Anthropic states the underlying problem directly: "the agent that wrote the code has no
+way to approve it" (S3). This module is about building a second, independent check into the loop.
 
 ---
 
 ## 2. CONCEPT — Core Ideas
 
-### The AI Code Review Paradox
+### Why the author's own Claude can't be the reviewer
 
-AI code often LOOKS cleaner than human code. But it can miss:
-- Implicit requirements not stated in the prompt
-- Context from verbal discussions or past decisions
-- Edge cases that "everyone knows" but weren't mentioned
-- Integration patterns from other parts of the codebase
+The context that wrote the code carries the same assumptions, the same blind spots, and often a
+documented bias toward telling you it did well — Anthropic's own agent-harness research calls this
+"confident praising": a generator that also grades its own work tends to over-report success
+(S12). The fix is structural, not a better prompt: the reviewer needs a **fresh context** that
+never saw the plan, only the diff.
 
-Reviewers let their guard down because it "looks professional." This is dangerous.
+### `/code-review` and `/security-review`
 
-### AI-Specific Review Checklist
+| Command | What it checks | Notes |
+|---|---|---|
+| `/code-review` (alias `/review`) | Correctness bugs in the current diff, a PR, a branch, or a path | Pass `ultra` (i.e. `/code-review ultra`) to run a deep multi-agent review in a cloud sandbox — there is no separate `claude ultrareview` CLI command |
+| `/security-review` | Security vulnerabilities in the changes on your current branch | Diffs against `origin/HEAD` — needs a configured `origin` remote, or the underlying `git diff` fails and the whole review aborts |
 
-| Check | Why | Example Issue |
-|-------|-----|---------------|
-| Requirements match | AI may misunderstand | Implemented login, not SSO as discussed |
-| Edge cases covered | AI handles explicit, misses implicit | No null check for optional field |
-| Context awareness | AI doesn't know verbal decisions | Used approach rejected in standup |
-| Integration fit | AI sees file, not system | New pattern inconsistent with existing |
-| Security considered | AI may not prioritize security | SQL built with string concat |
+Both commands spawn their own read-only reviewer subagents rather than reusing the authoring
+session's context — the DEMO below shows `/security-review` literally naming two background
+agents (an identifier and a false-positive filter) with their own findings and confidence scores.
 
-### Author Responsibilities
+### Confidence thresholds are a design choice, not a bug
 
-When submitting AI-assisted PR:
-1. **UNDERSTAND** every line — if you can't explain it, don't submit it
-2. **VERIFY** against requirements — not just "it compiles"
-3. **DISCLOSE** AI assistance — use 🤖 marker
-4. **HIGHLIGHT** uncertainties — "Not sure if this matches our pattern"
-5. **TEST** thoroughly — don't trust "I added tests"
+`/security-review` doesn't report every possible issue — it filters by confidence, and a real
+vulnerability can fall just under the bar if nothing in the repo currently calls the vulnerable
+function. That's a deliberate trade-off against noise, not proof the tool missed something; treat
+"below threshold" findings as a to-track list, not a clean bill of health.
 
-### Reviewer Responsibilities
+### Human gate at every artifact handoff
 
-For AI-assisted PR:
-1. **DON'T** assume correctness — AI code can be subtly wrong
-2. **CHECK** requirements — does it solve the right problem?
-3. **VERIFY** patterns — does it match existing codebase?
-4. **QUESTION** author — can they explain the tricky parts?
-5. **TEST** edge cases — AI often misses implicit ones
+Author and reviewer responsibilities don't change because a machine wrote the diff:
 
-### Claude as Review Assistant
+- **Author**: understand every line well enough to explain it; disclose that Claude wrote it;
+  flag uncertain sections explicitly.
+- **Reviewer**: don't let "it looks professional" substitute for checking it solves the *right*
+  problem, matches existing patterns, and handles the edge cases nobody wrote down.
 
-Use Claude to help review, but remember limits:
-- "Review this diff for security issues"
-- "What edge cases might this miss?"
-- "Does this match patterns in [existing file]?"
-
-BUT: Claude reviewing Claude has blind spots. Human judgment required.
+`/code-review` and `/security-review` are inputs to that human judgment, not a replacement for it
+— and CI can run `claude-code-action` on every PR to guarantee the input exists even if a human
+forgets to ask for it (Module 11.4).
 
 ---
 
 ## 3. DEMO — Step by Step
 
-**Scenario**: Reviewing a PR for user authentication, generated with Claude Code.
+**Scenario**: a small diff adds `src/calc.js` with two real issues — a division-by-zero and an
+`eval()` call — and both review commands are run against it.
 
-### Step 1: Author Self-Review Before Submitting
-
-```text
-You: Before I submit this PR, review the authentication implementation.
-Check for:
-- Security issues
-- Missing edge cases
-- Inconsistencies with our auth patterns in src/auth/
-
-Claude: POTENTIAL ISSUES FOUND:
-1. Password comparison uses == instead of timing-safe comparison
-2. No rate limiting on login attempts
-3. JWT expiry is 30 days (existing code uses 24 hours)
-4. Missing test for invalid token format
-```
-
-Author fixes issues BEFORE submitting.
-
-### Step 2: Author Submits with Disclosure
-
-```markdown
-## PR Description
-
-### What
-Implement user authentication with JWT
-
-### AI Assistance
-🤖 Generated with Claude Code
-
-### Areas for careful review
-- Token refresh logic (line 45-67) — unsure if matches our pattern
-- Error message format — Claude suggested, please verify
-
-### Author Checklist
-- [x] I understand all code in this PR
-- [x] Tested locally with edge cases
-- [x] Verified against existing patterns
-```
-
-### Step 3: Reviewer Uses Claude
+**Step 1: `/code-review` on the uncommitted diff**
 
 ```text
-You: Review this auth PR diff for:
-- Security vulnerabilities
-- Missing edge cases
-- Inconsistencies with src/auth/
-
-[paste diff]
-
-Claude: OBSERVATIONS:
-- Line 34: Good - uses bcrypt.compare
-- Line 56: Question - rate limit is 100/hour, existing uses 10/minute
-- Line 78: Missing - no handling for expired refresh token
+> /code-review
+```
+```text
+# Output may vary
+- src/calc.js:7 — Security: eval() runs user input, so a crafted expression can execute any code.
+- src/calc.js:2 — Correctness: percentOf returns Infinity or NaN when total is 0.
 ```
 
-### Step 4: Reviewer Questions Author
+**Step 2: `/security-review` on the same branch**
 
 ```text
-Reviewer comment:
-"Rate limit is 100/hour but existing code uses 10/minute.
-Was this intentional?"
+> /security-review
+```
+```text
+# Output may vary
+⏺ Agent(Identify vulns in calc.js)     ⎿ Backgrounded agent
+⏺ Agent "Identify vulns in calc.js" finished · 40s
+⏺ Agent(FP-filter eval finding)        ⎿ Backgrounded agent
+⏺ Agent "FP-filter eval finding" finished · 37s
 
-Author response:
-"Good catch! That was Claude's suggestion. Should match existing. Fixed."
+Security Review: src/calc.js
+No findings reached the reporting threshold of confidence 8 or higher.
+
+Below the threshold
+eval code injection in src/calc.js:7 (runExpression)
+- Confidence: 7/10 — excluded because nothing in the repo calls runExpression yet, so there's
+  no confirmed path from untrusted input to this line.
+- Risk if a future caller passes untrusted input: full remote code execution.
+- Recommendation: replace eval with a restricted parser.
 ```
 
-### Step 5: Final Human Review
+Two independent, read-only subagents (identify → filter false positives) produced this, not the
+session that would have written the fix.
 
-Reviewer:
-- Manually tests edge cases
-- Verifies author can explain complex sections
-- Approves after human judgment, not just AI review
+**Step 3: A human reads both, decides it's worth fixing now**
+
+The `eval()` finding appeared in both runs — once above threshold in `/code-review`, once below
+threshold in `/security-review` with an explicit reason. A human reviewer treats the two together
+as "fix before merge," not "one tool said it's fine."
+
+**Step 4: Fix, following Module 10.2's git conventions**
+
+The actual fix and its commit trailer are the DEMO in Module 10.2 — same diff, same repo,
+continuing this exact finding.
 
 ---
 
 ## 4. PRACTICE — Try It Yourself
 
-### Exercise 1: Pre-Submit Self-Review
+### Exercise 1: Run both reviews on your own branch
 
-**Goal**: Catch issues before submitting.
+**Goal**: See real findings on real code, not lab code.
 
 **Instructions**:
-1. Create a small feature with Claude's help
-2. Before submitting, ask Claude to review for issues
-3. Fix what Claude finds
-4. Document: what did Claude catch that you missed?
+1. On a branch with an actual diff, run `/code-review`.
+2. Run `/security-review`. If it errors on `origin/HEAD`, add or fetch a remote first — that
+   failure is itself worth knowing about before you rely on the command in CI.
+3. For each finding, decide: fix now, track, or dismiss — and say why.
 
 <details>
 <summary>💡 Hint</summary>
 
-Prompt: "Review this code for security issues, edge cases, and consistency with [existing file]"
+`/security-review` needs `origin/HEAD` to resolve. In a repo cloned normally this already works;
+a from-scratch lab repo may need `git remote add origin <url>` first.
 </details>
 
-### Exercise 2: AI-Aware Review
+### Exercise 2: Read a below-threshold finding correctly
 
-**Goal**: Practice the enhanced review checklist.
-
-**Instructions**:
-1. Review a colleague's PR (or an old PR of your own)
-2. Apply the AI-specific checklist
-3. Use Claude to assist
-4. Compare: what did Claude catch vs. what did you catch?
-
-### Exercise 3: Understanding Test
-
-**Goal**: Verify author comprehension.
+**Goal**: Practice treating a filtered finding as "track," not "ignore."
 
 **Instructions**:
-1. For AI-generated code, ask author to explain a complex section
-2. If they can't explain it clearly, flag for revision
-3. Document the exchange
+1. Take the `eval()` example from the DEMO (or a similar low-confidence finding of your own).
+2. Write one sentence on what would raise its confidence (e.g. "a new caller passes user input").
+3. Add a code comment or issue linking that condition to the original finding.
+
+### Exercise 3: Explain-it-or-don't-submit-it
+
+**Goal**: Verify author comprehension, independent of any review tool.
+
+**Instructions**: For a Claude-authored PR, ask the author to explain the trickiest section out
+loud. If they can't, that's a revision flag regardless of what `/code-review` reported.
 
 <details>
 <summary>✅ Solution</summary>
 
-Rule: "If you can't explain it, don't submit it."
-
-If author says "Claude wrote it, I'm not sure why" — that's a red flag. Code should be revised until author understands it.
+"Claude wrote it, I'm not sure why it works" is a red flag on its own — a passing `/code-review`
+doesn't substitute for author comprehension.
 </details>
 
 ---
 
 ## 5. CHEAT SHEET
 
-### AI-Specific Review Checklist
+| Command | Scope | Notes |
+|---|---|---|
+| `/code-review` (alias `/review`) | Current diff, a PR, a branch, or a path | `/code-review ultra` = deep cloud multi-agent review |
+| `/security-review` | Diff against `origin/HEAD` on current branch | Needs a resolvable `origin` remote |
+| `claude-code-action` on PRs | CI-enforced review, every PR | Module 11.4 |
+| `/pr-comments` | ❌ Removed in v2.1.91 | Ask Claude directly to view PR comments instead |
+
+### Human gate checklist
 
 ```text
-[ ] Requirements actually match (not just code quality)
-[ ] Edge cases covered (implicit ones too)
-[ ] Consistent with existing patterns
-[ ] Security considered
 [ ] Author can explain every line
-```
-
-### Author Responsibilities
-
-1. Understand every line
-2. Verify vs. requirements
-3. Disclose AI assistance
-4. Highlight uncertainties
-5. Test thoroughly
-
-### Reviewer Prompts
-
-```text
-"Review this diff for security issues"
-"What edge cases might this miss?"
-"Does this match patterns in [existing file]?"
-"What would a senior dev question here?"
-```
-
-### PR Template Addition
-
-```markdown
-### AI Assistance
-🤖 Generated with Claude Code: Yes/No
-
-### Areas for careful review
-- [List uncertain parts]
+[ ] Requirements actually match, not just "compiles"
+[ ] /code-review and /security-review findings triaged (fix / track / dismiss + why)
+[ ] Edge cases implied but not stated in the prompt are covered
+[ ] Matches existing patterns in the codebase
 ```
 
 ---
@@ -243,39 +195,24 @@ If author says "Claude wrote it, I'm not sure why" — that's a red flag. Code s
 
 | ❌ Mistake | ✅ Correct Approach |
 |-----------|---------------------|
-| "AI wrote it, must be correct" | AI code needs MORE scrutiny, not less |
-| Reviewing only code quality | Check: does it solve the RIGHT problem? |
-| Submitting code you don't understand | Rule: explain it or don't submit it |
-| Only Claude reviewing Claude | Human judgment required. AI assists, doesn't replace. |
-| No disclosure of AI assistance | Always flag AI-assisted PRs with 🤖 |
-| Skipping edge case testing | AI misses implicit edge cases. Test them. |
-| Same review rigor as human code | AI code has different failure modes. Adapt. |
+| Same session writes and approves the code | Reviewer needs a fresh context — `/code-review`/`/security-review` or a human, never the authoring session |
+| "AI wrote it, must be fine" | AI code needs MORE scrutiny, not less — it looks clean and can still miss implicit requirements |
+| Treating a below-threshold finding as "no issue" | It's a confidence filter, not a clean bill of health — track it |
+| Assuming `/security-review` always runs | It fails outright if `origin/HEAD` doesn't resolve — verify the remote first |
+| Expecting `claude ultrareview` as a CLI command | It's `/code-review ultra`, not a standalone subcommand |
+| Relying on `/pr-comments` | Removed in v2.1.91 — ask Claude directly, or use `--from-pr` |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: Vietnamese e-commerce company, major production incident.
-
-**What happened**:
-- Developer used Claude to implement payment retry logic
-- Code looked clean, passed tests
-- Reviewer approved quickly — "looks professional"
-- Production: race condition caused double charges
-- Cost: ₫200M in refunds + customer trust damage
-
-**Root cause**: Tests didn't cover concurrent requests. AI-generated code had subtle race condition that looked correct.
-
-**Protocol changes implemented**:
-1. AI-assisted PRs require explicit 🤖 label
-2. Added AI-specific review checklist to PR template
-3. Author must document "areas of uncertainty"
-4. Reviewer must ask "can you explain lines X-Y?"
-5. Critical paths (payment, auth) require 2 reviewers + manual edge case testing
-
-**Result**: No AI-related incidents in 6 months since protocol adoption.
-
-**Quote**: "AI makes code that looks right. Our job is to verify it IS right."
+An e-commerce team's payment-retry logic, written by Claude, passed its tests and got a fast
+"looks professional" approval. In production, a race condition under concurrent requests caused
+duplicate charges — the tests never simulated concurrent requests, and the reviewer's fast
+approval never asked "what happens if this runs twice at once?" The team's fix wasn't a smarter
+prompt: it was requiring `/code-review` and `/security-review` output attached to every
+payment-path PR, plus a second human reviewer for that directory specifically, so a fast skim
+could no longer be the only check before merge.
 
 ---
 

@@ -1,6 +1,8 @@
 ---
 title: 'Git Conventions'
-description: 'Establish git conventions for AI-assisted development with Claude Code commit attribution best practices.'
+description: 'Configure commit and PR attribution with the attribution setting, and give every feature its own worktree.'
+verified: 2026-09-27
+claude_version: 2.1.283
 ---
 
 # Module 10.2: Git Conventions
@@ -9,253 +11,207 @@ description: 'Establish git conventions for AI-assisted development with Claude 
 >
 > **Prerequisite**: Module 10.1 (Team CLAUDE.md)
 >
-> **Outcome**: After this module, you will have git conventions that work for AI-assisted development, know how to train Claude to follow them, and understand best practices for commit attribution.
+> **Outcome**: After this module, you will know Claude Code's actual default commit/PR
+> attribution, how to change or hide it with the `attribution` setting, and how to give each
+> feature its own isolated worktree.
 
 ---
 
 ## 1. WHY — Why This Matters
 
-Developer uses Claude Code to implement a feature. Claude makes 1 giant commit with message "implemented feature." PR reviewer can't understand what changed or why. Another developer's Claude commits are verbose novels. Git history is useless for debugging.
-
-Git conventions exist for humans. When AI generates commits, those conventions matter MORE — because AI will consistently follow them (or consistently ignore them). This module makes Claude a good git citizen.
+A developer asks Claude to implement a feature. Claude makes the commit itself with `git commit`
+and opens the PR with `gh pr create`. That's convenient — until legal asks "why does every commit
+have a `Co-Authored-By` line naming a model?" or a teammate asks "can we turn that off for this
+repo?" Git conventions for AI-assisted work aren't about writing a nicer commit message by hand —
+they're about knowing exactly what Claude Code writes into your history by default, and the one
+setting that changes it.
 
 ---
 
 ## 2. CONCEPT — Core Ideas
 
-### Commit Message Convention
+### Git as the artifact trail, not just history
 
-```text
-<type>(<scope>): <short description>
+Treat each unit of AI-assisted work the same way you'd treat a spec: an intent, a plan, a diff,
+and a PR that a human reviews before it merges. Anthropic's own framing of this shift: "Code is no
+longer the bottleneck — the human-speed steps around it are" (S3). Git conventions matter more
+with AI than without it, precisely because Claude will follow them (or ignore them) consistently
+across every commit — a human forgets the convention sometimes; a misconfigured Claude forgets it
+every time.
 
-[optional body: what and why]
+### The actual default attribution (not a guess)
 
-🤖 Generated with Claude Code
+When Claude Code creates a commit or PR itself, it adds attribution by default. The exact,
+documented defaults:
+
+| Surface | Default text |
+|---|---|
+| Commit trailer | `Co-Authored-By: <model> <noreply@anthropic.com>` — `<model>` is whatever model made the commit, e.g. `Claude Sonnet 5` |
+| Pull request description | `🤖 Generated with [Claude Code](https://claude.com/claude-code)` |
+
+### `attribution` — the current setting (not `includeCoAuthoredBy`)
+
+`includeCoAuthoredBy` is **deprecated since v2.0.62**. The current key is `attribution`, in any
+settings file (user, project, or local):
+
+```json
+{
+  "attribution": {
+    "commit": "Generated with AI\n\nCo-Authored-By: AI <ai@example.com>",
+    "pr": "",
+    "sessionUrl": false
+  }
+}
 ```
 
-**Types**: feat, fix, refactor, docs, test, chore
+- `attribution.commit` (string) — replaces the commit trailer text entirely.
+- `attribution.pr` (string) — replaces the PR description text; empty string hides it.
+- `attribution.sessionUrl` (boolean, default `true`) — the `Claude-Session` trailer added on cloud
+  or Remote Control commits; `false` omits it.
+- `attribution: false` (Claude Code **v2.1.281+**) hides all attribution at once. Earlier versions
+  reject this shape and skip the whole settings file that holds it.
+- Once you set `commit` or `pr` yourself, Claude Code ignores `includeCoAuthoredBy` for that
+  surface and uses its own default only for whichever of the two you left unset.
+- Your own CLAUDE.md/memory instructions about attribution take precedence over these two lines —
+  *unless* the line is set in managed settings (Module 10.5), which always wins.
 
-### Commit Granularity Rules
+### One worktree per feature
 
-| Rule | Good | Bad |
-|------|------|-----|
-| Atomic commits | One logical change per commit | "implemented everything" |
-| Reviewable size | 50-200 lines per commit | 2000-line commit |
-| Builds pass | Each commit compiles/passes tests | Broken intermediate commits |
+`claude --worktree <name>` (short: `-w`) starts Claude in an isolated git worktree at
+`<repo>/.claude/worktrees/<name>`, so two features never collide in the same working directory.
+It also accepts a PR/MR URL or `#<number>` to branch straight from that pull request. It needs at
+least one existing commit — an empty repo fails with `Failed to resolve base branch "HEAD"`.
 
-### Branch Naming
+### The atomic-commit habit still matters
 
-```text
-<type>/<ticket>-<short-description>
-
-feat/PROJ-123-user-auth
-fix/PROJ-456-login-validation
-refactor/PROJ-789-payment-service
-```
-
-### AI Attribution Approaches
-
-1. **Footer marker**: `🤖 AI-assisted` in commit message (recommended)
-2. **Co-author**: `Co-authored-by: Claude <noreply@anthropic.com>`
-3. **Branch suffix**: `-ai-assisted`
-4. **PR label**: Add "AI-assisted" label
-
-Footer marker is least intrusive, most informative.
+None of the above changes what makes a commit reviewable: one logical change, a subject a human
+wrote or approved, a body that says *why*. AI attribution documents that Claude was involved — it
+doesn't replace review of *what* it did.
 
 ---
 
 ## 3. DEMO — Step by Step
 
-**Scenario**: Team adopts Conventional Commits with AI attribution.
+**Scenario**: Claude commits a real fix in the lab, then the team changes the trailer.
 
-### Step 1: Add Git Conventions to CLAUDE.md
-
-```markdown
-## Git Conventions
-
-### Commit Message Format
-<type>(<scope>): <short description>
-
-[body: explain what and why, not how]
-
-🤖 Generated with Claude Code
-
-### Types
-- feat: New feature
-- fix: Bug fix
-- refactor: Code change that neither fixes nor adds
-- docs: Documentation only
-- test: Adding tests
-- chore: Maintenance
-
-### Rules
-- Subject line: max 50 characters, imperative mood
-- Body: wrap at 72 characters
-- One logical change per commit
-- Each commit must pass: npm test && npm run lint
-```
-
-### Step 2: Train Claude with Example
-
-```text
-You: I've added git conventions to CLAUDE.md. Let's practice.
-I just added input validation to the login form.
-Generate the appropriate commit.
-
-Claude: Here's the commit following our conventions:
-
-git commit -m "feat(auth): add input validation to login form
-
-Add email format validation
-Add password strength requirements
-Display inline error messages
-
-🤖 Generated with Claude Code"
-```
-
-### Step 3: Multi-Commit Workflow
-
-```text
-You: Implement user registration with email verification.
-Break this into appropriate commits following our granularity rules.
-
-Claude: I'll implement this in 4 atomic commits:
-1. feat(auth): add user registration endpoint
-2. feat(auth): add email verification token generation
-3. feat(auth): add verification email sending
-4. feat(auth): add email verification confirmation endpoint
-
-Each commit will be independently testable. Shall I proceed?
-```
-
-### Step 4: Verify in Git Log
+**Step 1: Let Claude commit with the default trailer**
 
 ```bash
-$ git log --oneline -5
+$ claude -p "Stage src/calc.js and commit it with a Conventional Commits message." \
+  --permission-mode acceptEdits \
+  --allowedTools "Bash(git add:*) Bash(git commit:*) Bash(git status:*) Bash(git diff:*)"
 ```
 
-Output:
-```text
-abc1234 feat(auth): add email verification confirmation endpoint
-def5678 feat(auth): add verification email sending
-ghi9012 feat(auth): add email verification token generation
-jkl3456 feat(auth): add user registration endpoint
-mno7890 docs: update CLAUDE.md with git conventions
+**Step 2: Read back the real trailer**
+
+```bash
+$ git log -1 --format="%H%n%s%n%n%b"
 ```
+```text
+# Output may vary
+6135609ad9da7a45170e07ce4cac5f326a41ced4
+fix(calc): guard percentOf against zero total and drop eval in runExpression
+
+- percentOf now returns 0 when total is 0 instead of Infinity/NaN.
+- runExpression no longer calls eval on user input...
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+```
+
+That's the documented default, unmodified — no CLAUDE.md instruction changed it.
+
+**Step 3: Set `attribution.commit` in the project's `.claude/settings.json`**
+
+```bash
+$ cat > .claude/settings.json <<'EOF'
+{
+  "attribution": {
+    "commit": "Generated-by: Claude Code (lab demo)"
+  }
+}
+EOF
+```
+
+**Step 4: Commit again — the trailer changes immediately**
+
+```bash
+$ claude -p "Stage src/calc.js and commit it: 'docs(calc): add clarifying comment'." \
+  --permission-mode acceptEdits \
+  --allowedTools "Bash(git add:*) Bash(git commit:*)"
+$ git log -1 --format="%s%n%n%b"
+```
+```text
+# Output may vary
+docs(calc): add clarifying comment
+
+Generated-by: Claude Code (lab demo)
+```
+
+No `Co-Authored-By` line anymore — the project setting replaced it for every commit Claude makes
+in this repo, for every developer who checks it in.
 
 ---
 
 ## 4. PRACTICE — Try It Yourself
 
-### Exercise 1: Convention Setup
+### Exercise 1: Decide your team's attribution policy
 
-**Goal**: Configure git conventions for your team.
+**Goal**: Pick and configure one attribution stance for your repo.
 
 **Instructions**:
-1. Add git convention section to your CLAUDE.md
-2. Include: message format, types, granularity rules
-3. Include AI attribution approach
-4. Test with a small change
+1. Decide: keep the default trailer, customize the text, or hide it (`attribution: false`,
+   v2.1.281+).
+2. Add the chosen `attribution` block to `.claude/settings.json` (shared) or
+   `.claude/settings.local.json` (personal only).
+3. Have Claude make a real commit and confirm with `git log -1`.
 
 <details>
 <summary>💡 Hint</summary>
 
-```markdown
-## Git Conventions
-- Format: type(scope): description
-- Types: feat, fix, refactor, docs, test, chore
-- Max 50 char subject line
-- Add 🤖 AI-assisted footer
-```
+`attribution: false` needs v2.1.281+; older Claude Code rejects the whole settings file that has
+it, so check `claude --version` first.
 </details>
 
-### Exercise 2: Atomic Commit Drill
+### Exercise 2: One worktree per feature
 
-**Goal**: Practice proper commit granularity.
-
-**Instructions**:
-1. Ask Claude to implement a medium feature
-2. Require it to break into 3-5 atomic commits
-3. Review each commit: Is it truly atomic? Does it pass tests alone?
-4. Iterate on CLAUDE.md if Claude's granularity is off
-
-### Exercise 3: History Readability
-
-**Goal**: Validate your conventions work.
+**Goal**: Run two features in parallel without touching the same working directory.
 
 **Instructions**:
-1. After using Claude for a day, run `git log --oneline -20`
-2. Can you understand what happened from messages alone?
-3. If not, what's missing? Update CLAUDE.md.
+1. `claude --worktree feature-a "implement X"`
+2. `claude --worktree feature-b "implement Y"`
+3. Confirm both live under `.claude/worktrees/` and neither's `git status` shows the other's files.
+
+### Exercise 3: Atomic commit drill
+
+**Goal**: Practice reviewable commit granularity independent of attribution.
+
+**Instructions**:
+1. Ask Claude to implement a small multi-step feature.
+2. Require 3-5 atomic commits, each passing tests on its own.
+3. Run `git log --oneline -10` — can you tell what happened without opening a diff?
 
 <details>
 <summary>✅ Solution</summary>
 
-Good git log output:
-```text
-abc1234 feat(cart): add quantity validation
-def5678 fix(cart): handle empty cart checkout
-ghi9012 refactor(cart): extract price calculation
-jkl3456 test(cart): add unit tests for CartService
-```
-
-Bad git log output:
-```text
-abc1234 updates
-def5678 WIP
-ghi9012 fixed stuff
-jkl3456 implemented feature
-```
-
-If your log looks like the bad example, add more specific rules to CLAUDE.md.
+If the log reads like `feat(auth): add endpoint` / `feat(auth): add token generation` / `feat(auth):
+add email send`, each one independently testable, that's atomic. If it reads `wip` / `more changes`
+/ `fix`, tighten the instruction in `CLAUDE.md`: "one logical change per commit; each commit must
+pass `npm test`."
 </details>
 
 ---
 
 ## 5. CHEAT SHEET
 
-### Commit Message Format
-
-```text
-<type>(<scope>): <description>
-
-[body]
-
-🤖 Generated with Claude Code
-```
-
-### Types
-
-feat | fix | refactor | docs | test | chore
-
-### Granularity Rules
-
-- One logical change per commit
-- 50-200 lines per commit
-- Each commit passes tests
-
-### Branch Naming
-
-```text
-<type>/<ticket>-<description>
-feat/PROJ-123-user-auth
-```
-
-### CLAUDE.md Git Section
-
-```markdown
-## Git Conventions
-- Format: type(scope): description
-- Max 50 char subject
-- Add 🤖 AI-assisted footer
-- Atomic commits, each passes tests
-```
-
-### Quick Prompts
-
-- "Commit this following our conventions"
-- "Break this into atomic commits"
-- "What's the appropriate commit type?"
+| Key / Flag | Effect |
+|---|---|
+| `attribution.commit` | Replace the commit trailer text (default: `Co-Authored-By: <model> <noreply@anthropic.com>`) |
+| `attribution.pr` | Replace the PR description text (default: `🤖 Generated with [Claude Code](https://claude.com/claude-code)`); `""` hides it |
+| `attribution.sessionUrl` | `false` omits the `Claude-Session` trailer on cloud/Remote Control commits |
+| `attribution: false` | Hide all attribution at once (v2.1.281+ only) |
+| `includeCoAuthoredBy` | ⚠️ Deprecated since v2.0.62 — use `attribution` |
+| `claude --worktree <name>` (`-w`) | Isolated worktree at `.claude/worktrees/<name>`; accepts a PR URL or `#<number>` |
+| `gh pr create` / `glab mr create` | What Claude actually calls to open a PR — links the session to it |
 
 ---
 
@@ -263,39 +219,25 @@ feat/PROJ-123-user-auth
 
 | ❌ Mistake | ✅ Correct Approach |
 |-----------|---------------------|
-| "Just commit it" with no format | Explicit format in CLAUDE.md |
-| Giant commits ("implemented feature") | Require atomic commits |
-| No AI attribution | Footer marker: 🤖 AI-assisted |
-| Committing broken code | Rule: each commit must pass tests |
-| Vague commit messages | Require body explaining why |
-| Inconsistent between team members | Same CLAUDE.md = same conventions |
-| Obsessing over perfect commits | Good enough is fine. Squash in PR if needed. |
+| Assuming `includeCoAuthoredBy: false` still works on current versions | It's read for compatibility, but set `attribution.commit`/`attribution.pr` instead |
+| Setting `attribution: false` and wondering why nothing changed | Requires v2.1.281+; on older versions the whole settings file that holds it is skipped |
+| Expecting a CLAUDE.md instruction to remove attribution set in managed settings | Managed settings always win over your own instructions on this |
+| One giant "implemented everything" commit | Require atomic commits, each passing tests, in `CLAUDE.md` |
+| Two features editing the same working directory at once | `claude --worktree <name>` per feature |
+| Believing attribution proves the code was reviewed | It only records that Claude wrote it — Module 10.3 covers actually reviewing it |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: Vietnamese dev team, 8 developers, heavy Claude Code usage. Git history became unusable:
-- "fixed stuff"
-- "WIP"
-- 500-line commits with no description
-- No way to understand feature evolution
-
-**Solution: Git conventions in CLAUDE.md**
-
-Added:
-- Conventional Commits format
-- 🤖 footer for AI-generated code
-- Atomic commit requirement
-- Pre-commit hook: rejects commits without proper format
-
-**Results after 2 weeks**:
-- `git log` became readable
-- Code review time: -30% (reviewers understood commit intent)
-- Debugging easier (could bisect with meaningful commits)
-- New devs understood feature history without asking
-
-**Unexpected benefit**: AI attribution helped identify patterns — "AI-generated commits have fewer bugs but sometimes miss edge cases" became a learning for the team.
+A Hanoi-based team let every developer's Claude commit and open PRs directly with the documented
+default trailer. During a compliance review, security asked which commits were AI-assisted across
+three repos — instead of grepping commit messages for inconsistent hand-written markers, they
+grepped for the exact `Co-Authored-By: Claude` string, because every AI-made commit in every repo
+used the same documented default. For one internal-tools repo where they didn't want the trailer
+visible in a client-facing changelog, they set `attribution.commit` to an empty-body private note
+format and `attribution.pr` to `""` in that repo's `.claude/settings.json` — a two-line change,
+not a policy negotiation, because the mechanism already existed and only needed configuring.
 
 ---
 
