@@ -1,408 +1,376 @@
 ---
 title: 'Hệ Thống Memory'
-description: 'Tìm hiểu hệ thống memory của Claude Code: cách lưu trữ, truy xuất và duy trì context qua các session.'
+description: 'Bốn thứ Claude Code thực sự nhớ — CLAUDE.md, auto memory, session transcript, checkpoint — và cách resume, branch, rewind chúng.'
+verified: 2026-09-27
+claude_version: 2.1.283
 ---
 
 # Module 4.4: Hệ Thống Memory
 
-> **Thời gian học**: ~30 phút
+> **Thời gian học**: ~35 phút
 >
 > **Yêu cầu trước**: Module 4.3 (Slash Commands)
 >
-> **Kết quả**: Sau module này, bạn sẽ hiểu toàn bộ kiến trúc memory của Claude Code — cái gì persist, cái gì không, và cách thiết kế workflow để Claude Code giữ đúng knowledge xuyên session, project, và team member.
+> **Kết quả**: Sau module này, bạn giải thích được bốn loại memory Claude Code duy trì —
+> CLAUDE.md, auto memory, session transcript, và checkpoint — resume hoặc branch một session cũ,
+> rewind một turn tệ, và tìm từng loại trên đĩa.
 
 ---
 
 ## 1. WHY — Tại Sao Cần Biết Điều Này
 
-Bạn dùng Claude Code được ba tuần. Có hôm nó nhớ mọi thứ về project của bạn. Có hôm bạn phải giải thích lại kiến trúc lần thứ năm. Bạn tự hỏi: "Claude Code thực sự nhớ gì giữa các session? Tại sao đôi khi nó biết convention của mình, đôi khi lại quên sạch?" Hiểu kiến trúc memory của Claude Code là ranh giới giữa việc dùng nó như công cụ stateless phải train đi train lại, versus một coding partner bền vững học được workflow của bạn.
+Bạn gập laptop giữa chừng task. Sáng hôm sau gõ `claude`, chuẩn bị tinh thần cho khởi đầu trắng
+tinh — nhưng nó đã biết cái quirk JWT bạn nói hôm qua, mà bạn chưa từng ghi vào đâu cả. Rồi Claude
+chạy `rm` nhầm file, bạn bấm Esc hai lần mong có undo, và... file vẫn mất. Hai hệ thống, hai kết
+quả, và hầu hết mọi người chẳng bao giờ học được cái nào là cái nào. Module này vẽ bản đồ bốn nơi
+Claude Code thực sự giữ state, để bạn ngừng đoán mò và dùng đúng nơi có chủ đích.
 
 ---
 
 ## 2. CONCEPT — Ý Tưởng Cốt Lõi
 
-Memory của Claude Code không phải là một hệ thống thống nhất — nó là một **stack nhiều lớp**, mỗi lớp có tính persistence khác nhau. Hiểu stack này là then chốt để làm việc hiệu quả.
-
-### Memory Stack (4 Lớp)
+Claude Code giữ state ở bốn nơi tách biệt. Hai nơi bạn viết, hai nơi nó tự viết cho bạn — và mỗi
+nơi tồn tại trong một khoảng thời gian khác nhau.
 
 ```mermaid
 graph TB
-    A[Session Memory<br/>VOLATILE - Tạm thời] -->|Chết khi exit| B[Mất hết]
-    C[CLAUDE.md Memory<br/>FILE-BASED - Dựa file] -->|Persist| D[Lưu vào đĩa]
-    E[Project Memory<br/>⚠️ CẦN XÁC MINH] -->|Có thể persist| F[Cách hoạt động chưa rõ]
-    G[Global Memory<br/>⚠️ CẦN XÁC MINH] -->|Có thể persist| H[Vị trí ~/.claude/ chưa rõ]
-
-    style A fill:#ff6b6b
-    style C fill:#51cf66
-    style E fill:#ffd43b
-    style G fill:#ffd43b
+    A["1. CLAUDE.md<br/>bạn viết<br/>tồn tại đến khi bạn sửa/xóa"]
+    B["2. Auto memory<br/>Claude tự viết<br/>projects/&lt;proj&gt;/memory/, tồn tại đến khi bị sửa"]
+    C["3. Session transcript<br/>Claude Code ghi mỗi turn<br/>~30 ngày (cleanupPeriodDays)"]
+    D["4. Checkpoint<br/>Claude Code snapshot các edit<br/>100 checkpoint gần nhất/session, ~30 ngày"]
+    A -.chủ đích.-> B -.thụ động.-> C -.thô.-> D
 ```
 
-**Lớp 1: Session Memory (Tạm thời)**
-Mọi thứ trong context cuộc hội thoại hiện tại. Quản lý bằng `/compact` và `/clear`. Chết khi bạn thoát session. Bao gồm: prompt gần đây, response của Claude, nội dung file nó đã đọc, và mental model nó đã xây dựng.
+**1. CLAUDE.md — ghi chú bạn để lại cho chính mình.** Đã học ở [Module 4.2](../02-claude-md/).
+Bạn viết nó, nó nằm ở `./CLAUDE.md` hoặc `~/.claude/CLAUDE.md`, và tồn tại mãi mãi cho đến khi bạn
+sửa hoặc xóa.
 
-**Lớp 2: CLAUDE.md Memory (Dựa file)**
-Nội dung lưu trong `CLAUDE.md` (global hoặc project-specific). Đây là **lớp persistent duy nhất có bảo đảm**. Sống dưới dạng file thường trên đĩa. Load lại mới mỗi session. Đã đề cập ở Module 4.2.
+**2. Auto memory — ghi chú Claude để lại cho chính nó.** Bật mặc định. Claude tự viết file ngắn
+vào `~/.claude/projects/<project>/memory/` — index `MEMORY.md` cộng topic file cho mỗi memory,
+gắn tag `user`, `feedback`, `project`, hoặc `reference` — không cần bạn yêu cầu. "200 dòng đầu của
+`MEMORY.md`, hoặc 25KB đầu, cái nào đến trước, được load khi bắt đầu mỗi conversation"; topic file
+chỉ load khi được reference. Không như transcript, nó không bị retention quét dọn. Bật/tắt qua
+`/memory`, per-project bằng `{"autoMemoryEnabled": false}`, hoặc toàn cục bằng
+`CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` ([docs/en/memory](https://code.claude.com/docs/en/memory)).
 
-**Lớp 3: Project Memory** ⚠️ Cần xác minh
-Claude Code có thể duy trì memory persistent cho project ngoài những gì có trong `CLAUDE.md`. Chi tiết cách hoạt động chưa rõ. Coi như không chắc chắn cho đến khi verify trong môi trường của bạn.
+**3. Session transcript — bản ghi âm.** Mọi message và tool call bạn trao đổi được append, trực
+tiếp, vào `~/.claude/projects/<project>/<session-id>.jsonl`. Đây là thứ `--continue`, `--resume`,
+`/resume`, `/branch`, `/rename`, và `/export` đều đọc từ đó. Giữ khoảng 30 ngày mặc định, cấu
+hình bằng setting `cleanupPeriodDays`
+([docs/en/sessions](https://code.claude.com/docs/en/sessions)).
 
-**Lớp 4: Global User Memory** ⚠️ Cần xác minh
-Thư mục `~/.claude/` có thể chứa persistent memory ngoài `CLAUDE.md` global. File config chắc chắn persist, nhưng việc Claude Code có duy trì learned patterns hay user preferences ngoài config hay không thì chưa được xác minh.
+**4. Checkpoint — lịch sử undo.** Mỗi prompt bắt đầu một turn tạo ra một checkpoint: snapshot file
+của bất cứ gì tool của Claude thay đổi. Claude Code "giữ file snapshot cho 100 checkpoint gần nhất
+trong một session," restore được bằng `/rewind` hoặc Esc Esc khi prompt trống. **Checkpointing
+không track file bị sửa bởi Bash command** — `rm`, `mv`, `cp` vô hình với nó và không thể hoàn tác
+qua rewind (S15) — và nó nói rõ "không phải thứ thay thế version control"
+([docs/en/checkpointing](https://code.claude.com/docs/en/checkpointing)).
 
-### Ma Trận Persistence
-
-| Loại Memory | Persist Qua Sessions? | Cách Quản Lý |
-|-------------|----------------------|--------------|
-| Session context | ❌ Không | `/compact`, `/clear` |
-| Nội dung CLAUDE.md | ✅ Có | Edit file |
-| Conversation history | ⚠️ Xác minh | Chưa rõ |
-| Config preferences | ✅ Có | `claude config` |
-| Learned patterns | ⚠️ Xác minh | Chưa rõ |
-| Nội dung file đã đọc | ❌ Không | Đọc lại mỗi session |
-
-**Điểm mấu chốt**: Memory duy nhất bạn có thể *bảo đảm* là CLAUDE.md. Mọi thứ khác hoặc là volatile hoặc không chắc chắn. Thiết kế workflow xung quanh thực tế này.
-
-### Ví Dụ Hình Ảnh
-
-Giống như đi khám bác sĩ:
-- **Session Memory** = Cuộc trò chuyện trong phòng khám (xong khám là quên)
-- **CLAUDE.md** = Hồ sơ bệnh án (lưu vĩnh viễn, lần sau khám vẫn đọc được)
-- **Project Memory** = Có thể bác sĩ nhớ mặt bạn? (Không chắc)
-- **Global Memory** = Có thể bệnh viện có database tập trung? (Không chắc)
-
-Bạn chỉ tin tưởng được **hồ sơ bệnh án** (CLAUDE.md). Còn lại đừng trông chờ.
+Chỉ lớp 1 và 2 là knowledge Claude *mang theo vào việc mới*. Lớp 3 và 4 chỉ để *quay lại* việc đã
+làm.
 
 ---
 
 ## 3. DEMO — Từng Bước Cụ Thể
 
-Hãy test ranh giới memory và verify cái gì persist.
+Lab: `~/cc-lab` (một git repo nhỏ có `src/math.js`).
 
-**Bước 1: Start fresh và check baseline knowledge**
+**Bước 1: Xem cả bốn lớp nằm ở đâu**
+```bash
+# docs: en/settings, en/sessions
+ls ~/.claude/
+```
+```text
+# Output có thể khác — entry đặc thù của plugin đã cài được thay bằng …
+…
+backups
+cache
+…
+CLAUDE.md
+…
+debug
+downloads
+feedback
+file-history
+…
+history.jsonl
+…
+jobs
+…
+mcp-needs-auth-cache.json
+paste-cache
+plans
+plugins
+projects
+session-env
+sessions
+settings.json
+shell-snapshots
+skills
+state
+stats-cache.json
+tasks
+…
+```
+Entry cụ thể tùy version Claude Code và plugin/feature bạn đã cài.
+
+`projects/` chứa lớp 2 và 3, một thư mục cho mỗi repo:
+```bash
+# docs: en/sessions — <project> = đường dẫn thư mục, ký tự non-alphanumeric thành -
+ls ~/.claude/projects | grep cc-lab
+```
+```text
+# Output có thể khác
+-Users-you-cc-lab
+-Users-you-cc-lab--claude-worktrees-auto-demo
+```
+
+**Bước 2: Xem auto memory tự viết**
 ```bash
 $ claude
+> Remember that this lab uses node:test, never jest
 ```
-Tương tác mong đợi:
 ```text
-Claude: Hello! How can I help you today?
-
-Bạn: Bạn biết gì về project này?
-
-Claude: I can see we're in /Users/you/myproject. [Có thể hoặc không nhắc đến nội dung CLAUDE.md tùy vào hành vi auto-loading]
+# Output có thể khác
+⏺ Directory is empty — no existing memory to update.
+  Wrote 2 memories (ctrl+o to expand)
+⏺ I've saved this to memory: tests in this lab use node:test with node:assert/strict, and never jest.
 ```
-
-**Bước 2: Build session memory qua công việc**
 ```text
-Bạn: Đọc src/auth.ts và nhớ: chúng ta dùng JWT với expiry 24 giờ
-
-Claude: [Đọc file, xác nhận pattern]
-
-Bạn: API base URL của chúng ta là https://api.example.com/v2
-
-Claude: Noted. I'll use that URL for API-related code.
+> /memory
 ```
-Bây giờ session context của Claude bao gồm: nội dung file, JWT pattern, API URL.
-
-**Bước 3: Dùng /compact và quan sát**
 ```text
-Bạn: /compact
+# Output có thể khác
+  Memory
+  ❯ Auto-memory  true
+  ❯ User instructions   Saved in ~/.claude/CLAUDE.md
+    Project instructions   Checked in at ./CLAUDE.md
+    Open auto-memory folder
+  Learn more: https://code.claude.com/docs/en/memory
 ```
-Output mong đợi:
-```text
-Context compacted. Reduced from 45,000 to 12,000 tokens.
-Preserved: Recent conversation, file contents, key facts.
-```
-Test: Hỏi Claude "JWT expiry của chúng ta là bao lâu?" — nó vẫn phải biết.
-
-**Bước 4: Kết thúc session, start session mới**
+Trên đĩa:
 ```bash
-$ exit
-$ claude
+# docs: en/memory — MEMORY.md là index; mỗi memory còn có topic file riêng
+cat ~/.claude/projects/-Users-you-cc-lab/memory/MEMORY.md
 ```
-Kết quả mong đợi:
 ```text
-Claude: Hello! How can I help you today?
-
-Bạn: JWT expiry time của chúng ta là bao lâu?
-
-Claude: I don't have that information in the current context. Could you remind me?
+# Output có thể khác
+- [Test runner: node:test](test-runner-node-test.md) — cc-lab uses node:test, never jest
 ```
-❌ Session memory ĐÃ MẤT. Claude không nhớ chi tiết JWT.
+Topic file mang frontmatter `type: feedback` và giải thích đầy đủ Claude viết.
 
-**Bước 5: Update CLAUDE.md với những phát hiện từ session**
-Edit `CLAUDE.md`:
-```markdown
-## Authentication
-
-- JWT tokens với 24-hour expiry
-- API base: https://api.example.com/v2
-- Refresh tokens lưu trong httpOnly cookies
-```
-
-**Bước 6: Verify CLAUDE.md memory trong session mới**
-Start session mới:
+**Bước 3: Resume một session có tên**
 ```bash
-$ claude
+# docs: en/sessions — claude -n <name> đặt tên; claude --resume <name> mở lại theo tên đó
+$ claude -n memory-demo
+> The magic word for this session is grapefruit.
+> /exit
+$ claude --resume memory-demo
+> What's the magic word from earlier in this session?
 ```
 ```text
-Bạn: JWT expiry time của chúng ta là bao lâu?
-
-Claude: According to CLAUDE.md, your JWT tokens have a 24-hour expiry.
+# Output có thể khác
+⏺ The magic word is grapefruit.
 ```
-✅ CLAUDE.md memory PERSIST.
+`--resume <name>` mở lại transcript theo tên — lớp 3, không phải lớp 2.
 
-**Bước 7: Check persistent memory ngoài CLAUDE.md** ⚠️
+**Bước 4: Rewind một edit sai**
+
+Nhờ Claude thêm một function vào `src/math.js`, approve edit, rồi bấm **Esc, Esc** khi prompt
+trống:
+```text
+# Output có thể khác
+  Rewind
+  Restore the code and/or conversation to the point before…
+    Add a subtract(a, b) function to src/math.js that returns a - b
+    math.js +1
+  ❯ (current)
+```
+Bấm Up, Enter. Màn hình confirm này (chụp đủ chiều cao, không cắt) chỉ có tối đa 5 lựa chọn khi có
+code snapshot để restore — không có dòng "Never mind" ở đây, Esc để hủy thay vào đó; Bài Tập 3 bên
+dưới sẽ cho thấy bản 4 lựa chọn dùng khi không có code để restore:
+```text
+# Output có thể khác
+  Confirm you want to restore to the point before you sent this message:
+  The conversation will be forked.
+  The code will be restored -1 in math.js.
+  ❯ 1. Restore code and conversation
+    2. Restore conversation
+    3. Restore code
+    4. Summarize from here
+  ↓ 5. Summarize up to here
+  ⚠ Rewinding does not affect files edited manually or via bash.
+```
+Chọn **Restore code and conversation**, rồi kiểm tra:
 ```bash
-$ ls -la ~/.claude/
+# docs: en/checkpointing
+git -C ~/cc-lab diff
 ```
-Output mong đợi:
 ```text
-# Output có thể khác — cách hoạt động chưa rõ
-drwxr-xr-x  5 you  staff   160 Jan 15 10:30 .
--rw-r--r--  1 you  staff  1234 Jan 15 10:30 config.json
--rw-r--r--  1 you  staff   456 Jan 10 09:15 CLAUDE.md
-# Có thể có file khác — verify trong môi trường của bạn
+# Output có thể khác — trống, math.js đã trở về nội dung trước khi edit
 ```
 
-Trong một Claude session:
+**Bước 5: Branch thay vì ghi đè**
 ```text
-Bạn: Bạn có duy trì persistent memory nào về tôi hoặc project của tôi ngoài CLAUDE.md không?
-
-Claude: [Response sẽ làm rõ cách hoạt động — quan sát kỹ]
+> /branch try-alt
 ```
+```text
+# Output có thể khác
+⎿  Branched conversation "try-alt". You are now in the new branch (session fd2adace-…). Use
+   /resume 1c8dba65-… ("branch-demo") to return to the original, or run claude -r
+   1c8dba65-… in a new terminal.
+```
+Cả hai session chia sẻ history đến điểm branch, rồi rẽ nhánh.
 
-⚠️ Nếu Claude nhắc đến persistent learning hoặc conversation history, ghi chú lại cơ chế. Nếu không, giả định chỉ có CLAUDE.md persist.
+**Bước 6: Dọn dẹp memory bạn vừa tạo**
+```bash
+# docs: en/memory — file thường, xóa trực tiếp an toàn
+rm ~/.claude/projects/-Users-you-cc-lab/memory/MEMORY.md \
+   ~/.claude/projects/-Users-you-cc-lab/memory/test-runner-node-test.md
+```
+Chỉ xóa file *bạn* vừa tạo — auto memory dùng chung cho mọi worktree của repo đó.
 
 ---
 
 ## 4. PRACTICE — Thử Tự Làm
 
-### Bài Tập 1: Memory Audit
+### Bài Tập 1: Export transcript hôm qua
 
-**Mục tiêu**: Lập bản đồ ranh giới persistence chính xác trong Claude Code installation của bạn.
+**Mục tiêu**: Tìm session cũ của thư mục hiện tại và export ra file.
 
-**Hướng dẫn**:
-1. Start Claude Code trong thư mục trống (không có `CLAUDE.md`)
-2. Nói với Claude: "Code style tôi thích: single quotes, 2-space indent, arrow functions"
-3. Nhờ nó viết một TypeScript function nhỏ
-4. Verify nó dùng style của bạn
-5. Exit và restart Claude trong CÙNG thư mục
-6. Nhờ nó viết function khác MÀ KHÔNG nhắc lại style preferences
-7. Quan sát: Nó có nhớ style của bạn không?
-8. Giờ tạo `CLAUDE.md` với style rules của bạn
-9. Exit và restart lần nữa
-10. Nhờ function thứ ba — giờ nó có dùng style của bạn chưa?
-
-**Kết quả mong đợi**:
-- Bước 1-6: Claude quên style của bạn (chứng minh session memory là volatile)
-- Bước 7-10: Claude nhớ qua CLAUDE.md (chứng minh file-based persistence hoạt động)
+**Hướng dẫn**: Chạy `claude --resume` (không tên) để mở session picker, tìm entry hôm qua,
+resume nó, rồi chạy `/export` và chọn "Save to file."
 
 <details>
 <summary>💡 Gợi Ý</summary>
-Chú ý xem Claude Code có auto-load CLAUDE.md khi start session hay bạn cần reference nó rõ ràng không. Hành vi có thể khác nhau theo version.
+Picker còn hỗ trợ `Ctrl+A` để hiện session từ mọi project, không chỉ project hiện tại.
 </details>
 
 <details>
 <summary>✅ Giải Pháp</summary>
 
-**Điều bạn nên quan sát được**:
-- **Không có CLAUDE.md**: Claude Code có ZERO memory giữa các session. Mỗi restart là tờ giấy trắng.
-- **Có CLAUDE.md**: Claude Code load project rules khi start session (hoặc ở file operation đầu tiên). Memory persist hoàn hảo.
-
-**Điểm mấu chốt**: Nếu muốn Claude nhớ điều gì, ĐƯA VÀO CLAUDE.md. Session memory vô dụng cho persistence.
-
-**Điều ngạc nhiên thường gặp**: Nhiều người kỳ vọng Claude Code sẽ "học" style của họ theo thời gian. Nó không làm vậy. Nó stateless giữa các session. CLAUDE.md là lớp persistence duy nhất.
+```bash
+claude --resume
+# chọn session, bấm Enter
+> /export
+# chọn "2. Save to file"
+```
+`/export <filename>` bỏ qua menu luôn. File lưu là plain text, không phải `.jsonl` thô — hữu ích
+để paste vào ticket, không dùng để script vào được.
 </details>
 
-### Bài Tập 2: Thiết Kế Memory Architecture
+### Bài Tập 2: Tắt auto memory cho một repo nhạy cảm
 
-**Mục tiêu**: Thiết kế setup memory lý tưởng cho một project thực của bạn.
+**Mục tiêu**: Xác nhận auto memory đã tắt bằng `/memory`, không phải bằng cách hỏi Claude.
 
-**Hướng dẫn**:
-1. Chọn một project bạn đang làm
-2. Xác định 3 loại knowledge Claude cần:
-   - **Session-level**: Context tạm thời (debugging session hiện tại, thay đổi gần đây)
-   - **Project-level**: Project rules persistent (kiến trúc, conventions, APIs)
-   - **Global-level**: Preferences cá nhân của bạn (coding style, workflow habits)
-3. Thiết kế memory strategy:
-   - Cái gì vào project `CLAUDE.md`?
-   - Cái gì vào global `~/.claude/CLAUDE.md`?
-   - Cái gì chỉ ở session memory?
-4. Thực thi strategy và test trong một tuần
-
-**Kết quả mong đợi**: Phân tách rõ ràng giữa ephemeral (session), project-persistent (CLAUDE.md), và global-persistent (global CLAUDE.md) knowledge.
+**Hướng dẫn**: Thêm `{"autoMemoryEnabled": false}` vào `.claude/settings.json` của repo đó, start
+`claude`, chạy `/memory`, và kiểm tra dòng "Auto-memory".
 
 <details>
 <summary>💡 Gợi Ý</summary>
-Global CLAUDE.md chỉ nên chứa preferences áp dụng cho TẤT CẢ projects của bạn. Project CLAUDE.md chỉ nên chứa rules cụ thể cho codebase đó. Session memory cho mọi thứ trở nên irrelevant sau khi task hoàn thành.
+Setting này per-project; `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` là bản toàn cục tương đương.
 </details>
 
 <details>
 <summary>✅ Giải Pháp</summary>
 
-**Ví Dụ Memory Strategy** (cho project Next.js + TypeScript):
-
-**Global `~/.claude/CLAUDE.md`**:
-```markdown
-# Coding Preferences Của Tôi
-
-- TypeScript strict mode luôn bật
-- Ưu tiên functional programming patterns
-- Dùng Prettier defaults, single quotes
-- Test framework: Vitest (không phải Jest)
+```text
+# Output có thể khác
+  Memory
+  ❯ Auto-memory  false
+  ❯ User instructions   Saved in ~/.claude/CLAUDE.md
+    Project instructions   Checked in at ./CLAUDE.md
 ```
+Để ý dòng "Open auto-memory folder" cũng biến mất — tắt rồi thì không còn folder nào để mở.
+</details>
 
-**Project `CLAUDE.md`**:
-```markdown
-# Project: E-commerce Dashboard
+### Bài Tập 3: Chứng minh rewind không hoàn tác được `rm`
 
-## Stack
-- Next.js 14 (App Router)
-- Prisma ORM với PostgreSQL
-- Tailwind CSS cho styling
+**Mục tiêu**: Tận mắt thấy giới hạn Bash của checkpointing (S15), rồi khôi phục đúng cách.
 
-## Architecture Rules
-- Server components by default
-- Client components đánh dấu 'use client'
-- API routes trong app/api/
-- Database schema định nghĩa trong prisma/schema.prisma
+**Hướng dẫn**: Tạo một file throwaway, nhờ Claude xóa nó bằng Bash `rm`, rồi chạy `/rewind` và
+chọn "Restore conversation."
+
+<details>
+<summary>💡 Gợi Ý</summary>
+Để ý restore option nào còn được đưa ra khi thay đổi đến từ Bash.
+</details>
+
+<details>
+<summary>✅ Giải Pháp</summary>
+
+```text
+# Output có thể khác
+  Rewind
+  Confirm you want to restore to the point before you sent this message:
+  The code will be unchanged.
+  ❯ 1. Restore conversation
+    2. Summarize from here
+    3. Summarize up to here
+    4. Never mind
 ```
-
-**Session Memory** (không bao giờ viết xuống):
-- "Đang debug checkout flow"
-- "User báo lỗi với Safari browser"
-- "Test payment webhook locally"
-
-**Tại sao cách này hiệu quả**:
-- Global rules áp dụng cho tất cả 15 projects của bạn
-- Project rules cụ thể cho codebase này
-- Session context bị quên sau khi bạn giải quyết bug — và điều đó ổn
-
-**Sai lầm thường gặp**: Đưa temporary debugging context vào CLAUDE.md. Đừng làm bẩn project memory với chi tiết ephemeral.
+Để ý "Restore code" thậm chí không xuất hiện như một lựa chọn — không có snapshot nào để restore.
+File vẫn mất. Khôi phục phải đến từ git: `git restore <path>` (nếu tracked) hoặc backup riêng của
+bạn (untracked — không có gì mang nó trở lại).
 </details>
 
 ---
 
 ## 5. CHEAT SHEET
 
-### Bảng Tham Chiếu Memory Layer
+| Lớp | Nằm ở | Tồn tại | Quản lý qua |
+|---|---|---|---|
+| CLAUDE.md | `./CLAUDE.md`, `~/.claude/CLAUDE.md` | Đến khi bạn sửa/xóa | Edit file ([4.2](../02-claude-md/)) |
+| Auto memory | `~/.claude/projects/<project>/memory/` | Đến khi bị sửa/xóa | `/memory`, `autoMemoryEnabled` |
+| Session transcript | `~/.claude/projects/<project>/<id>.jsonl` | ~30 ngày, `cleanupPeriodDays` | `--continue`, `--resume`, `/export` |
+| Checkpoint | File snapshot nội bộ | 100 gần nhất, ~30 ngày | `/rewind`, Esc Esc |
 
-| Loại Memory | Lưu Ở Đâu | Persist? | Quản Lý Qua | Tốt Nhất Cho |
-|-------------|-----------|----------|-------------|--------------|
-| Session context | In-memory | ❌ Không | `/compact`, `/clear` | Focus task hiện tại |
-| CLAUDE.md (project) | `./CLAUDE.md` | ✅ Có | Edit file | Rules cụ thể project |
-| CLAUDE.md (global) | `~/.claude/CLAUDE.md` | ✅ Có | Edit file | Preferences cá nhân |
-| Config settings | `~/.claude/config.json` ⚠️ | ✅ Có | `claude config` | CLI preferences |
-| Conversation history | Chưa rõ ⚠️ | ⚠️ Xác minh | Chưa rõ | Chưa rõ |
-
-### Test Memory Nhanh
-
-Để verify cái gì persist trong Claude Code installation CỦA BẠN:
-
-```bash
-# Test 1: Session memory (sẽ fail)
-$ claude -p "Nhớ nhé: màu yêu thích của tôi là xanh dương"
-$ claude -p "Màu yêu thích của tôi là gì?"
-# Mong đợi: "I don't have that information" (không persist)
-
-# Test 2: CLAUDE.md memory (sẽ work)
-$ echo "# User thích màu xanh dương" > CLAUDE.md
-$ claude -p "Tôi thích màu gì?"
-# Mong đợi: "According to CLAUDE.md, you prefer blue" (persist)
-```
-
-### Workflow Session → Permanent
-
-```text
-1. Làm việc trong session → build context
-2. Dùng /compact → giữ lại phần quan trọng
-3. Xác định patterns đáng giữ
-4. Update CLAUDE.md với patterns đó
-5. Exit session
-6. Session tiếp theo → Claude loads CLAUDE.md → knowledge persist
-```
-
-### Config Preferences (Verified Persistent)
-
-```bash
-# Các settings này persist qua tất cả sessions
-$ claude config --help  # Xem các config options có sẵn
-
-# Ví dụ: Set preferred model (nếu được hỗ trợ)
-$ claude config set model sonnet  # ⚠️ Cần xác minh
-
-# Config lưu trong ~/.claude/config.json (hoặc tương tự)
-```
+| Lệnh | Tác dụng |
+|---|---|
+| `claude -n <name>` | Start một session có tên |
+| `claude --continue` | Mở lại session gần nhất ở đây |
+| `claude --resume [name\|id]` | Mở lại một session cụ thể, hoặc mở picker |
+| `claude --continue --fork-session` | Resume vào một session ID *mới*, không kế thừa grant |
+| `/branch [name]` | Copy conversation, giữ cả hai, cùng process/grant |
+| `/rename <name>` | Đặt/đổi tên session hiện tại |
+| `/export [file]` | Copy hoặc lưu transcript dạng plain text |
+| `/rewind`, Esc Esc | Mở menu rewind |
+| `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` | Tắt auto memory ở mọi nơi |
+| `cleanupPeriodDays` (settings.json) | Đổi retention của transcript/checkpoint |
 
 ---
 
 ## 6. PITFALLS — Sai Lầm Thường Gặp
 
 | ❌ Sai Lầm | ✅ Cách Đúng |
-|------------|--------------|
-| **Giả định Claude "học" style của bạn theo thời gian** | Claude Code là stateless giữa các session. Nếu muốn nó nhớ, đưa vào CLAUDE.md. |
-| **Giải thích lại kiến trúc mỗi session** | Viết kiến trúc vào CLAUDE.md một lần. Reference mãi mãi. Session memory KHÔNG thiết kế cho persistence. |
-| **Nhét CLAUDE.md đầy context tạm thời** | Chi tiết session-level ("đang debug X") nên ở trong session memory. CLAUDE.md chỉ cho project rules *persistent*. |
-| **Quên update CLAUDE.md sau khi phát hiện patterns** | Khi bạn dạy Claude điều quan trọng giữa session, thêm vào CLAUDE.md trước khi exit. Nếu không ngày mai phải dạy lại. |
-| **Kỳ vọng /compact persist qua sessions** | `/compact` chỉ ảnh hưởng session HIỆN TẠI. Nó không ghi gì vào đĩa. Session kết thúc = compacted context mất luôn. |
-| **Không test ranh giới persistence** | Chạy memory audit (Bài Tập 1) ít nhất một lần. Đừng giả định — verify cái version Claude Code của bạn thực sự persist. |
+|---|---|
+| Giả định Claude Code là stateless giữa các session | Auto memory và transcript đều sống sót qua `/exit` — check `/memory` và `claude --resume` trước khi giải thích lại |
+| `claude config set model sonnet` / sửa `~/.claude/config.json` | Cả hai đều không tồn tại. Settings nằm ở `~/.claude/settings.json` (hoặc `.claude/settings.json` per project) |
+| Hỏi Claude "bạn có nhớ tôi không?" như bằng chứng persistence | Hỏi filesystem: `/memory`, hoặc `cat` các file trong `~/.claude/projects/<project>/memory/` |
+| Tin `/rewind` sau khi Claude chạy `rm`, `mv`, hoặc `cp` | Checkpointing chưa bao giờ track thay đổi từ Bash (S15) — khôi phục từ git hoặc backup |
+| Commit `CLAUDE.local.md` vào repo | Đó là lớp cá nhân, gitignored — commit `CLAUDE.md`, giữ `.local.md` ngoài version control |
 
 ---
 
 ## 7. REAL CASE — Câu Chuyện Thực Tế
 
-**Tình huống**: Nam, một freelance developer Việt Nam ở TP.HCM, quản lý bốn project client cùng lúc:
-- Client A: App ngân hàng KMP (Kotlin Multiplatform)
-- Client B: Next.js e-commerce cho Shopee Affiliate
-- Client C: Python data pipeline cho logistics
-- Client D: Flutter social app cho startup Việt
+**Tình huống**: Nam, một freelance developer ở TP.HCM, xoay vòng bốn repo client: một app ngân
+hàng KMP, một storefront Next.js, một data pipeline Python, và một social app Flutter.
 
-**Vấn đề**: Trước khi hiểu memory system của Claude Code, Nam bắt đầu mỗi coding session với nghi thức "re-onboarding" 10 phút. Anh gõ ra project stack, architecture rules, và task hiện tại. Rồi làm việc 2 tiếng. Ngày hôm sau? Cùng nghi thức 10 phút. Bốn projects = 40 phút lặp lại context mỗi ngày. Frustrating và lãng phí.
+**Vấn đề**: Mỗi sáng anh giải thích lại thread debug hôm trước — branch nào, giả thuyết nào đã
+loại, client vừa đổi yêu cầu gì.
 
-**Giải pháp**: Nam thực thi kiến trúc memory hai tầng:
+**Giải pháp**: Anh ngừng chống lại bốn lớp và dùng đúng chỗ của từng lớp. Quy tắc project vào
+`CLAUDE.md` mỗi repo — chủ đích, theo client. Quirk Claude tự nhận ra ("CI repo này reject
+`node --test` nếu không chỉ file glob rõ ràng") rơi vào auto memory mà Nam không gõ gì. Mỗi
+session debug được đặt tên: `claude -n checkout-bug`. Sáng hôm sau, `claude --resume checkout-bug`
+đưa anh về đúng chỗ đã dừng — không cần giải thích lại — và nếu fix sai hướng, Esc Esc chỉ rewind
+session đó, không đụng ba client kia.
 
-1. **Global `~/.claude/CLAUDE.md`** (style cá nhân):
-   ```markdown
-   # Coding Preferences Của Nam
-   - Luôn dùng TypeScript khi có thể
-   - Ưu tiên React hooks hơn class components
-   - Follow Airbnb style guide
-   - Comments bằng tiếng Anh, commit messages bằng tiếng Việt
-   ```
-
-2. **Per-project `CLAUDE.md`** (cụ thể client):
-   - Client A: KMP conventions, shared code structure, iOS/Android specifics
-   - Client B: Next.js App Router patterns, Shopee API integration, affiliate tracking
-   - Client C: Python virtual env, data sources, cron schedule, legacy quirks
-   - Client D: Flutter navigation setup, Firebase collections, push notification flow
-
-**Workflow**:
-```bash
-# Switch sang project Client A
-$ cd ~/clients/clientA-banking-kmp
-$ claude  # Auto-loads global + project CLAUDE.md
-
-# Claude biết ngay:
-# - Preferences cá nhân của Nam (global)
-# - Setup KMP của Client A (project)
-# - Không cần giải thích lại
-
-# Làm việc 2 tiếng, phát hiện pattern mới
-# Trước khi exit:
-Bạn: Update CLAUDE.md — chúng ta đã chuẩn hóa dùng Ktor cho networking, không dùng Retrofit
-
-# Ngày hôm sau:
-$ claude
-Claude: [Biết về Ktor standard từ CLAUDE.md]
-```
-
-**Kết quả**:
-- **Trước**: 10 phút/ngày/project × 4 projects = 40 phút lãng phí mỗi ngày
-- **Sau**: Zero re-onboarding. Chuyển context tức thì.
-- **Bonus**: Khi Nam đưa junior dev vào giúp Client B, anh chỉ cần gửi file `CLAUDE.md` của project. Claude Code session của junior dev bắt đầu với cùng knowledge Nam có. Team synchronization miễn phí.
-
-**Điểm mấu chốt**: Nam coi CLAUDE.md như "bộ não project" và session memory như "giấy nháp." Bộ não persist. Giấy nháp vứt đi mỗi ngày. Khi anh hiểu rõ sự phân biệt này, workflow nhanh hơn 3 lần.
+**Kết quả**: Nghi thức "cập nhật cho tôi" mỗi sáng biến mất. Fix sai giờ chỉ tốn vài giây, không
+phải revert tay; Claude xóa file qua Bash đưa anh thẳng tới `git restore`, không bao giờ `/rewind`.
+CLAUDE.md là bộ não anh viết có chủ đích; auto memory là cuốn sổ Claude âm thầm giữ; transcript là
+cuộn băng anh tua lại hoặc rẽ nhánh.
 
 ---
 
