@@ -1,6 +1,8 @@
 ---
 title: 'Workflow Patterns'
-description: 'Learn 6 reusable n8n workflow patterns for Claude Code automation and combine them for complex scenarios.'
+description: 'Five reusable n8n patterns for calling an Agent SDK service: fan-out, merge, aggregation, error recovery, and human approval.'
+verified: 2026-09-28
+claude_version: 2.1.283
 ---
 
 # Module 12.2: Workflow Patterns
@@ -9,263 +11,191 @@ description: 'Learn 6 reusable n8n workflow patterns for Claude Code automation 
 >
 > **Prerequisite**: Module 12.1 (Claude Code + n8n)
 >
-> **Outcome**: After this module, you will know 6 reusable workflow patterns, understand when to apply each, and be able to combine patterns for complex scenarios.
+> **Outcome**: After this module, you will know five reusable patterns for calling the
+> `agent-service` from n8n, and be able to combine them for batch, error-recovery, and
+> approval-gated workflows.
 
 ---
 
 ## 1. WHY — Why This Matters
 
-You can build one-off n8n workflows. But every new automation feels like starting from scratch. You end up with inconsistent approaches, repeated mistakes, and workflows that are hard to maintain.
-
-Workflow patterns are the "recipes" of automation. Just like software design patterns (Factory, Observer, Strategy), these are proven solutions to recurring problems. Know the patterns, and you can quickly assemble solutions for most AI automation challenges. This module gives you a pattern library to draw from.
+One HTTP Request node calling `agent-service` is a demo. Real workflows need to process many
+items, survive a call that comes back with a refusal instead of an answer, and sometimes stop for
+a human before doing anything risky. Without a pattern to reach for, every workflow reinvents its
+own — inconsistently, and usually without error handling until something breaks in production.
 
 ---
 
 ## 2. CONCEPT — Core Ideas
 
+All five patterns build on the same architecture from Module 12.1: **HTTP Request node →
+`agent-service` → JSON result**. What changes is what surrounds that call.
+
 ### Pattern 1: Sequential Pipeline
 
 ```text
-[Input] → [Claude: Step 1] → [Claude: Step 2] → [Claude: Step 3] → [Output]
+[Webhook] → [HTTP Request: agent-service] → [Code: reshape] → [HTTP Request: agent-service] → [Output]
 ```
+**Use when** each step needs the previous step's answer. **Example**: extract structured data,
+then draft a response from it, in two separate prompts (two separate calls keep each prompt
+focused and each `total_cost_usd` visible).
 
-**Use when**: Tasks must happen in order, each step needs previous output.
-**Example**: Extract → Analyze → Summarize → Format
-
-### Pattern 2: Parallel Fan-Out/Fan-In
+### Pattern 2: Fan-Out / Fan-In with Loop Over Items
 
 ```text
-         ┌→ [Claude: Task A] →┐
-[Input] ─┼→ [Claude: Task B] →┼→ [Merge] → [Output]
-         └→ [Claude: Task C] →┘
+[Webhook: items[]] → [Loop Over Items] → [HTTP Request: agent-service] → [Merge] → [Output]
 ```
+**Use when** you have a list and want to call the service once per item instead of stuffing the
+whole list into one prompt. The **Loop Over Items** node (`n8n-nodes-base.splitInBatches` — the
+current UI name is "Loop Over Items"; older docs and node internals still say "Split in Batches")
+takes a **Batch Size**; set it to `1` to process items one at a time, or higher to send small
+groups per call. Docs: "The Loop Over Items node helps you loop through data when needed... with
+each iteration, returns a predefined amount of data through the loop output."
 
-**Use when**: Independent tasks can run simultaneously.
-**Example**: Analyze document for sentiment, keywords, and entities in parallel.
-
-### Pattern 3: Classification Router
+### Pattern 3: Merge by Position
 
 ```text
-[Input] → [Claude: Classify] → [Switch] ─→ [Handler A]
-                                       ├→ [Handler B]
-                                       └→ [Handler C]
+[Loop Over Items] → [HTTP Request: agent-service] → [Merge: Combine → Position] → [Code: $input.all()]
 ```
+**Use when** you fanned work out per item and need the per-item results lined back up in order.
+The **Merge** node's **Combine** mode has a **Combine By** option named **Position** (docs: "the
+item at index 0 in Input 1 merges with the item at index 0 in Input 2, and so on") — not two
+separate inputs in this case, but the accumulated loop output paired back with the original items.
+A following **Code** node reads everything with `$input.all()` — "All input items in current
+node" — to build the final list.
 
-**Use when**: Different inputs need different processing paths.
-**Example**: Route support tickets by category (billing, technical, urgent).
-
-### Pattern 4: Human-in-the-Loop
+### Pattern 4: Error Recovery
 
 ```text
-[Input] → [Claude: Draft] → [Wait for Approval] → [IF Approved] → [Execute]
-                                                        ↓ No
-                                               [Claude: Revise] → [Back to Wait]
+[HTTP Request: agent-service] → [Code: check result] → [IF: refused or errored?] → [HTTP Request: retry with a stricter prompt]
+                                                              ↓ no
+                                                          [Output]
 ```
+**Use when** the service call might come back with a refusal in plain text rather than an HTTP
+error — the Agent SDK still reports `subtype: "success"` when Claude simply declines a request in
+words, so an IF node checking only the HTTP status code will miss it. Check the `result` string
+itself in a Code node first.
 
-**Use when**: AI output needs human review before action.
-**Example**: Email drafts, code changes, content publishing.
-
-### Pattern 5: Batch Processing
+### Pattern 5: Human-in-the-Loop
 
 ```text
-[Input List] → [Loop Over Items] → [Claude: Process Each] → [Aggregate] → [Output]
+[HTTP Request: agent-service (draft)] → [Wait] → [IF: approved?] → [HTTP Request: agent-service (apply)]
+                                                        ↓ no
+                                                    [Output: rejected]
 ```
-
-**Use when**: Processing many items, need rate limiting or chunking.
-**Example**: Analyze 100 documents, 10 at a time.
-
-### Pattern 6: Error Recovery Loop
-
-```text
-[Input] → [Claude: Try] → [IF Error] → [Claude: Fix] → [Retry]
-                              ↓ Success
-                          [Output]
-```
-
-**Use when**: Claude might fail, need graceful retry.
-**Example**: Code generation with validation.
+**Use when** the agent's answer should not act on its own — a drafted reply, a proposed change.
+The **Wait** node ("Wait before continue with execution") pauses the workflow until a webhook call
+resumes it, giving a person time to approve or reject in between.
 
 ---
 
 ## 3. DEMO — Step by Step
 
-### Demo 1: Sequential Pipeline — Content Creation
+These patterns configure nodes around the same HTTP Request → `agent-service` call already proven
+working end-to-end in Module 12.1's Step 6 — the JSON in and out is identical, so the walkthrough
+below is configuration, not a second live run of the same call.
 
-**Workflow**: `[Webhook] → [Research] → [Outline] → [Write] → [Edit] → [Output]`
+**Fan-out (Pattern 2)**: add a **Loop Over Items** node between the trigger and the HTTP Request
+node. Open it and set **Batch Size** to `1`. Each iteration sends one item's worth of `$json` into
+the same `{"prompt": "{{ $json.body.prompt }}"}` body shown in 12.1.
 
-**Research Node**: `claude -p "Find 5 key points about: {{ $json.topic }}"`
+**Merge by position (Pattern 3)**: after the loop's HTTP Request node, add a **Merge** node, set
+**Mode** to `Combine`, and set **Combine By** to `Position`. Connect the loop's own "done" output
+into the Merge node's second input so unpaired iterations aren't silently dropped (the "Include
+Any Unpaired Items" option controls that; it's off by default).
 
-**Outline Node**: `claude -p "Create blog outline:\n\n{{ $json.stdout }}"`
-
-**Write Node**: `claude -p "Write 500-word post from outline:\n\n{{ $json.stdout }}"`
-
-**Edit Node**: `claude -p "Edit for clarity and SEO:\n\n{{ $json.stdout }}"`
-
-**Test**: `curl -X POST http://localhost:5678/webhook/blog -d '{"topic": "remote work"}'`
-
-### Demo 2: Classification Router — Support Tickets
-
-**Classify Node**: `claude -p "Classify as billing/technical/general/urgent. Return ONLY category:\n\n{{ $json.description }}"`
-
-**Code Node (clean output)**:
+**Aggregate with Code node (Pattern 3, continued)**:
 ```javascript
-const category = $input.first().json.stdout.trim().toLowerCase();
-return [{ json: { category, original: $('Webhook').first().json } }];
+// docs: https://docs.n8n.io/build/work-with-data/transform-data/expression-reference/nodeinputdata
+const items = $input.all();
+return items.map(item => ({ json: { result: item.json.result } }));
 ```
 
-**Switch Node**: Map `billing`→0, `technical`→1, `urgent`→2, `general`→3
+**Error recovery (Pattern 4)** — a real refusal captured from the running `agent-service`, using a
+prompt that asks for a tool outside `allowedTools`:
+```bash
+curl -s localhost:8787/run -H 'content-type: application/json' \
+  -d '{"prompt":"Create a new file named notes.txt in this repo with the text hello."}'
+```
+Expected output:
+```text
+# Output may vary
+{"result":"I don't have permission to create new files in this environment. The file creation was blocked by the system's permission settings.\n\nWould you like me to try a different approach, or do you need to adjust the permissions to allow file creation?","session_id":"bba6f51b-8d1d-4406-a967-49f59b6b33fc","total_cost_usd":0.0558}
+```
+Note the HTTP call still returned `200` with a normal-looking JSON body — the refusal lives inside
+`result`. The Code node in an error-recovery branch should check for language like "don't have
+permission" (or, better, ask the agent to prefix failures with a fixed token you can match on)
+before deciding whether to retry.
 
-**Connect**: Output 0→#billing-support, 1→#engineering, 2→PagerDuty, 3→Auto-response
-
-**Test**: `curl -X POST http://localhost:5678/webhook/ticket -d '{"description": "Payment failed!"}'`
-
-### Demo 3: Batch Processing — Document Analysis
-
-**Loop Over Items**: Size 10, reset on each run
-
-**Execute Command**: `claude -p "Summarize each document:\n\n{{ JSON.stringify($json) }}"`
-
-**Merge Node**: "Merge (Combine → Position)" to collect all outputs
+**Human approval (Pattern 5)**: after the "draft" HTTP Request node, add a **Wait** node
+configured to resume on a webhook call; send the draft to Slack with an approve/reject link that
+hits that resume webhook, then branch on the response before the second `agent-service` call runs.
 
 ---
 
 ## 4. PRACTICE — Try It Yourself
 
-### Exercise 1: Sequential Pipeline
+### Exercise 1: Batch of five
 
-**Goal**: Build a 3-step translation pipeline.
+**Goal**: Process five prompts one at a time instead of one big prompt.
 
 **Instructions**:
-1. Webhook receives text in any language
-2. Claude #1: Detect language
-3. Claude #2: Translate to English
-4. Claude #3: Summarize in 1 sentence
-5. Return final summary
+1. Feed a Webhook a JSON body with a `prompts` array of five short questions.
+2. **Loop Over Items** with Batch Size `1`, then the same HTTP Request → `agent-service` node from
+   12.1.
+3. **Merge** (Combine → Position), then a Code node with `$input.all()` to collect the five
+   results into one array.
+
+**Expected result**: The final output is an array of five `{result, session_id, total_cost_usd}`
+objects, one per prompt, in the original order.
 
 <details>
 <summary>💡 Hint</summary>
-
-Each Execute Command output is in `$json.stdout`. Reference with `{{ $json.stdout }}` in the next node's prompt.
-
+The loop's non-"done" output feeds the HTTP Request node; its "done" output is what you connect
+into the Merge node's second input.
 </details>
 
 <details>
 <summary>✅ Solution</summary>
-
-**Node 1 - Detect:**
-```json
-{ "command": "claude", "arguments": "-p \"What language is this? Reply with language name only:\n\n{{ $json.text }}\"" }
-```
-
-**Node 2 - Translate:**
-```json
-{ "command": "claude", "arguments": "-p \"Translate to English:\n\n{{ $('Webhook').first().json.body.text }}\"" }
-```
-
-**Node 3 - Summarize:**
-```json
-{ "command": "claude", "arguments": "-p \"Summarize in one sentence:\n\n{{ $json.stdout }}\"" }
-```
-
+Webhook → Loop Over Items → HTTP Request (agent-service) → back into Loop Over Items → (on done) →
+Merge (Combine, Position) → Code (`$input.all()`) → Respond to Webhook.
 </details>
 
-### Exercise 2: Classification Router
+### Exercise 2: Detect a refusal without guessing at English phrasing
 
-**Goal**: Route messages to different channels based on type.
+**Goal**: Make the error-recovery IF node reliable instead of string-matching "don't have
+permission".
 
 **Instructions**:
-1. Claude classifies input as: question, complaint, feedback, spam
-2. Switch routes to 4 different Slack channels
-3. Test with 10 different inputs
+1. Change the prompt template to end with: `If you cannot complete this, respond with exactly the
+   single word REFUSED and nothing else.`
+2. Re-run the Exercise 2 curl from 12.1 with a request outside `allowedTools`.
+3. Branch the IF node on `{{ $json.result.trim() === 'REFUSED' }}` instead of a substring match.
 
 <details>
 <summary>💡 Hint</summary>
-
-Make Claude return ONLY the category name. Use a Code node to clean/lowercase the output before the Switch node.
-
+A fixed sentinel token in the prompt is far more reliable across languages and phrasings than
+matching on the model's natural-language wording.
 </details>
 
 <details>
 <summary>✅ Solution</summary>
-
-**Classify prompt:**
-```text
-"Classify as exactly one of: question, complaint, feedback, spam. Return ONLY the word.\n\nMessage: {{ $json.message }}"
-```
-
-**Code node:**
-```javascript
-return [{ json: { type: $input.first().json.stdout.trim().toLowerCase() } }];
-```
-
-**Switch rules:** Map each type to output 0-3, connect to respective Slack nodes.
-
-</details>
-
-### Exercise 3: Batch Processing
-
-**Goal**: Process 20 items in batches of 5.
-
-**Instructions**:
-1. Webhook receives array of 20 items
-2. Loop Over Items (size 5)
-3. Claude summarizes each batch
-4. Merge all results
-
-<details>
-<summary>💡 Hint</summary>
-
-After Loop Over Items, the workflow runs 4 times (20/5). Use Merge node at the end to collect all outputs.
-
-</details>
-
-<details>
-<summary>✅ Solution</summary>
-
-**Loop Over Items:** Batch Size = 5
-
-**Execute Command:**
-```json
-{ "command": "claude", "arguments": "-p \"Summarize these items:\n\n{{ JSON.stringify($json) }}\"" }
-```
-
-**Merge node:** Mode = "Merge (Combine → Position)"
-
+This is the same idea Module 12.3 takes further with structured output: instead of parsing prose,
+ask for (or configure) a format you can check exactly.
 </details>
 
 ---
 
 ## 5. CHEAT SHEET
 
-### Pattern Selection Guide
-
-| Scenario | Pattern |
-|----------|---------|
-| Multi-step transformation | Sequential Pipeline |
-| Independent parallel tasks | Fan-Out/Fan-In |
-| Different handling per type | Classification Router |
-| Need human approval | Human-in-the-Loop |
-| Many items to process | Batch Processing |
-| Might fail, need retry | Error Recovery Loop |
-
-### Key n8n Nodes
-
-| Node | Purpose |
-|------|---------|
-| `Loop Over Items` | Chunk arrays into smaller groups |
-| `Merge` | Combine parallel branches |
-| `Switch` | Multi-way routing (3+ paths) |
-| `Wait` | Pause for external webhook |
-| `IF` | Binary branching (2 paths) |
-
-### Data Passing
-
-```javascript
-{{ $json.stdout }}                    // Claude output from previous node
-{{ $('NodeName').first().json.field }} // Specific field from named node
-{{ $items() }}                         // All items in current batch
-{{ JSON.stringify($json) }}            // Serialize for Claude prompt
-```
+| Pattern | Key node(s) |
+|---|---|
+| Sequential Pipeline | Two HTTP Request nodes, second reads the first's `result` |
+| Fan-Out / Fan-In | **Loop Over Items** (Batch Size) → HTTP Request |
+| Merge by Position | **Merge** → Mode: Combine → Combine By: **Position** |
+| Aggregate | Code node: `$input.all()` |
+| Error Recovery | Code node checks `result` text → IF → retry HTTP Request |
+| Human-in-the-Loop | **Wait** node (resumes on webhook) → IF: approved? |
 
 ---
 
@@ -273,52 +203,32 @@ After Loop Over Items, the workflow runs 4 times (20/5). Use Merge node at the e
 
 | ❌ Mistake | ✅ Correct Approach |
 |---|---|
-| One giant Claude call | Break into sequential steps with clear prompts |
-| Sequential when parallel possible | Fan-out for independent tasks (3x faster) |
-| No human review for risky actions | Human-in-the-loop for emails, payments, publishing |
-| Processing 1000 items at once | Batch processing with rate limiting (10-20 per batch) |
-| No error handling | Error Recovery pattern for production workflows |
-| Hardcoded routing rules | Let Claude classify, Switch node routes |
-| Mixing patterns randomly | Choose primary pattern, compose intentionally |
+| Calling the node by its pre-rename batching name | Current UI name is **Loop Over Items** |
+| Checking only HTTP status for errors | The service returns `200` even on a refusal — check `result` text or a sentinel token |
+| Sending 100 items in one prompt | **Loop Over Items** with a small Batch Size, one `agent-service` call per item or small group |
+| Merging without checking unpaired items | Review "Include Any Unpaired Items" on the Merge node before assuming nothing was dropped |
+| Letting the agent act before a human sees the draft | Insert a **Wait** node for anything that publishes, spends, or deletes |
+| Using `$items()` from old n8n versions | Current expression is `$input.all()` inside a Code node |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: Vietnamese e-commerce company processes 200+ customer reviews daily. Need to: analyze sentiment, extract product issues, route to right team, respond appropriately.
+**Scenario**: A Vietnamese e-commerce team gets 200+ customer reviews a day and wants each one
+triaged: sentiment, product issue, and a suggested reply routed to the right team.
 
-**Problem**: Manual processing took 4 hours daily. Responses were inconsistent. Negative reviews sometimes missed.
+**Problem**: A single giant prompt per batch of reviews was slow to debug — one bad review in a
+batch of twenty made the whole call's output unpredictable, and there was no way to retry just the
+one review that confused the model.
 
-**Multi-Pattern Solution**:
+**Solution**: **Loop Over Items** with Batch Size `1` sends one review per `agent-service` call.
+**Merge (Combine → Position)** lines the per-review results back up with the original review IDs.
+An error-recovery branch checks each result for a `REFUSED` sentinel and retries with a simplified
+prompt. Negative-sentiment results route through a **Wait** node for manager approval before a
+reply goes out.
 
-```text
-Pattern 1: Batch Processing
-└─ 200 reviews → batches of 20
-
-    Pattern 2: Sequential Pipeline (per review)
-    └─ Analyze sentiment → Extract issues → Generate response
-
-        Pattern 3: Classification Router
-        └─ positive → Marketing | negative → Support | neutral → Product
-
-            Pattern 4: Human-in-the-Loop
-            └─ Negative reviews need manager approval
-```
-
-**Implementation**:
-- Database trigger fetches new reviews every hour
-- Batch processing handles volume without rate limits
-- Sequential pipeline extracts structured data
-- Router sends to appropriate team's Slack
-- Human approval required for negative responses
-
-**Results** (after 1 month):
-- Processing time: 4 hours → 30 minutes
-- Response consistency: 100% follow same format
-- Escalation: Zero negative reviews missed
-- Customer satisfaction: +15% (faster, better responses)
-
-**Quote**: "Patterns let us build in 2 days what would have taken 2 weeks of custom coding. Now our support team just reviews and approves."
+**Result**: Each review is independently retryable, a stuck review no longer blocks the batch, and
+the manager approval step means no auto-reply reaches an angry customer unreviewed.
 
 ---
 

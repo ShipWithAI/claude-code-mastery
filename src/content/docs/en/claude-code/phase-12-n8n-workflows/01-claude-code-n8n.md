@@ -1,373 +1,282 @@
 ---
 title: 'Claude Code + n8n'
-description: 'Trigger Claude Code from n8n workflows and build visual AI automation pipelines for development tasks.'
+description: 'Call a small Agent SDK service from n8n over HTTP, and know when self-hosted Execute Command + claude -p is the right fallback instead.'
+verified: 2026-09-28
+claude_version: 2.1.283
 ---
 
 # Module 12.1: Claude Code + n8n
 
 > **Estimated time**: ~35 minutes
 >
-> **Prerequisite**: Phase 11 (Automation & Headless)
+> **Prerequisite**: Module 11.2 (Claude Agent SDK)
 >
-> **Outcome**: After this module, you will understand n8n basics, know how to trigger Claude Code from n8n workflows, and be able to build visual AI automation pipelines.
+> **Outcome**: After this module, you will be able to call a small Agent SDK service from an n8n
+> workflow over plain HTTP, and know when a self-hosted Execute Command node is the right (and
+> only) alternative.
 
 ---
 
 ## 1. WHY — Why This Matters
 
-You've learned to automate Claude with GitHub Actions and scripts. But what if you need:
-- Non-developers to create AI workflows?
-- Visual debugging of complex pipelines?
-- Quick prototyping without writing YAML?
-- Integration with 400+ services without coding each one?
-
-n8n gives you visual workflow automation. Drag, drop, connect. Claude Code becomes a node in a larger system. Perfect for teams with mixed technical skills or rapid iteration. While GitHub Actions is code-centric, n8n is visual-first — build AI pipelines without touching YAML.
+You want n8n to trigger a repo-aware Claude Code task from a webhook or a schedule. The obvious
+move is an **Execute Command** node running `claude -p` — that's how most tutorials show it. It
+also doesn't work on the n8n most people run: Execute Command is disabled by default from n8n 2.0
+onward, and it isn't available on n8n Cloud at all (docs: "This node isn't available on n8n
+Cloud."). You need an approach that works on the n8n your team actually has.
 
 ---
 
 ## 2. CONCEPT — Core Ideas
 
-### What is n8n?
+There are two real ways to reach Claude Code from n8n, and they trade off differently.
 
-n8n is an open-source workflow automation platform — think Zapier but self-hosted. Your data stays with you, and you have full control.
+**(A) Recommended — HTTP Request → a small Agent SDK service.** You run a tiny Node.js (or
+Python) process that wraps the Agent SDK's `query()` and exposes it as `POST /run`. n8n's
+**HTTP Request** node calls that endpoint like any other API. This works everywhere — n8n Cloud
+included — because from n8n's side it's just an outbound HTTP call. You control exactly which
+tools the agent can use (`allowedTools`) and what directory it can see (`cwd`), independent of
+whatever n8n itself can reach.
 
-Key features:
-- **Visual editor** with drag-and-drop workflow design
-- **400+ integrations** (Slack, Google Sheets, databases, APIs)
-- **Triggers**: webhooks, schedules, email, database changes
-- **Can run any CLI command** — this is how we connect Claude Code
+**(B) Self-hosted only — Execute Command running `claude -p`.** If you self-host n8n, you can
+re-enable Execute Command and run the `claude` CLI directly in that container. This means
+installing the `claude` CLI in the n8n image, giving it credentials, and accepting that the node
+now runs an arbitrary shell command with n8n's own process privileges — a materially bigger blast
+radius than an HTTP call to a service you wrote.
 
-### n8n + Claude Code Architecture
-
-```text
-[Trigger] → [n8n Workflow] → [Execute Claude Code] → [Process Output] → [Action]
-    │             │                  │                     │              │
-  Email      Visual Editor        claude -p            Parse JSON      Slack
-  Webhook    Drag & Drop          Headless             Transform       Database
-  Schedule                                                             Trello
+```mermaid
+graph LR
+    T[n8n Trigger<br/>webhook / schedule] --> H[HTTP Request node]
+    H --> S[agent-service<br/>Agent SDK query#40;#41;]
+    S --> R[(repo volume)]
+    S --> H2[JSON result]
+    H2 --> N[n8n: Slack / Email / GitHub nodes]
 ```
 
-### Key n8n Nodes for Claude Code
+| Node | Path | Works on n8n Cloud? | What it runs |
+|---|---|---|---|
+| **HTTP Request** | (A) recommended | Yes | Calls your `agent-service` over HTTP |
+| **Execute Command** | (B) self-hosted only | No — "isn't available on n8n Cloud" | `claude -p …` as a shell command, in-process |
+| **Code** | either | Yes | JavaScript/Python glue between nodes |
 
-| Node | Purpose | Use Case |
-|------|---------|----------|
-| **Execute Command** | Run `claude -p` | Core Claude execution |
-| **HTTP Request** | Call APIs directly | Alternative approach |
-| **Code** | JavaScript processing | Parse Claude output |
-| **IF** | Conditional branching | Route based on AI response |
-| **Set** | Transform data | Prepare prompts |
-
-### Installation
-
-```bash
-# Option 1: npm (recommended for development)
-$ npm install -g n8n
-$ n8n start
-
-# Option 2: Docker (recommended for production)
-$ docker run -it --rm -p 5678:5678 n8nio/n8n
+To re-enable Execute Command on a self-hosted instance, set the `NODES_EXCLUDE` environment
+variable to a JSON array that leaves it out. The docs' own example, exactly as written in a
+compose/YAML value (the surrounding quotes are escaped because the whole array is one string):
+```yaml
+NODES_EXCLUDE: "[\"n8n-nodes-base.readWriteFile\"]"
 ```
-
-Access the editor at `http://localhost:5678`.
+That pairs Execute Command with Read/Write Files from Disk in the *default* blocked list; drop the
+one you want back out of the array. Docs: "Some nodes, like Execute Command, are blocked by
+default. Remove them from the exclude list to enable them."
 
 ---
 
 ## 3. DEMO — Step by Step
 
-**Scenario**: Build a workflow where incoming emails are summarized by Claude and sent to Slack.
+**Lab setup**: n8n runs in Docker; `agent-service` runs on the **host** with `node`, so the Agent
+SDK reuses your machine's existing `claude` login — no token minted, no key baked into a
+container. n8n reaches the host service at `http://host.docker.internal:8787`.
 
-### Step 1: Install and start n8n
-
-```bash
-$ npm install -g n8n
-$ export ANTHROPIC_API_KEY="sk-ant-api03-..."
-$ n8n start
-```
-
-Expected output:
-```text
-n8n ready on port 5678
-Editor is now accessible via: http://localhost:5678
-```
-
-### Step 2: Create new workflow
-
-1. Open `http://localhost:5678`
-2. Click "New Workflow"
-3. Name it "Email Summarizer"
-
-### Step 3: Add Webhook trigger (for testing)
-
-Add a **Webhook** node:
-- Method: POST
-- Path: `/email-summary`
-
-This gives you a test URL like `http://localhost:5678/webhook/email-summary`.
-
-### Step 4: Add Execute Command node for Claude
-
-Add an **Execute Command** node and configure:
-
-```json
-{
-  "command": "claude",
-  "arguments": "-p \"Summarize this email. At the end, write URGENT: YES or URGENT: NO.\n\nSubject: {{ $json.subject }}\n\nBody: {{ $json.body }}\""
-}
-```
-
-### Step 5: Parse Claude output with Code node
-
-Add a **Code** node:
+**Step 1: Write the service** (`agent-service/server.mjs`, ~40 lines)
 
 ```javascript
-const response = $input.first().json.stdout;
-const isUrgent = response.includes('URGENT: YES');
-const summary = response.replace(/URGENT: (YES|NO)/g, '').trim();
+// docs: https://code.claude.com/docs/en/agent-sdk/typescript
+import http from 'node:http';
+import { query } from '@anthropic-ai/claude-agent-sdk';
 
-return [{
-  json: {
-    summary,
-    isUrgent,
-    originalSubject: $('Webhook').first().json.body.subject
+const PORT = process.env.PORT || 8787;
+const REPO_DIR = process.env.REPO_DIR || '/repo';
+
+const server = http.createServer(async (req, res) => {
+  if (req.method !== 'POST' || req.url !== '/run') {
+    res.writeHead(404).end('not found');
+    return;
   }
-}];
+  let body = '';
+  for await (const chunk of req) body += chunk;
+  const { prompt, session_id } = JSON.parse(body);
+
+  let result = null;
+  for await (const message of query({
+    prompt,
+    options: {
+      cwd: REPO_DIR,
+      allowedTools: ['Read', 'Grep', 'Glob'], // read-only — no Bash, no Edit
+      permissionMode: 'dontAsk',              // deny anything not in allowedTools
+      maxTurns: 6,
+      resume: session_id,                     // continue a prior session if the caller sends one
+      settingSources: [],                     // isolate from the host's user/project/.claude settings
+    },
+  })) {
+    if (message.type === 'result') result = message;
+  }
+
+  res.writeHead(200, { 'content-type': 'application/json' });
+  res.end(JSON.stringify({
+    result: result?.result ?? null,
+    session_id: result?.session_id ?? null,
+    total_cost_usd: result?.total_cost_usd ?? null,
+  }));
+});
+
+server.listen(PORT, () => console.log(`agent-service listening on :${PORT}`));
 ```
 
-### Step 6: Add IF node for routing
+`npm install @anthropic-ai/claude-agent-sdk` installed `0.1.77` for this lab. (Outputs below were
+captured before `settingSources: []` was added here; `~/cc-lab` has no `CLAUDE.md`, so nothing
+changed — without it, `query()` loads the host's user/project/local settings like the CLI does.)
 
-Add an **IF** node:
-- Condition: `{{ $json.isUrgent }}` equals `true`
-- True branch → Urgent Slack channel
-- False branch → Regular Slack channel
-
-### Step 7: Add Slack nodes
-
-Add two **Slack** nodes:
-
-**True branch (urgent):**
-```json
-{
-  "channel": "#urgent",
-  "text": "🚨 *Urgent Email*\n\n{{ $json.summary }}"
-}
-```
-
-**False branch (regular):**
-```json
-{
-  "channel": "#email-summaries",
-  "text": "📧 *Email Summary*\n\n{{ $json.summary }}"
-}
-```
-
-### Step 8: Test the workflow
+**Step 2: Run it on the host**
 
 ```bash
-$ curl -X POST http://localhost:5678/webhook/email-summary \
-  -H "Content-Type: application/json" \
-  -d '{"subject": "Server down!", "body": "Production server is unresponsive since 3am."}'
+REPO_DIR=$HOME/cc-lab PORT=8787 node server.mjs
 ```
 
-Expected: Claude summarizes, detects urgency, routes to `#urgent` channel.
+**Step 3: Test the service directly**
+
+```bash
+curl -s localhost:8787/run -H 'content-type: application/json' \
+  -d '{"prompt":"List exported functions in src/math.js"}'
+```
+Expected output:
+```text
+# Output may vary
+{"result":"The exported functions in `src/math.js` are:\n\n1. **`add(a, b)`** - Returns the sum of two numbers\n2. **`divide(a, b)`** - Returns the division of two numbers","session_id":"6f86887b-d23c-4f63-bb19-40dd8404cbad","total_cost_usd":0.0558}
+```
+
+**Step 4: Start n8n in Docker**
+
+```bash
+# compose.yaml — lab only: n8n in a container, agent-service on the host
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    ports: ['5678:5678']
+    extra_hosts: ['host.docker.internal:host-gateway']
+    volumes: ['n8n_data:/home/node/.n8n']
+volumes:
+  n8n_data:
+```
+```bash
+docker compose up -d
+```
+`docker run --rm docker.n8n.io/n8nio/n8n --version` printed `2.40.7` for this lab.
+
+**Step 5: Build the workflow**
+
+1. **Webhook** node — Method `POST`, Path `agent`, Respond: **Using 'Respond to Webhook' Node**.
+2. **HTTP Request** node — Method `POST`, URL `http://host.docker.internal:8787/run`, Send Body
+   on, Specify Body: **Using JSON**, body: `{"prompt": "{{ $json.body.prompt }}"}`.
+3. **Respond to Webhook** node — default (**First Incoming Item**, i.e. the HTTP Request node's
+   response).
+
+**Step 6: Publish and call the production webhook**
+
+```bash
+curl -s -X POST http://localhost:5678/webhook/agent \
+  -H 'content-type: application/json' \
+  -d '{"prompt":"List exported functions in src/math.js"}'
+```
+Expected output:
+```text
+# Output may vary
+{"result":"The exported functions in `src/math.js` are:\n\n1. **`add(a, b)`** - Returns the sum of two numbers\n2. **`divide(a, b)`** - Returns the division of two numbers","session_id":"c11a4f3e-29e0-44d4-915a-9630befa3cc3","total_cost_usd":0.2176}
+```
+
+**Trimmed exported workflow** (`n8n export:workflow`, node identifiers as this n8n version wrote
+them):
+```json
+{
+  "name": "agent-service-demo",
+  "nodes": [
+    { "type": "n8n-nodes-base.webhook", "typeVersion": 2.1, "name": "Webhook",
+      "parameters": { "httpMethod": "POST", "path": "agent", "responseMode": "responseNode" } },
+    { "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.5, "name": "HTTP Request",
+      "parameters": { "method": "POST", "url": "http://host.docker.internal:8787/run",
+        "sendBody": true, "specifyBody": "json",
+        "jsonBody": "={\"prompt\": \"{{ $json.body.prompt }}\"}" } },
+    { "type": "n8n-nodes-base.respondToWebhook", "typeVersion": 1.5, "name": "Respond to Webhook" }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "HTTP Request", "type": "main", "index": 0 }]] },
+    "HTTP Request": { "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]] }
+  }
+}
+```
 
 ---
 
 ## 4. PRACTICE — Try It Yourself
 
-### Exercise 1: Webhook to Claude
+### Exercise 1: Widen the service's reach
 
-**Goal**: Create a simple webhook that accepts a prompt and returns Claude's response.
+**Goal**: Let the agent read files but not run shell commands, still without editing anything.
 
 **Instructions**:
-1. Create workflow with Webhook trigger
-2. Add Execute Command: `claude -p "{{ $json.prompt }}"`
-3. Add "Respond to Webhook" node returning the output
-4. Test with curl
+1. In `server.mjs`, change `allowedTools` to `['Read', 'Grep', 'Glob', 'WebSearch']`.
+2. Restart the service and re-run the Step 3 curl with a prompt that needs a web search.
+
+**Expected result**: The response includes a synthesized answer; `total_cost_usd` is still
+returned. `Bash` and `Edit` remain unavailable no matter what the prompt asks for.
 
 <details>
 <summary>💡 Hint</summary>
-
-The "Respond to Webhook" node lets you return data to the HTTP caller. Connect it after the Execute Command node.
-
+`allowedTools` only *adds* tools the agent may use without prompting — it does not need `Bash` or
+`Edit` listed to keep those tools out; they're simply absent.
 </details>
 
 <details>
 <summary>✅ Solution</summary>
-
-Workflow: Webhook → Execute Command → Respond to Webhook
-
-Execute Command config:
-```json
-{
-  "command": "claude",
-  "arguments": "-p \"{{ $json.prompt }}\""
-}
-```
-
-Respond to Webhook config:
-```json
-{
-  "respondWith": "json",
-  "responseBody": "={{ $json.stdout }}"
-}
-```
-
-Test:
+Edit the array, restart with `node server.mjs`, then:
 ```bash
-curl -X POST http://localhost:5678/webhook/xxx \
-  -H "Content-Type: application/json" \
-  -d '{"prompt": "What is 2+2?"}'
+curl -s localhost:8787/run -H 'content-type: application/json' \
+  -d '{"prompt":"What does this project'\''s package.json say the entry point is?"}'
 ```
-
 </details>
 
-### Exercise 2: Scheduled Daily Analysis
+### Exercise 2: Enable Execute Command safely (self-hosted only)
 
-**Goal**: Every day at 9am, fetch a webpage and have Claude analyze it.
+**Goal**: Understand exactly what you're trading away before you flip this switch.
 
 **Instructions**:
-1. Schedule Trigger: daily at 9:00
-2. HTTP Request: fetch a news page or API
-3. Execute Command: Claude analyzes content
-4. Send email with analysis
+1. On a self-hosted n8n, set the compose/YAML value
+   `NODES_EXCLUDE: "[\"n8n-nodes-base.readWriteFile\"]"` (leaving Execute Command out of the
+   exclude list re-enables it).
+2. List, in your own words, what an attacker who can edit this workflow could now do that they
+   couldn't with the HTTP Request approach.
 
 <details>
 <summary>💡 Hint</summary>
-
-Use the Schedule Trigger node with cron expression `0 9 * * *`. The HTTP Request node can fetch any URL.
-
+Execute Command runs a real shell inside the n8n process's container, with whatever credentials
+that container has — not just the ones you intended for Claude.
 </details>
 
 <details>
 <summary>✅ Solution</summary>
-
-Workflow: Schedule → HTTP Request → Execute Command → Send Email
-
-Schedule: `0 9 * * *` (9am daily)
-
-HTTP Request: `https://news.ycombinator.com/`
-
-Execute Command:
-```json
-{
-  "command": "claude",
-  "arguments": "-p \"Summarize the top 5 stories from this page:\n\n{{ $json.data }}\""
-}
-```
-
-</details>
-
-### Exercise 3: Multi-Step Pipeline
-
-**Goal**: Chain multiple Claude calls: analyze → suggest → format.
-
-**Instructions**:
-1. Webhook input with raw text
-2. Claude #1: Analyze sentiment and key points
-3. Claude #2: Suggest actions based on analysis
-4. Claude #3: Format as bullet points
-5. Return final output
-
-<details>
-<summary>💡 Hint</summary>
-
-Each Execute Command node's output becomes input for the next. Reference previous outputs with `$('NodeName').first().json.stdout`.
-
-</details>
-
-<details>
-<summary>✅ Solution</summary>
-
-Workflow: Webhook → Execute Command (Analyze) → Execute Command (Suggest) → Execute Command (Format) → Respond to Webhook
-
-**Node 1 - Analyze:**
-```json
-{
-  "command": "claude",
-  "arguments": "-p \"Analyze this text for sentiment and key points:\n\n{{ $json.text }}\""
-}
-```
-
-**Node 2 - Suggest (reference Node 1):**
-```json
-{
-  "command": "claude",
-  "arguments": "-p \"Based on this analysis, suggest 3 actions:\n\n{{ $('Execute Command').first().json.stdout }}\""
-}
-```
-
-**Node 3 - Format (reference Node 2):**
-```json
-{
-  "command": "claude",
-  "arguments": "-p \"Format these suggestions as bullet points:\n\n{{ $('Execute Command1').first().json.stdout }}\""
-}
-```
-
-Test:
-```bash
-curl -X POST http://localhost:5678/webhook/pipeline \
-  -H "Content-Type: application/json" \
-  -d '{"text": "Customer complained about slow delivery times."}'
-```
-
+They could run any command the container's user can run — read other workflows' credentials from
+disk, reach internal network hosts, or install a backdoor — none of which the `agent-service`
+path exposes, since that service only accepts a `prompt` field over HTTP.
 </details>
 
 ---
 
 ## 5. CHEAT SHEET
 
-### Quick Start
-
-```bash
-npm install -g n8n
-export ANTHROPIC_API_KEY="sk-ant-..."
-n8n start
-# Open http://localhost:5678
-```
-
-### Execute Command Node
-
-```json
-{
-  "command": "claude",
-  "arguments": "-p \"{{ $json.prompt }}\""
-}
-```
-
-### Parse Output (Code Node)
-
-```javascript
-const output = $input.first().json.stdout;
-return [{ json: { result: output } }];
-```
-
-### Common Triggers
-
-| Trigger | Use Case |
-|---------|----------|
-| Webhook | External events, API calls |
-| Schedule | Cron-based, daily/hourly |
-| Email (IMAP) | Incoming emails |
-| Database | Row changes |
-
-### Data References
-
-```javascript
-{{ $json.field }}                    // Current node
-{{ $('NodeName').first().json.field }}  // Other node
-{{ $input.first().json.stdout }}     // In Code node
-```
-
-### Useful Nodes
+| Task | Command / Config |
+|---|---|
+| Install SDK | `npm install @anthropic-ai/claude-agent-sdk` |
+| Run service on host | `REPO_DIR=~/cc-lab PORT=8787 node server.mjs` |
+| Pull n8n image | `docker pull docker.n8n.io/n8nio/n8n` |
+| n8n → host service URL | `http://host.docker.internal:8787/run` |
+| Re-enable Execute Command (compose/YAML value) | `NODES_EXCLUDE: "[\"n8n-nodes-base.readWriteFile\"]"` |
+| Webhook → HTTP Request body | `{"prompt": "{{ $json.body.prompt }}"}` |
 
 | Node | Purpose |
-|------|---------|
-| Set | Prepare/transform data |
-| IF | Conditional routing |
-| Switch | Multi-way routing |
-| Merge | Combine branches |
-| Error Trigger | Handle failures |
+|---|---|
+| Webhook | Trigger, respond via "Respond to Webhook" node |
+| HTTP Request | Call `agent-service` (path A) |
+| Execute Command | Run `claude -p` directly (path B, self-hosted only) |
+| Respond to Webhook | Return the HTTP Request node's JSON |
 
 ---
 
@@ -375,47 +284,36 @@ return [{ json: { result: output } }];
 
 | ❌ Mistake | ✅ Correct Approach |
 |---|---|
-| Claude CLI not in n8n's PATH | Use full path: `~/.local/bin/claude` |
-| API key not available | Set `ANTHROPIC_API_KEY` before starting n8n |
-| No timeout on Claude calls | Set timeout in Execute Command (60000ms+) |
-| Quotes breaking prompts | Use Set node to prepare complex prompts |
-| Ignoring Claude errors | Check `exitCode` and `stderr` in output |
-| Huge prompts in command line | Write to temp file, pass file path |
-| No error handling | Add Error Trigger node to catch failures |
+| Execute Command → `claude -p` on n8n Cloud | Not available there at all; use the HTTP Request → service path |
+| Assuming Execute Command just works self-hosted | It's blocked by default from n8n 2.0; requires `NODES_EXCLUDE` |
+| Hardcoding an old system-wide install path for the CLI | The native installer puts it at `~/.local/bin/claude`; use `which claude` |
+| `claude -p` with no permission flag in a node | Always pass `--permission-mode` or `--allowedTools`; a bare `-p` run defaults to Manual |
+| Baking `ANTHROPIC_API_KEY` into the n8n image | Pass it from the environment at container start; never a literal in `compose.yaml` |
+| Treating a natural-language refusal as a thrown error | The Agent SDK returns `result: "success"` even when Claude declines a request in text — check the text, don't assume HTTP status alone means success |
+| Shipping this demo's `/run` as-is | It has no auth and no input validation; put it behind an auth check and network isolation, and validate `prompt`/`session_id` before they reach `query()` |
 
 ---
 
 ## 7. REAL CASE — Production Story
 
-**Scenario**: Vietnamese marketing agency receives 50+ client briefs daily via email. Manual processing took 2 hours every morning.
+**Scenario**: A Vietnamese marketing agency's client briefs land in a shared inbox. Someone reads
+each one, logs it to a spreadsheet, and pings the right Slack channel — about two hours of manual
+triage every morning.
 
-**Problem**: Briefs arrived in different formats. Staff had to read each one, extract requirements, log to spreadsheet, create project cards, and notify teams. Error-prone and slow.
+**Problem**: The team's first attempt used an Execute Command node calling `claude -p` directly
+inside n8n Cloud. It silently failed — Execute Command isn't available there — and the team lost a
+day debugging a node that was never going to run.
 
-**n8n + Claude Solution**:
+**Solution**: They moved to the architecture in this module: a small `agent-service` (running as a
+lightweight Fly.io app for production, with `ANTHROPIC_API_KEY` set from the platform's secret
+store, never in a Dockerfile) that a webhook-triggered n8n Cloud workflow calls over HTTP. The
+service reads each brief, extracts client name/deadline/requirements with `allowedTools: ['Read']`
+scoped to a read-only mailbox export, and returns structured JSON that a Code node turns into a
+spreadsheet row and a Slack message.
 
-```text
-[Email Trigger] → [Claude: Extract] → [Claude: Suggest] → [Google Sheets]
-                                                              ↓
-                                          [Slack] ← [Trello: Create Card]
-```
-
-**Implementation**:
-1. Email arrives with client brief
-2. Claude extracts: client name, deadline, requirements, budget
-3. Claude suggests: team assignment, approach, timeline
-4. Auto-logs to Google Sheets
-5. Creates Trello card with all details
-6. Notifies appropriate Slack channel
-
-**Results** (after 2 months):
-- Processing time: 2 hours → 5 minutes (just review)
-- Zero missed briefs
-- Consistent data extraction format
-- Marketing manager modifies workflow herself — no engineering needed
-
-**Quote**: "n8n let our marketing manager build AI automation without asking engineering. She just drags and drops. We went from 'can you build this?' to 'I already built it.'"
-
-**Cost**: n8n is free (self-hosted). Claude API: ~$30/month for 50 briefs/day.
+**Result**: Morning triage now takes about the time it takes a human to skim the extracted
+summaries and approve them — the extraction itself runs unattended. The team runs entirely on n8n
+Cloud, something the Execute Command approach could never have supported.
 
 ---
 
