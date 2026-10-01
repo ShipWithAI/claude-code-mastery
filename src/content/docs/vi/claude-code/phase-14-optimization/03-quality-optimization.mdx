@@ -1,6 +1,8 @@
 ---
 title: 'Tối ưu Chất lượng'
-description: 'Nâng cao chất lượng output của Claude Code: prompt engineering nâng cao, verification và iteration.'
+description: 'Thay thói quen "reason step by step" bằng một quality gate thật — hook, reviewer subagent context sạch, và output style.'
+verified: 2026-09-27
+claude_version: 2.1.283
 ---
 
 # Module 14.3: Tối ưu Chất lượng
@@ -9,266 +11,265 @@ description: 'Nâng cao chất lượng output của Claude Code: prompt enginee
 >
 > **Yêu cầu trước**: Module 14.2 (Tối ưu Tốc độ)
 >
-> **Kết quả**: Sau module này, bạn sẽ biết kỹ thuật improve output quality, hiểu quality/speed tradeoff, và configure Claude cho high-quality result.
+> **Kết quả**: Sau module này, bạn nối được một quality gate deterministic — hook `PostToolUse`
+> lint, hook `Stop` chạy test, và reviewer subagent context sạch — thay vì bảo Claude "reason step
+> by step" rồi hy vọng.
 
 ---
 
 ## 1. WHY — Tại sao cần học
 
-Claude produce code nhanh, nhưng không quite right. Variable name không match convention. Missing error handling. Works nhưng không fit architecture. Bạn mất 30 phút fix cái Claude generate — defeating purpose.
+Claude viết code nhanh. Nhưng chưa hoàn toàn đúng: thiếu một edge case, vi phạm lint, một quyết
+định thiết kế không qua nổi review. Bạn phát hiện ở code review — sau khi việc đã xong, bằng tay,
+mỗi lần. Đó không phải chiến lược quality, đó là thuế bạn trả trên mỗi pull request.
 
-Quality optimization ensure output production-ready từ đầu. Less fixing, more shipping. Thời gian đầu tư vào setup trả về ở mọi task.
+Một gate chạy giống nhau mỗi lần, không cần bạn nhớ để yêu cầu, đáng giá hơn mọi cách diễn đạt
+prompt.
 
 ---
 
 ## 2. CONCEPT — Khái niệm cốt lõi
 
-### Quality Dimension
+> "Give Claude a check it can run: tests, a build, a screenshot to compare." (S1)
 
-| Dimension | Low Quality | High Quality |
-|-----------|-------------|--------------|
-| **Correctness** | Có bug | Works correctly |
-| **Standards** | Generic pattern | Match your style |
-| **Architecture** | Tightly coupled | Clean separation |
-| **Robustness** | Happy path only | Error handling |
-| **Maintainability** | Khó thay đổi | Dễ mở rộng |
+Verify có một trong ba dạng: rules-based, visual, hoặc LLM-as-judge (S7). Một rule lint là
+rules-based; một screenshot diff là visual; một subagent đọc diff là LLM-as-judge — và nó chỉ hoạt
+động với context sạch, vì "the agent that wrote the code has no way to approve it" (S3), và
+self-review trong cùng session có xu hướng "confident praising" thay vì phê bình thật (S12).
 
-### Quality Lever
-
-```text
-CLAUDE.md Setup      → Thiết lập standard upfront
-Examples             → Show, không chỉ tell
-Think Mode           → Better reasoning cho complex task
-Iterative Refinement → Review và improve
-Explicit Constraints → State DO và DON'T
+```mermaid
+graph LR
+    A[Claude sửa file] --> B["PostToolUse hook<br/>lint --fix"]
+    A --> C[Claude kết thúc turn]
+    C --> D["Stop hook<br/>chạy test"]
+    B -.->|fail deterministic, mỗi lần| E[Quality gate]
+    D -.-> E
+    F["Reviewer subagent context sạch"] -.->|context khác, không phải session vừa viết| E
 ```
 
-### Examples Principle
+Ba đòn bẩy thật, xếp theo độ khó bỏ qua:
 
-```text
-Không có example:
-"Dùng proper error handling"
-→ Claude đoán ý bạn
+- **Hook** — `PostToolUse` sau mỗi lần sửa, `Stop` trước khi Claude được kết thúc turn.
+  Deterministic: "Unlike CLAUDE.md instructions which are advisory, hooks are deterministic and
+  guarantee the action happens" (S1). Module 11.3 phủ cơ chế; module này chỉ dùng lại cặp nhỏ
+  nhất, hữu ích nhất.
+- **Reviewer subagent** — một `.claude/agents/reviewer.md` riêng, tool chỉ đọc, gọi trên diff. Nó
+  bắt đầu không có ký ức viết ra code đó, nên nó review thay vì bảo vệ nó.
+- **`.claude/rules/` và output style** — `.claude/rules/` giữ coding standard Claude đọc như file
+  project bình thường (Module 4.2 dạy cách viết); `/output-style
+  Explanatory|Learning|Concise|Proactive` đổi mức Claude tường thuật lý do của chính nó khi làm
+  việc, một đòn bẩy khác với correctness nhưng ảnh hưởng độ dễ review của một thay đổi.
 
-Có example:
-"Dùng pattern này:
-try {
-  await operation();
-} catch (error) {
-  logger.error('Operation failed', { error, context });
-  throw new AppError('OPERATION_FAILED', error);
-}"
-→ Claude follow chính xác
-```
+Không gì trong số này thay việc bạn đọc diff. Nó thay việc bạn phải nhớ yêu cầu một lượt lint và
+một ý kiến thứ hai trên mỗi thay đổi.
 
-### Think Mode cho Quality
+Cái không hiệu quả: bảo Claude reason qua từng bước trong prompt. Extended thinking đã bật mặc
+định trên model hiện tại (Module 6.1) — câu đó không thêm ngân sách reasoning; nó là thói quen sót
+lại từ model cần được nhắc.
 
-Complex task cần reasoning. Yêu cầu Claude "think step by step" về architecture. Trade speed cho better decision. Dùng cho: design, debugging, refactoring.
-
-### Explicit Constraint
-
-```text
-DO:
-- Dùng TypeScript strict mode
-- Thêm JSDoc cho public function
-- Handle null/undefined explicitly
-
-DON'T:
-- Dùng any type
-- Ignore error case
-- Dùng deprecated API
-```
+Qua khỏi "trông có vẻ ổn," một mini-eval hơn hẳn cảm tính: chạy cùng 20-50 task thật qua một thay
+đổi, đọc transcript, xem cái gì thực sự hỏng (S11) — nó bắt được regression mà một lượt review tay
+bỏ lỡ.
 
 ---
 
 ## 3. DEMO — Từng bước cụ thể
 
-**Scenario**: Implement user service với CRUD operation.
+**Bước 1: Gate lint deterministic — `PostToolUse`**
 
-### Không có Quality Setup
-
-```text
-Bạn: Tạo user service với CRUD operation.
-
-Claude: [Generate code]
-```
-
-```javascript
-// user-service.js
-const users = [];
-
-function createUser(data) {
-  const user = { id: Date.now(), ...data };
-  users.push(user);
-  return user;
-}
-
-function getUser(id) {
-  return users.find(u => u.id === id);
-}
-```
-
-**Vấn đề**: Không TypeScript, không error handling, in-memory storage, không validation, không match team standard.
-
-### Có Quality Setup
-
-**CLAUDE.md bao gồm**:
-- TypeScript strict mode
-- Repository pattern
-- Error handling với custom AppError
-- Zod cho validation
-- Example code từ existing service
-
-```text
-Bạn: Tạo user service theo repository pattern với proper
-validation và error handling.
-
-Think through design trước:
-- Validation rule cần gì?
-- Error nào có thể xảy ra?
-- Fit với existing service thế nào?
-
-Claude: [Think through design, rồi generate]
-```
-
-```typescript
-// src/services/UserService.ts
-import { UserRepository } from '../repositories/UserRepository';
-import { CreateUserSchema } from '../schemas/user';
-import { AppError } from '../errors/AppError';
-import { logger } from '../utils/logger';
-
-export class UserService {
-  constructor(private readonly repository: UserRepository) {}
-
-  async create(data: unknown): Promise<User> {
-    const validated = CreateUserSchema.parse(data);
-
-    const existing = await this.repository.findByEmail(validated.email);
-    if (existing) {
-      throw new AppError('DUPLICATE_EMAIL', 'Email đã đăng ký');
-    }
-
-    try {
-      const user = await this.repository.create(validated);
-      logger.info('User created', { userId: user.id });
-      return user;
-    } catch (error) {
-      logger.error('Failed to create user', { error });
-      throw new AppError('CREATE_FAILED', 'Không thể tạo user', error);
-    }
+```json
+// docs: en/hooks — .claude/settings.json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "jq -r '.tool_input.file_path' | xargs npx eslint --fix" }
+        ]
+      }
+    ]
   }
 }
 ```
 
-### So sánh Quality
+Test trực tiếp bằng input của chính hook, đúng cách docs khuyên test hook trước khi tin nó
+(`hooks-guide`):
 
-| Không Setup | Có Quality Setup |
-|-------------|------------------|
-| JavaScript | TypeScript strict |
-| Không validation | Zod schema |
-| Không error handling | Custom error + logging |
-| Không fit project | Match existing pattern |
-| Cần rewrite | Production-ready |
+```bash
+echo "{\"tool_input\":{\"file_path\":\"$(pwd)/src/messy.js\"}}" \
+  | jq -r '.tool_input.file_path' | xargs npx eslint --fix
+```
+
+```text
+# Output may vary
+/Users/you/cc-lab/src/messy.js
+  2:9  error  'unused' is assigned a value but never used  no-unused-vars
+
+✖ 1 problem (1 error, 0 warnings)
+```
+
+Dấu chấm phẩy thiếu được fix âm thầm; `no-unused-vars` không auto-fixable nên vẫn hiện —
+`PostToolUse` không thể block (edit đã xảy ra rồi), nhưng stderr của nó nằm cạnh tool result nên
+Claude thấy vấn đề thật ngay lập tức, không phải lúc review.
+
+**Bước 2: Gate Claude không thể bỏ qua — `Stop`**
+
+```json
+// docs: en/hooks
+{
+  "hooks": {
+    "Stop": [
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "npm test" }] }
+    ]
+  }
+}
+```
+
+```bash
+npm test
+```
+
+```text
+# Output may vary
+> cc-lab@1.0.0 test
+> node --test
+# tests 1
+# pass 1
+# fail 0
+```
+
+Hook `Stop` thất bại thì exit-2, Claude tiếp tục làm việc thay vì kết thúc turn — tối đa 8 lần
+block liên tiếp trước khi Claude Code override, nên một test suite hỏng thật không lặp vô tận.
+
+**Bước 3: Reviewer subagent context sạch**
+
+```markdown
+---
+# docs: en/sub-agents — .claude/agents/reviewer.md
+name: reviewer
+description: Reviews a diff for correctness, style, and missed edge cases. Fresh context — never the session that wrote the code.
+tools: Read, Grep, Glob
+model: sonnet
+---
+You are a code reviewer. Read the diff you are given, check it against the
+surrounding code, and report concrete, actionable issues. Do not praise; list
+problems or state there are none.
+```
+
+Gọi đích danh nó — không phải một helper chung chung — để nó chạy review:
+
+```text
+Use the reviewer subagent on the diff of src/messy.js against HEAD
+```
+
+{/* AUTHOR-CAPTURE: chạy
+  claude -p "Use the reviewer subagent on the diff of src/messy.js against HEAD
+  (git diff HEAD -- src/messy.js)." --allowedTools "Read,Grep,Glob,Bash(git diff*)"
+  trong một checkout ~/cc-lab sạch, không cài plugin bên thứ ba nào. Trong môi trường của tác
+  giả, một hook SubagentStop từ plugin đã cài thay thế message cuối của reviewer bằng "Task
+  complete" chung chung, nên transcript chụp được không đại diện cho hành vi mặc định — chạy
+  lại trên bản cài trơn để có transcript reviewer thật. */}
+
+Subagent nhận diff và câu lệnh gọi nó, cộng `CLAUDE.md` và git status — không phải lịch sử
+conversation của bạn. Nó flag gì thì flag mà không có lợi ích gì từ việc đã viết ra code đó.
+
+**Bước 4: Kiểm tra output style**
+
+```text
+/output-style
+```
+
+```text
+# Output may vary
+  Output style: default
+
+     Available styles:
+     - default (current)
+     - Proactive: Claude executes immediately, minimizes interruptions, and prefers action over
+       planning
+     - Concise: Claude responds tersely, leading with results and skipping preamble and narration
+     - Explanatory: Claude explains its implementation choices and codebase patterns
+     - Learning: Claude pauses and asks you to write small pieces of code for hands-on practice
+```
+
+`Explanatory` đáng dùng thêm chữ trong tuần nặng review — Claude tường thuật *vì sao*, đúng thứ
+reviewer cần mà chế độ "code only" bỏ qua.
 
 ---
 
 ## 4. PRACTICE — Luyện tập
 
-### Bài 1: Quality CLAUDE.md
+### Bài 1: Nối gate hai-hook
 
-**Mục tiêu**: Enhance CLAUDE.md cho quality.
+**Mục tiêu**: Một lượt fix lint và chạy test xảy ra mà không cần bạn yêu cầu.
 
 **Hướng dẫn**:
-1. Audit CLAUDE.md hiện tại cho quality guidance
-2. Thêm: coding standard, error handling pattern, example code
-3. Test: Generate cùng feature trước/sau
-4. So sánh quality difference
+1. Thêm hook `PostToolUse` và `Stop` ở Bước 1–2 vào `.claude/settings.local.json`.
+2. Yêu cầu Claude sửa gì đó làm hỏng một test.
+3. Xác nhận turn không kết thúc gọn cho tới khi test pass.
 
 <details>
 <summary>💡 Gợi ý</summary>
 
-Include ít nhất một code example cho pattern quan trọng nhất (ví dụ: error handling, API endpoint structure).
+Check `stop_hook_active` nếu bạn viết nhiều hơn một `Stop` hook — Claude Code override một hook
+block 8 lần liên tiếp không tiến triển.
 
 </details>
 
 <details>
 <summary>✅ Giải pháp</summary>
 
-Thêm vào CLAUDE.md:
-````markdown
-## Code Quality Standard
-- TypeScript strict mode
-- Không dùng `any` type
-- Mọi error phải handle với AppError
-- Public function cần JSDoc
-
-## Error Handling Example
-```typescript
-try {
-  const result = await operation();
-  return result;
-} catch (error) {
-  logger.error('Operation failed', { error });
-  throw new AppError('OPERATION_FAILED', error);
-}
-```
-````
+Test hỏng giữ hook `Stop` exit 2 và turn mở; Claude thấy fail và fix trước khi bạn phải hỏi —
+hoặc cap 8-lần-block kích hoạt và trả quyền lại cho bạn.
 
 </details>
 
-### Bài 2: Example-Driven Quality
+### Bài 2: Viết reviewer của riêng bạn
 
-**Mục tiêu**: Dùng example để enforce pattern.
+**Mục tiêu**: Một subagent review đúng lỗi hay lặp lại nhất của project bạn.
 
 **Hướng dẫn**:
-1. Pick một pattern bạn muốn Claude follow
-2. Viết một example rõ ràng
-3. Thêm vào CLAUDE.md
-4. Test xem Claude có replicate pattern không
+1. Chọn một comment review lặp lại từ vài PR gần nhất.
+2. Viết `.claude/agents/reviewer.md` bảo nó check đúng thứ đó.
+3. Chạy trên một diff thật và xem nó có bắt được cái human reviewer bắt được không.
 
 <details>
 <summary>💡 Gợi ý</summary>
 
-Example hiệu quả nhất khi là real code từ project, không phải generic sample.
+`tools: Read, Grep, Glob` là đủ cho reviewer — nó không bao giờ cần sửa gì cả.
 
 </details>
 
 <details>
 <summary>✅ Giải pháp</summary>
 
-Pick pattern lặp nhiều nhất. Extract clean example. Reference: "Follow pattern trong Error Handling Example section."
-
-Claude sẽ match style, naming, và structure của example.
+Brief của reviewer càng hẹp càng hữu ích. "Review mọi thứ" ra output mơ hồ; "check mọi
+database call mới thiếu index" ra một finding thật hoặc một tờ giấy sạch.
 
 </details>
 
-### Bài 3: Think Mode cho Design
+### Bài 3: Xây mini-eval 20 task
 
-**Mục tiêu**: So sánh direct implementation vs think-first.
+**Mục tiêu**: Vượt qua "trông ổn với tôi" cho một loại task hay lặp lại.
 
 **Hướng dẫn**:
-1. Pick complex feature
-2. Đầu tiên: yêu cầu Claude implement trực tiếp
-3. Sau đó: yêu cầu Claude think through design, rồi implement
-4. So sánh architectural quality
+1. Gom 20 ví dụ thật của một task bạn hay giao cho Claude (ví dụ: "thêm endpoint").
+2. Chạy mỗi cái qua cùng một prompt template.
+3. Đọc mọi transcript, không chỉ diff. Ghi lại pattern trong cái hỏng.
 
 <details>
 <summary>💡 Gợi ý</summary>
 
-Hỏi: "Think step by step về cái gì có thể sai, edge case nào tồn tại, và fit architecture thế nào."
+20-50 task thật là khoảng S11 dùng — ít hơn thì một outlier làm lệch kết quả.
 
 </details>
 
 <details>
 <summary>✅ Giải pháp</summary>
 
-Think-first thường produce:
-- Better error handling (consider edge case)
-- Cleaner architecture (consider fit với existing code)
-- More complete implementation (consider full requirement)
-
-Dùng cho feature touch nhiều phần của system.
+Hầu hết team thấy một hoặc hai failure mode lặp lại, không phải hai mươi cái khác nhau. Sửa
+prompt hoặc thêm hook cho những cái đó, rồi chạy lại cùng 20 task để xác nhận đã sửa.
 
 </details>
 
@@ -276,73 +277,43 @@ Dùng cho feature touch nhiều phần của system.
 
 ## 5. CHEAT SHEET
 
-### Quality Lever
-
-| Lever | Effect |
-|-------|--------|
-| CLAUDE.md | Standard và pattern |
-| Examples | Show cái bạn muốn |
-| Think Mode | Better reasoning |
-| Constraints | DO/DON'T list |
-| Review Loop | Iterate để improve |
-
-### Quality Prompt
-
-```text
-"Follow existing pattern trong [file]"
-"Think through design trước khi implement"
-"Dùng error handling giống [example]"
-"Đừng dùng [pattern], dùng [better pattern]"
-```
-
-### CLAUDE.md Quality Template
-
-```markdown
-## Code Quality Standard
-- TypeScript strict mode
-- Không dùng `any` type
-- Mọi error phải handle
-
-## Example Pattern
-[Include actual code example từ project]
-```
+| Đòn bẩy | Đảm bảo gì |
+|---|---|
+| Hook `PostToolUse` (lint `--fix`) | Chạy sau mỗi lần sửa, mỗi lần — prompt text advisory thì không |
+| Hook `Stop` (`npm test`) | Chặn turn kết thúc tới khi pass (cap: 8 lần block liên tiếp) |
+| `.claude/agents/reviewer.md` | Review context sạch — không thiên vị code vừa viết |
+| `.claude/rules/` | Coding standard Claude đọc như file project (Module 4.2) |
+| `/output-style Explanatory` | Claude tường thuật *vì sao*, hữu ích tuần nặng review |
+| Mini-eval 20-50 task (S11) | Thay "trông đúng" bằng "đã verify trên case thật" |
 
 ---
 
 ## 6. PITFALLS — Sai lầm thường gặp
 
 | ❌ Sai | ✅ Đúng |
-|--------|---------|
-| Không có quality guidance trong CLAUDE.md | Define standard explicit |
-| Tell mà không show | Include code example |
-| Accept output đầu tiên | Review và iterate |
-| Yêu cầu quality vague | Specific: "dùng Zod validation" |
-| Ignore existing pattern | "Follow pattern trong [file]" |
-| Không bao giờ dùng think mode | Think mode cho complex decision |
-| Luôn ưu tiên speed hơn quality | Biết khi nào quality matter nhất |
+|---|---|
+| Bảo Claude reason qua từng bước để tăng quality | Extended thinking đã bật mặc định (Module 6.1); câu đó không làm gì trên model hiện tại |
+| Để cùng session tự review diff của chính nó | Spawn reviewer subagent context sạch (S3, S12) |
+| Coding standard chỉ trong prompt hoặc CLAUDE.md | Advisory, không enforced — backing bằng hook `PostToolUse` cho gì không thể thương lượng |
+| Chấp nhận output đầu tiên, không check nào cả | Cho Claude một test hoặc lượt lint nó tự chạy được (S1) |
+| Liếc qua diff một lần là cả quy trình quality | Mini-eval 20-50 task bắt được pattern một lượt review đơn lẻ bỏ lỡ (S11) |
 
 ---
 
 ## 7. REAL CASE — Câu chuyện thực tế
 
-**Scenario**: Fintech Việt Nam thấy Claude-generated code có consistent issue: missing error handling, inconsistent naming, không logging. Code review catch nhưng waste time.
+**Scenario**: Một team ở Hà Nội review mọi pull request do Claude viết giống hệt cách review PR
+của người — một lượt tay đầy đủ, mỗi lần, vì không có gì chạy tự động ở giữa.
 
-**Quality Improvement Initiative**:
+**Vấn đề**: Cùng ba vấn đề cứ đến được review: một case null chưa handle, một call log lỗi không
+nhất quán, thiếu test cho nhánh mới. Không cái nào cần con người bắt.
 
-| Tuần | Focus | Action |
-|------|-------|--------|
-| 1 | Audit | Review 20 PR: error (80%), naming (60%), logging (70%) |
-| 2 | CLAUDE.md | Thêm pattern với example cho mỗi issue |
-| 3 | Examples | Tạo /examples folder, one per pattern |
-| 4 | Policy | Think mode required cho complex feature |
+**Giải pháp**: Một hook `PostToolUse` lint cho convention logging, một hook `Stop` fail turn nếu
+`npm test` không pass trên file mới, và một `.claude/agents/reviewer.md` chỉ tập trung
+null-safety và test coverage, chạy trên mọi diff trước khi tới tay người.
 
-**Kết quả (4 tuần sau)**:
-- Error handling issue: 80% → 10%
-- Naming consistency: 60% → 5%
-- Code review rejection: 40% → 8%
-- Time to production: -30% (less rework)
-
-**Quote**: "Dừng blame Claude cho bad code. Bắt đầu teach Claude standard. Quality không phải magic — là setup."
+**Kết quả**: Reviewer ngừng tìm lại cùng ba vấn đề và bắt đầu review thiết kế với naming — những
+thứ một hook và một subagent hẹp không phán đoán được thay họ.
 
 ---
 
